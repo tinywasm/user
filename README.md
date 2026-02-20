@@ -1,3 +1,67 @@
-# user
+# tinywasm/user
 
-user management library
+User management library for the tinywasm ecosystem. Handles user entities,
+password authentication, OAuth providers (Google, Microsoft), LAN (local network)
+authentication by RUT + IP, and session management.
+Applications import `tinywasm/user` directly to configure session behaviour and register
+**isomorphic UI modules** into `tinywasm/site`.
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — What & Why: schema, contracts, design principles
+- [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — How: file layout, reference code, test strategy
+
+## Diagrams
+
+- [docs/diagrams/AUTH_FLOW.md](docs/diagrams/AUTH_FLOW.md) — Local login credential validation
+- [docs/diagrams/SESSION_FLOW.md](docs/diagrams/SESSION_FLOW.md) — Session lifecycle
+- [docs/diagrams/USER_CRUD_FLOW.md](docs/diagrams/USER_CRUD_FLOW.md) — User creation pipeline
+- [docs/diagrams/OAUTH_FLOW.md](docs/diagrams/OAUTH_FLOW.md) — OAuth begin/callback flow (all branches)
+- [docs/diagrams/LAN_AUTH_FLOW.md](docs/diagrams/LAN_AUTH_FLOW.md) — LAN login: RUT validation + IP allowlist check
+- [docs/diagrams/LAN_IP_FLOW.md](docs/diagrams/LAN_IP_FLOW.md) — LAN IP management: RegisterLAN, AssignLANIP, RevokeLANIP, GetLANIPs, UnregisterLAN
+
+## Integration
+
+```go
+// main.go — application setup
+
+// 1. Configure site (DB shared with user via applyUser internally)
+site.SetDB(db)
+site.SetUserID(extractUserID)    // reads session cookie, calls user.GetSession
+site.CreateRole('a', "Admin", "full access")
+
+// 2. Configure user via Config struct (all optional, zero values = defaults)
+site.SetUserConfig(user.Config{
+    SessionCookieName: "s",           // default: "session"
+    SessionTTL:        86400,         // default: 86400 (24h)
+    TrustProxy:        true,          // default: false
+    OAuthProviders: []user.OAuthProvider{
+        &user.GoogleProvider{
+            ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+            ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+            RedirectURL:  "https://example.com/oauth/callback",
+        },
+    },
+})
+
+// 3. Register user modules alongside app modules
+site.RegisterHandlers(
+    user.LoginModule,     // /login    — handles auth end-to-end (validate → login → session → cookie)
+    user.RegisterModule,  // /register
+    user.ProfileModule,   // /profile
+    user.LANModule,       // /lan
+    user.OAuthCallback,   // /oauth/callback
+    &myapp.Dashboard{},
+)
+
+site.Serve(":8080")
+// site.Serve internally calls:  applyUser() → user.Init(dbExecutor, cfg)
+//                                applyRBAC() → rbac.Init(dbExecutor)
+
+// After user registration/OAuth, assign default role:
+// site.AssignRole(u.ID, 'v')  // rbac — completely independent of user lib
+```
+
+## Status
+
+> Implementation pending. Documentation complete.
