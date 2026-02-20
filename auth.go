@@ -6,6 +6,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var PasswordHashCost = bcrypt.DefaultCost
+
 func Login(email, password string) (User, error) {
 	u, err := GetUserByEmail(email)
 	if err != nil {
@@ -34,7 +36,7 @@ func SetPassword(userID, password string) error {
 	if len(password) < 8 {
 		return ErrWeakPassword
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), PasswordHashCost)
 	if err != nil {
 		return err
 	}

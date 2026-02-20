@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/tinywasm/user"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 )
 
@@ -46,6 +46,7 @@ func newTestDB(t *testing.T) *TestExecutor {
 }
 
 func RunUserTests(t *testing.T) {
+	user.PasswordHashCost = bcrypt.MinCost
 	t.Run("TestInit", testInit)
 	t.Run("TestCRUD", testCRUD)
 	t.Run("TestAuth", testAuth)
@@ -149,7 +150,7 @@ func testAuth(t *testing.T) {
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	user.Init(db, user.Config{SessionTTL: 1})
+	user.Init(db, user.Config{SessionTTL: 3600})
 
 	u, err := user.CreateUser("sess@example.com", "Sess User", "")
 	if err != nil {
@@ -161,6 +162,7 @@ func testSessions(t *testing.T) {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
+	// Get Session
 	s2, err := user.GetSession(sess.ID)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
@@ -169,7 +171,14 @@ func testSessions(t *testing.T) {
 		t.Errorf("Session user ID mismatch")
 	}
 
-	time.Sleep(2 * time.Second)
+	// Instant expire via SQL
+	if err := db.Exec("UPDATE user_sessions SET expires_at = 0 WHERE id = ?", sess.ID); err != nil {
+		t.Fatalf("failed to expire session in DB: %v", err)
+	}
+
+	// Re-init to flush memory cache
+	user.Init(db, user.Config{SessionTTL: 3600})
+
 	_, err = user.GetSession(sess.ID)
 	if err != user.ErrSessionExpired {
 		t.Errorf("expected ErrSessionExpired, got %v", err)
