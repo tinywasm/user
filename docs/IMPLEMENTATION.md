@@ -29,21 +29,22 @@
 
 ### Backend (build: `!wasm` or untagged)
 
-| File | Responsibility | Key functions / exports |
-|------|---------------|------------------------|
-| `user.go` | Types, store singleton, `Init`, config | `Init(exec, cfg)`, `Config`, types `User`, `Session`, `Identity`, `Store` |
-| `sql.go` | DB interfaces | `Executor`, `Scanner`, `Rows` |
-| `migrate.go` | Schema creation | `runMigrations(exec)` — M001: 4 tables (no `password_hash`), M002: email nullable + `user_lan_ips` |
-| `cache.go` | In-memory session cache | `sessionCache` (RWMutex map) |
-| `crud.go` | User CRUD | `CreateUser`, `GetUser`, `GetUserByEmail`, `UpdateUser`, `SuspendUser`, `ReactivateUser` |
-| `auth.go` | Local credential validation (identity-based) | `Login(email, password)`, `SetPassword`, `VerifyPassword` |
-| `sessions.go` | Session lifecycle | `CreateSession`, `GetSession`, `DeleteSession`, `PurgeExpiredSessions` |
-| `identities.go` | Identity management | `CreateIdentity`, `GetIdentityByProvider`, `GetUserIdentities`, `UnlinkIdentity` |
-| `oauth.go` | OAuth flow + state management | `BeginOAuth`, `CompleteOAuth`, `consumeState`, `PurgeExpiredOAuthStates` |
-| `google.go` | Google OAuth adapter | `GoogleProvider` (implements `OAuthProvider`) |
-| `microsoft.go` | Microsoft OAuth adapter | `MicrosoftProvider` (implements `OAuthProvider`) |
-| `lan.go` | LAN auth: RUT validation, IP extraction, `LoginLAN` | `LoginLAN`, `validateRUT`, `extractClientIP` |
-| `lan_ips.go` | LAN identity & IP allowlist management | `RegisterLAN`, `UnregisterLAN` (explicit IP deletion + identity removal), `AssignLANIP`, `RevokeLANIP`, `GetLANIPs`, `LANIP` type |
+| File | Build tag | Responsibility | Key functions / exports |
+|------|-----------|----------------|-------------------------|
+| `user.go` | — (shared) | Types, errors, configuration | `User`, `Session`, `Identity`, `Config`, `SessionCookieName()` |
+| `user_back.go` | `!wasm` | Backend state & singleton | `Init(exec, cfg)`, `Store` |
+| `sql.go` | `!wasm` | DB interfaces | `Executor`, `Scanner`, `Rows` |
+| `migrate.go` | `!wasm` | Schema creation | `runMigrations(exec)` |
+| `cache.go` | `!wasm` | In-memory session cache | `sessionCache` |
+| `crud.go` | `!wasm` | User CRUD | `CreateUser`, `GetUser`, `UpdateUser`, etc. |
+| `auth.go` | `!wasm` | Credential validation | `Login`, `SetPassword`, `VerifyPassword` |
+| `sessions.go` | `!wasm` | Session lifecycle | `CreateSession`, `GetSession`, `DeleteSession` |
+| `identities.go` | `!wasm` | Identity management | `CreateIdentity`, `UnlinkIdentity` |
+| `oauth.go` | `!wasm` | OAuth management | `BeginOAuth`, `CompleteOAuth`, `consumeState` |
+| `google.go` | `!wasm` | Google adapter | `GoogleProvider` |
+| `microsoft.go` | `!wasm` | Microsoft adapter | `MicrosoftProvider` |
+| `lan.go` | `!wasm` | LAN auth logic | `LoginLAN`, `validateRUT` |
+| `lan_ips.go` | `!wasm` | LAN IP management | `RegisterLAN`, `AssignLANIP`, `RevokeLANIP` |
 
 ### Isomorphic module system (shared + build-tagged)
 
@@ -63,7 +64,8 @@
 | `module_lan.go` | — (shared) | `lanModule` struct, `HandlerName()`, `ModuleTitle()` |
 | `module_lan_back.go` | `!wasm` | `RenderHTML()` (SSR, IP list table), HTTP POST/DELETE handlers |
 | `module_lan_front.go` | `wasm` | `OnMount()` — add/remove IP rows |
-| `module_oauth.go` | `!wasm` | `oauthModule` — `HandlerName()`, `RenderHTML()`, HTTP GET callback handler |
+| `module_oauth.go` | — (shared) | `oauthModule` struct, `HandlerName()`, `ModuleTitle()` |
+| `module_oauth_back.go` | `!wasm` | `RenderHTML()`, HTTP GET callback handler |
 
 ---
 
@@ -200,43 +202,23 @@ if isNewUser {
 
 ---
 
-## Test Strategy (DDT)
+## Testing Strategy
 
-Test files follow the build-tag split pattern:
+The test suite follows the **WASM/Stlib Dual Testing Pattern** to ensure isomorphic compatibility.
 
-| File | Tag | Purpose |
-|------|-----|---------|
-| `setup_test.go` | — | Shared: in-memory DB adapter, `RunUserTests(t)` |
-| `user_back_test.go` | `!wasm` | Runs `RunUserTests(t)` + module SSR tests |
-| `user_front_test.go` | `wasm` | Runs `RunUserTests(t)` + module OnMount tests |
+### File Structure
 
-### MODULE coverage
+| File | Build tag | Purpose |
+|------|-----------|---------|
+| `tests/setup_test.go` | — (shared) | Shared: module checks, `RunSharedTests(t)` |
+| `tests/suite_back_test.go` | `!wasm` | Backend-only: DB helpers, CRUD/Auth logic, `RunUserTests(t)` |
+| `tests/user_back_test.go` | `!wasm` | Backend entry point: calls shared + backend suites |
+| `tests/user_front_test.go` | `wasm` | Frontend entry point: calls shared suite |
 
-[Implemented in tests/setup_test.go](../tests/setup_test.go), [tests/user_back_test.go](../tests/user_back_test.go) and [tests/user_front_test.go](../tests/user_front_test.go)
+### Coverage References
 
-### AUTH_FLOW coverage
-
-[Implemented in tests/setup_test.go](../tests/setup_test.go)
-
-### SESSION_FLOW coverage
-
-[Implemented in tests/setup_test.go](../tests/setup_test.go)
-
-### USER_CRUD_FLOW coverage
-
-[Implemented in tests/setup_test.go](../tests/setup_test.go)
-
-### OAUTH_FLOW coverage
-
-[Implemented in tests/setup_test.go](../tests/setup_test.go)
-
-### LAN_AUTH_FLOW coverage
-
-[Implemented in tests/setup_test.go](../tests/setup_test.go)
-
-### LAN_IP_FLOW coverage
-
-[Implemented in tests/setup_test.go](../tests/setup_test.go)
+- **MODULE**: `tests/setup_test.go`
+- **AUTH_FLOW**, **SESSION_FLOW**, **CRUD_FLOW**, **OAUTH_FLOW**, **LAN_FLOW**: `tests/suite_back_test.go`
 
 ---
 

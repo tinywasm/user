@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
+	_ "modernc.org/sqlite"
 )
 
 func TestUserBackend(t *testing.T) {
+	RunSharedTests(t)
 	RunUserTests(t)
 	t.Run("TestModulesSSR", testModulesSSR)
 }

@@ -1,3 +1,5 @@
+//go:build !wasm
+
 package user
 
 func runMigrations(exec Executor) error {

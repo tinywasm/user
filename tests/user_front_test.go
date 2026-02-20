@@ -7,7 +7,7 @@ import (
 )
 
 func TestUserFrontend(t *testing.T) {
-	RunUserTests(t)
+	RunSharedTests(t)
 	t.Run("TestModulesOnMount", testModulesOnMount)
 }
 
