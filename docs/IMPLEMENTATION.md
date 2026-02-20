@@ -71,310 +71,35 @@
 
 ### `user.go` — Store, Config, and Init
 
-```go
-package user
-
-import "sync"
-
-type Config struct {
-    SessionCookieName string          // default: "session"
-    SessionTTL        int             // default: 86400 (24h)
-    TrustProxy        bool            // default: false
-    OAuthProviders    []OAuthProvider
-}
-
-type Store struct {
-    exec   Executor
-    cache  *sessionCache
-    config Config
-    mu     sync.RWMutex
-}
-
-var store *Store
-
-func Init(exec Executor, cfg Config) error {
-    if cfg.SessionCookieName == "" { cfg.SessionCookieName = "session" }
-    if cfg.SessionTTL == 0 { cfg.SessionTTL = 86400 }
-    if err := runMigrations(exec); err != nil {
-        return err
-    }
-    store = &Store{
-        exec:   exec,
-        cache:  newSessionCache(),
-        config: cfg,
-    }
-    for _, p := range cfg.OAuthProviders {
-        registerProvider(p)
-    }
-    return store.cache.warmUp(exec)
-}
-
-func SessionCookieName() string { return store.config.SessionCookieName }
-```
+[Implemented in user.go](../user.go)
 
 ### `auth.go` — Login (identity-based)
 
-```go
-// Login validates email+password via the user_identities table (provider='local').
-// Returns ErrInvalidCredentials for: user not found, no local identity, wrong password.
-// Returns ErrSuspended if user is suspended.
-func Login(email, password string) (User, error) {
-    u, err := GetUserByEmail(email)
-    if err != nil {
-        return User{}, ErrInvalidCredentials
-    }
-    if u.Status == "suspended" {
-        return User{}, ErrSuspended
-    }
-    // Must have a local identity to authenticate via password
-    identity, err := getLocalIdentity(u.ID)
-    if err != nil {
-        return User{}, ErrInvalidCredentials  // no local identity — OAuth/LAN-only user
-    }
-    if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderID), []byte(password)); err != nil {
-        return User{}, ErrInvalidCredentials
-    }
-    return u, nil
-}
-
-// getLocalIdentity returns the 'local' identity for a user.
-// provider_id stores the bcrypt hash of the password.
-func getLocalIdentity(userID string) (Identity, error) {
-    return getIdentityByUserAndProvider(userID, "local")
-}
-
-// SetPassword creates or updates the 'local' identity with a bcrypt hash.
-// Returns ErrWeakPassword if password is less than 8 characters.
-func SetPassword(userID, password string) error {
-    if len(password) < 8 {
-        return ErrWeakPassword
-    }
-    hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-    if err != nil { return err }
-    // Upsert: if local identity exists, update provider_id; otherwise insert.
-    return upsertIdentity(userID, "local", string(hash), "")
-}
-
-// VerifyPassword checks the current password without changing it.
-func VerifyPassword(userID, password string) error {
-    identity, err := getLocalIdentity(userID)
-    if err != nil { return ErrInvalidCredentials }
-    if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderID), []byte(password)); err != nil {
-        return ErrInvalidCredentials
-    }
-    return nil
-}
-```
-
-Note: `Login` deliberately returns `ErrInvalidCredentials` for "user not found",
-"no local identity", and "wrong password" — prevents email enumeration attacks.
-OAuth-only and LAN-only users have no local identity, so `Login(email, "")` correctly
-fails with `ErrInvalidCredentials`.
+[Implemented in auth.go](../auth.go)
 
 ### `sessions.go` — CreateSession
 
-```go
-const defaultTTL = 24 * 60 * 60  // 24 hours in seconds
-
-func CreateSession(userID, ip, userAgent string) (Session, error) {
-    u, err := unixid.NewUnixID()
-    if err != nil { return Session{}, err }
-
-    now := time.Now().Unix()
-    sess := Session{
-        ID:        u.GetNewID(),
-        UserID:    userID,
-        ExpiresAt: now + defaultTTL,
-    }
-    if err := store.exec.Exec(
-        `INSERT INTO user_sessions (id, user_id, expires_at, ip, user_agent, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        sess.ID, sess.UserID, sess.ExpiresAt, ip, userAgent, now,
-    ); err != nil {
-        return Session{}, err
-    }
-    store.cache.set(sess.ID, sess)
-    return sess, nil
-}
-```
+[Implemented in sessions.go](../sessions.go)
 
 ### `crud.go` — CreateUser
 
-```go
-// nullableStr converts "" to nil so SQLite stores NULL instead of an empty string.
-// Required because users.email is now nullable (M002).
-func nullableStr(s string) any {
-    if s == "" { return nil }
-    return s
-}
-
-// CreateUser creates a user without any credentials.
-// To enable local login, call SetPassword(userID, password) separately.
-func CreateUser(email, name, phone string) (User, error) {
-    u, err := unixid.NewUnixID()
-    if err != nil { return User{}, err }
-
-    id := u.GetNewID()
-    now := time.Now().Unix()
-
-    if err := store.exec.Exec(
-        `INSERT INTO users (id, email, name, phone, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        id, nullableStr(email), name, phone, now,
-    ); err != nil {
-        if isUniqueViolation(err) {
-            return User{}, ErrEmailTaken
-        }
-        return User{}, err
-    }
-    return User{ID: id, Email: email, Name: name, Phone: phone, Status: "active", CreatedAt: now}, nil
-}
-```
+[Implemented in crud.go](../crud.go)
 
 ### `oauth.go` — CompleteOAuth reference logic
 
-```go
-func CompleteOAuth(providerName string, r *http.Request, ip, ua string) (User, bool, error) {
-    // 1. Validate CSRF state (single-use, 10 min TTL)
-    state := r.URL.Query().Get("state")
-    if err := consumeState(state, providerName); err != nil {
-        return User{}, false, ErrInvalidOAuthState
-    }
-    // 2. Exchange authorization code for token
-    p := getProvider(providerName)
-    token, err := p.ExchangeCode(r.Context(), r.URL.Query().Get("code"))
-    if err != nil { return User{}, false, err }
-    // 3. Get user info from provider
-    info, err := p.GetUserInfo(r.Context(), token)
-    if err != nil { return User{}, false, err }
-    // 4. Returning user? (known provider + provider_id)
-    identity, err := GetIdentityByProvider(providerName, info.ID)
-    if err == nil {
-        u, err := GetUser(identity.UserID)
-        return u, false, err
-    }
-    // 5. Local account with same email? Auto-link.
-    u, err := GetUserByEmail(info.Email)
-    if err == nil {
-        _ = CreateIdentity(u.ID, providerName, info.ID, info.Email)
-        return u, false, nil
-    }
-    // 6. New user — auto-register (no password, no local identity)
-    u, err = CreateUser(info.Email, info.Name, "")
-    if err != nil { return User{}, false, err }
-    _ = CreateIdentity(u.ID, providerName, info.ID, info.Email)
-    return u, true /* isNewUser */, nil
-}
-```
+[Implemented in oauth.go](../oauth.go)
 
 ### Error sentinels
 
-```go
-var (
-    ErrInvalidCredentials = fmt.Err("access", "denied")              // EN: Access Denied                    / ES: Acceso Denegado
-    ErrSuspended          = fmt.Err("user", "suspended")             // EN: User Suspended                   / ES: Usuario Suspendido
-    ErrEmailTaken         = fmt.Err("email", "registered")           // EN: Email Registered                 / ES: Correo electrónico Registrado
-    ErrWeakPassword       = fmt.Err("password", "weak")              // EN: Password Weak                    / ES: Contraseña Débil
-    ErrSessionExpired     = fmt.Err("token", "expired")              // EN: Token Expired                    / ES: Token Expirado
-    ErrNotFound           = fmt.Err("user", "not", "found")          // EN: User Not Found                   / ES: Usuario No Encontrado
-    ErrProviderNotFound   = fmt.Err("provider", "not", "found")      // EN: Provider Not Found               / ES: Proveedor No Encontrado
-    ErrInvalidOAuthState  = fmt.Err("state", "invalid")              // EN: State Invalid                    / ES: Estado Inválido
-    ErrCannotUnlink       = fmt.Err("identity", "cannot", "unlink")  // EN: Identity Cannot Unlink           / ES: Identidad No puede Desvincular
-    ErrInvalidRUT         = fmt.Err("rut", "invalid")                // EN: Rut Invalid                      / ES: Rut Inválido
-    ErrRUTTaken           = fmt.Err("rut", "registered")             // EN: Rut Registered                   / ES: Rut Registrado
-    ErrIPTaken            = fmt.Err("ip", "registered")              // EN: Ip Registered                    / ES: Ip Registrado
-    // Note: unauthorized IP on LoginLAN → ErrInvalidCredentials (intentional, no info leak)
-)
-```
+[Implemented in user.go](../user.go)
 
 ### `lan.go` — LAN authentication
 
-```go
-// extractClientIP extracts the client IP, stripping the port.
-// Uses store.config.TrustProxy to decide whether to trust proxy headers.
-// trustProxy=false: uses r.RemoteAddr only.
-// trustProxy=true:  checks X-Forwarded-For (first IP), then X-Real-IP, fallback RemoteAddr.
-// WARNING: only enable TrustProxy if the server is behind a trusted reverse proxy.
-// Without a trusted proxy, a client can spoof X-Forwarded-For to bypass IP checks.
-
-// LoginLAN authenticates a LAN user by RUT + source IP.
-// Returns ErrInvalidRUT if RUT format or check digit is invalid.
-// Returns ErrInvalidCredentials if RUT not registered OR IP not in allowlist (no info leak).
-// Returns ErrSuspended if the user account is suspended.
-// Does NOT create a session — call CreateSession explicitly (same contract as Login).
-func LoginLAN(rut string, r *http.Request) (User, error) {
-    normalized, err := validateRUT(rut)
-    if err != nil {
-        return User{}, ErrInvalidRUT
-    }
-    identity, err := GetIdentityByProvider("lan", normalized)
-    if err != nil {
-        return User{}, ErrInvalidCredentials  // RUT not registered — same error as wrong IP
-    }
-    u, err := GetUser(identity.UserID)
-    if err != nil {
-        return User{}, ErrInvalidCredentials
-    }
-    if u.Status == "suspended" {
-        return User{}, ErrSuspended
-    }
-    clientIP := extractClientIP(r, lanTrustProxy)
-    if err := checkLANIP(identity.UserID, clientIP); err != nil {
-        return User{}, ErrInvalidCredentials  // IP not allowed — no info leak
-    }
-    return u, nil
-}
-
-// validateRUT validates a Chilean RUT using the modulo-11 algorithm.
-// Accepts: "12345678-9", "12.345.678-9", "12345678-K" (case-insensitive K).
-// Returns normalized form: "12345678-9" (no dots, dash before check digit).
-func validateRUT(rut string) (string, error) { ... }
-
-// extractClientIP extracts the client IP, stripping the port.
-// trustProxy=false: uses r.RemoteAddr only.
-// trustProxy=true:  checks X-Forwarded-For (first IP), then X-Real-IP, fallback RemoteAddr.
-func extractClientIP(r *http.Request, trustProxy bool) string { ... }
-```
+[Implemented in lan.go](../lan.go)
 
 ### `lan_ips.go` — LAN identity & IP management
 
-```go
-// LANIP represents a single authorized IP entry for a LAN user.
-type LANIP struct {
-    ID        string
-    UserID    string
-    IP        string
-    Label     string
-    CreatedAt int64
-}
-
-// RegisterLAN creates a 'lan' identity for userID with the given RUT.
-// Validates and normalizes the RUT before storing.
-// Returns ErrInvalidRUT or ErrRUTTaken.
-func RegisterLAN(userID, rut string) error { ... }
-
-// UnregisterLAN removes the 'lan' identity for userID and ALL assigned IPs.
-// Explicitly deletes user_lan_ips rows first (FK references users.id, not identities).
-// Returns ErrNotFound if no LAN identity exists for userID.
-func UnregisterLAN(userID string) error { ... }
-
-// AssignLANIP adds an IP to userID's LAN allowlist with an optional label.
-// Returns ErrIPTaken if the IP is already assigned to any user.
-func AssignLANIP(userID, ip, label string) error { ... }
-
-// RevokeLANIP removes an IP from userID's allowlist.
-// Returns ErrNotFound if the IP is not in userID's list.
-// Scoped by user_id to prevent revoking another user's IP.
-func RevokeLANIP(userID, ip string) error { ... }
-
-// GetLANIPs returns all IPs assigned to userID, ordered by created_at ASC.
-// Returns an empty slice (not an error) when no IPs are assigned.
-func GetLANIPs(userID string) ([]LANIP, error) { ... }
-
-// checkLANIP is an internal helper used by LoginLAN.
-// Returns nil if ip is in userID's allowlist, error otherwise.
-func checkLANIP(userID, ip string) error { ... }
-```
+[Implemented in lan_ips.go](../lan_ips.go)
 
 ---
 
