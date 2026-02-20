@@ -107,170 +107,23 @@
 
 ### `forms.go` — Form data structs
 
-Zero struct tags — field names (`Email`, `Password`, `Name`, `Phone`, `Current`, `New`,
-`Confirm`) are already in `tinywasm/fmt/dictionary` and auto-translated by `tinywasm/form`.
-
-```go
-// forms.go — shared (no build tag)
-package user
-
-// LoginData is validated by LoginModule on both frontend and backend.
-type LoginData struct {
-    Email    string
-    Password string
-}
-
-// RegisterData is validated by RegisterModule.
-type RegisterData struct {
-    Name     string
-    Email    string
-    Password string
-    Phone    string
-}
-
-// ProfileData is validated by ProfileModule (name/phone update).
-type ProfileData struct {
-    Name  string
-    Phone string
-}
-
-// PasswordData is validated by ProfileModule (password change sub-form).
-type PasswordData struct {
-    Current string
-    New     string
-    Confirm string
-}
-```
+[Implemented in forms.go](../forms.go)
 
 ### `modules.go` — Package-level module vars
 
-```go
-// modules.go — shared (no build tag)
-package user
-
-import "github.com/tinywasm/form"
-
-// mustForm creates a form for the given parent ID and struct.
-// Panics at startup if the struct has unmatchable fields — fails early.
-func mustForm(parentID string, s any) *form.Form {
-    f, err := form.New(parentID, s)
-    if err != nil {
-        panic("user: mustForm: " + err.Error())
-    }
-    return f
-}
-
-// Module vars — configured once at package init, registered by the application.
-// All implement site.Module via duck typing (no import of tinywasm/site).
-var (
-    LoginModule    = &loginModule{form: mustForm("login", &LoginData{})}
-    RegisterModule = &registerModule{form: mustForm("register", &RegisterData{})}
-    ProfileModule  = &profileModule{
-        form:         mustForm("profile", &ProfileData{}),
-        passwordForm: mustForm("password", &PasswordData{}),
-    }
-    LANModule     = &lanModule{}
-    OAuthCallback = &oauthModule{}
-)
-```
+[Implemented in modules.go](../modules.go)
 
 ### `module_login.go` — Shared module definition
 
-```go
-// module_login.go — shared (no build tag)
-package user
-
-import "github.com/tinywasm/form"
-
-// loginModule implements site.Module via duck typing.
-// ValidateData satisfies crudp.DataValidator — used by crudp handlers on the backend.
-// Thread-safe: form.Form.ValidateData reads only pre-computed indices, never writes.
-type loginModule struct {
-    form *form.Form
-}
-
-func (m *loginModule) HandlerName() string { return "login" }
-func (m *loginModule) ModuleTitle() string { return "Login" }
-
-// ValidateData delegates to form.Form.ValidateData — same rules as frontend live validation.
-// action byte is ignored for auth forms (same rules for create 'c' and other actions).
-func (m *loginModule) ValidateData(action byte, data ...any) error {
-    return m.form.ValidateData(action, data...)
-}
-```
+[Implemented in module_login.go](../module_login.go)
 
 ### `module_login_back.go` — SSR render + HTTP handler
 
-```go
-// module_login_back.go
-//go:build !wasm
-
-package user
-
-import "net/http"
-
-// RenderHTML renders the login form for SSR (initial page load).
-// OAuth buttons are appended if providers are registered.
-func (m *loginModule) RenderHTML() string {
-    m.form.SetSSR(true)
-    out := m.form.RenderHTML()
-    // Append OAuth provider buttons if any are registered.
-    for _, p := range registeredProviders() {
-        out += `<a href="/oauth/` + p.Name() + `">Login with ` + p.Name() + `</a>`
-    }
-    return out
-}
-
-// Create handles POST /login: validate → login → create session → set cookie.
-// Called by the crudp handler after ValidateData passes.
-func (m *loginModule) Create(data ...any) (any, error) {
-    if len(data) == 0 {
-        return nil, ErrInvalidCredentials
-    }
-    d, ok := data[0].(*LoginData)
-    if !ok {
-        return nil, ErrInvalidCredentials
-    }
-    u, err := Login(d.Email, d.Password)
-    if err != nil {
-        return nil, err
-    }
-    return u, nil
-}
-
-// SetCookie writes the session cookie. Called by the crudp handler after Create.
-func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
-    sess, err := CreateSession(userID, extractClientIP(r, lanTrustProxy), r.UserAgent())
-    if err != nil {
-        return err
-    }
-    http.SetCookie(w, &http.Cookie{
-        Name:     sessionCookieName,
-        Value:    sess.ID,
-        HttpOnly: true,
-        Secure:   true,
-        SameSite: http.SameSiteStrictMode,
-        MaxAge:   sessionTTL,
-        Path:     "/",
-    })
-    return nil
-}
-```
+[Implemented in module_login_back.go](../module_login_back.go)
 
 ### `module_login_front.go` — WASM interactivity
 
-```go
-// module_login_front.go
-//go:build wasm
-
-package user
-
-// OnMount wires DOM events for live validation and form submission.
-// Called by tinywasm/dom after RenderHTML is injected into the page.
-func (m *loginModule) OnMount() {
-    m.form.OnMount()
-}
-```
+[Implemented in module_login_front.go](../module_login_front.go)
 
 ---
 
@@ -359,110 +212,31 @@ Test files follow the build-tag split pattern:
 
 ### MODULE coverage
 
-```go
-// LoginModule
-func TestLoginModule_HandlerName(t *testing.T)            // returns "login"
-func TestLoginModule_ValidateData_Valid(t *testing.T)     // valid LoginData → nil
-func TestLoginModule_ValidateData_BadEmail(t *testing.T)  // bad email → error
-func TestLoginModule_ValidateData_NoData(t *testing.T)    // no args → nil
-func TestLoginModule_RenderHTML_ContainsForm(t *testing.T) // SSR HTML contains form + inputs
-
-// RegisterModule
-func TestRegisterModule_ValidateData_Valid(t *testing.T)   // valid RegisterData → nil
-func TestRegisterModule_ValidateData_ShortName(t *testing.T) // name < 2 chars → error
-func TestRegisterModule_RenderHTML_ContainsForm(t *testing.T)
-
-// ProfileModule
-func TestProfileModule_ValidateData_Valid(t *testing.T)
-func TestProfileModule_ValidateData_InvalidPhone(t *testing.T) // non-digits in phone → error
-func TestProfileModule_RenderHTML_ContainsForm(t *testing.T)
-
-// LANModule
-func TestLANModule_HandlerName(t *testing.T)               // returns "lan"
-func TestLANModule_RenderHTML_ContainsTable(t *testing.T)  // SSR HTML contains IP table
-
-// OAuthCallback
-func TestOAuthCallback_HandlerName(t *testing.T)           // returns "oauth/callback"
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go), [tests/user_back_test.go](../tests/user_back_test.go) and [tests/user_front_test.go](../tests/user_front_test.go)
 
 ### AUTH_FLOW coverage
 
-```go
-func TestLogin_ValidCredentials(t *testing.T)        // user with local identity → returns User
-func TestLogin_InvalidPassword(t *testing.T)         // returns ErrInvalidCredentials
-func TestLogin_UserNotFound(t *testing.T)            // returns ErrInvalidCredentials (no enum)
-func TestLogin_NoLocalIdentity(t *testing.T)         // OAuth-only user → ErrInvalidCredentials
-func TestLogin_SuspendedUser(t *testing.T)           // returns ErrSuspended
-func TestSetPassword_Success(t *testing.T)           // creates local identity → Login works
-func TestSetPassword_WeakPassword(t *testing.T)      // < 8 chars → ErrWeakPassword
-func TestSetPassword_Update(t *testing.T)            // updates existing hash → new password works
-func TestVerifyPassword_Correct(t *testing.T)        // correct password → nil
-func TestVerifyPassword_Wrong(t *testing.T)          // wrong password → ErrInvalidCredentials
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go)
 
 ### SESSION_FLOW coverage
 
-```go
-func TestSession_CreateAndGet(t *testing.T)        // create → get → valid
-func TestSession_Expired(t *testing.T)             // expired → ErrSessionExpired
-func TestSession_Delete(t *testing.T)              // delete → subsequent get → error
-func TestSession_CacheHit(t *testing.T)            // second get served from cache
-func TestPurgeExpiredSessions(t *testing.T)        // purge → expired sessions removed from DB + cache
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go)
 
 ### USER_CRUD_FLOW coverage
 
-```go
-func TestCreateUser_Success(t *testing.T)          // creates user (no password)
-func TestCreateUser_DuplicateEmail(t *testing.T)   // returns ErrEmailTaken
-func TestGetUserByEmail_NotFound(t *testing.T)     // returns ErrNotFound
-func TestSuspendUser(t *testing.T)                 // status becomes "suspended"
-func TestReactivateUser(t *testing.T)              // status becomes "active"
-func TestSuspendedUser_CannotLogin(t *testing.T)   // Login returns ErrSuspended
-func TestUpdateUser(t *testing.T)                  // name and phone updated
-func TestCreateUser_ThenSetPassword(t *testing.T)  // CreateUser + SetPassword → Login works
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go)
 
 ### OAUTH_FLOW coverage
 
-```go
-func TestOAuth_NewUser_AutoRegister(t *testing.T)        // unknown email → create user + isNewUser=true
-func TestOAuth_ExistingOAuthUser(t *testing.T)           // known (provider, id) → user, isNewUser=false
-func TestOAuth_LinkToLocalAccount(t *testing.T)          // OAuth email matches local → link, isNewUser=false
-func TestOAuth_InvalidState(t *testing.T)                // wrong state → ErrInvalidOAuthState
-func TestOAuth_ExpiredState(t *testing.T)                // state > 10 min old → ErrInvalidOAuthState
-func TestOAuth_StateConsumedOnce(t *testing.T)           // replay attack: second use → error
-func TestUnlinkIdentity_LastIdentity(t *testing.T)       // → ErrCannotUnlink
-func TestUnlinkIdentity_MultipleIdentities(t *testing.T) // → nil
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go)
 
 ### LAN_AUTH_FLOW coverage
 
-```go
-func TestLoginLAN_ValidRUT_ValidIP(t *testing.T)              // valid RUT + authorized IP → User
-func TestLoginLAN_InvalidRUTFormat(t *testing.T)              // malformed string → ErrInvalidRUT
-func TestLoginLAN_InvalidCheckDigit(t *testing.T)             // correct format, wrong check digit → ErrInvalidRUT
-func TestLoginLAN_RUTNotFound(t *testing.T)                   // valid RUT, not registered → ErrInvalidCredentials (no enum)
-func TestLoginLAN_IPNotAssigned(t *testing.T)                 // valid RUT, wrong IP → ErrInvalidCredentials (no enum)
-func TestLoginLAN_SuspendedUser(t *testing.T)                 // valid RUT + IP, suspended → ErrSuspended
-func TestLoginLAN_TrustProxy_ValidIP(t *testing.T)            // Config.TrustProxy=true, IP from X-Forwarded-For → User
-func TestLoginLAN_TrustProxy_False_IgnoresHeader(t *testing.T) // Config.TrustProxy=false, X-Forwarded-For set → uses RemoteAddr
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go)
 
 ### LAN_IP_FLOW coverage
 
-```go
-func TestRegisterLAN_Success(t *testing.T)         // valid RUT, no prior identity → nil + identity in DB
-func TestRegisterLAN_InvalidRUT(t *testing.T)      // bad check digit → ErrInvalidRUT
-func TestRegisterLAN_RUTTaken(t *testing.T)        // RUT already linked to another user → ErrRUTTaken
-func TestAssignLANIP_Success(t *testing.T)         // new IP → nil + row in user_lan_ips
-func TestAssignLANIP_IPTaken(t *testing.T)         // IP already assigned to another user → ErrIPTaken
-func TestRevokeLANIP_Success(t *testing.T)         // existing IP → nil + row removed
-func TestRevokeLANIP_NotFound(t *testing.T)        // IP not in user's list → ErrNotFound
-func TestGetLANIPs_MultipleIPs(t *testing.T)       // 3 IPs assigned → []LANIP len=3, ordered by created_at
-func TestGetLANIPs_Empty(t *testing.T)             // no IPs → []LANIP len=0 (not an error)
-func TestUnregisterLAN_RemovesAll(t *testing.T)    // identity + IPs deleted → GetLANIPs returns empty slice
-```
+[Implemented in tests/setup_test.go](../tests/setup_test.go)
 
 ---
 
