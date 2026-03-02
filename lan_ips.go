@@ -8,13 +8,7 @@ import (
 	"github.com/tinywasm/unixid"
 )
 
-type LANIP struct {
-	ID        string
-	UserID    string
-	IP        string
-	Label     string
-	CreatedAt int64
-}
+
 
 func RegisterLAN(userID, rut string) error {
 	normalized, err := validateRUT(rut)
@@ -44,19 +38,27 @@ func UnregisterLAN(userID string) error {
 		return err
 	}
 
-	if err := store.exec.Exec("DELETE FROM user_lan_ips WHERE user_id = ?", userID); err != nil {
-		return err
+	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID)
+	ips, _ := ReadAllLANIP(qb)
+	for _, ip := range ips {
+		store.db.Delete(ip)
 	}
-	return store.exec.Exec("DELETE FROM user_identities WHERE user_id = ? AND provider = 'lan'", userID)
+
+	qbId := store.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq("lan")
+	ids, _ := ReadAllIdentity(qbId)
+	for _, id := range ids {
+		store.db.Delete(id)
+	}
+	return nil
 }
 
 func AssignLANIP(userID, ip, label string) error {
-	var count int
-	err := store.exec.QueryRow("SELECT COUNT(*) FROM user_lan_ips WHERE ip = ?", ip).Scan(&count)
+	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.IP).Eq(ip)
+	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return err
 	}
-	if count > 0 {
+	if len(results) > 0 {
 		return ErrIPTaken
 	}
 
@@ -67,53 +69,50 @@ func AssignLANIP(userID, ip, label string) error {
 	id := u.GetNewID()
 	now := time.Now().Unix()
 
-	return store.exec.Exec(
-		"INSERT INTO user_lan_ips (id, user_id, ip, label, created_at) VALUES (?, ?, ?, ?, ?)",
-		id, userID, ip, label, now,
-	)
+	i := &LANIP{
+		ID:        id,
+		UserID:    userID,
+		IP:        ip,
+		Label:     label,
+		CreatedAt: now,
+	}
+	return store.db.Create(i)
 }
 
 func RevokeLANIP(userID, ip string) error {
-	var count int
-	err := store.exec.QueryRow("SELECT COUNT(*) FROM user_lan_ips WHERE user_id = ? AND ip = ?", userID, ip).Scan(&count)
+	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
+	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return err
 	}
-	if count == 0 {
+	if len(results) == 0 {
 		return ErrNotFound
 	}
 
-	return store.exec.Exec("DELETE FROM user_lan_ips WHERE user_id = ? AND ip = ?", userID, ip)
+	return store.db.Delete(results[0])
 }
 
 func GetLANIPs(userID string) ([]LANIP, error) {
-	rows, err := store.exec.Query("SELECT id, user_id, ip, label, created_at FROM user_lan_ips WHERE user_id = ? ORDER BY created_at ASC", userID)
+	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).OrderBy(LANIPMeta.CreatedAt).Asc()
+	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var ips []LANIP
-	for rows.Next() {
-		var i LANIP
-		if err := rows.Scan(&i.ID, &i.UserID, &i.IP, &i.Label, &i.CreatedAt); err != nil {
-			return nil, err
-		}
-		ips = append(ips, i)
+	ips := make([]LANIP, 0, len(results))
+	for _, r := range results {
+		ips = append(ips, *r)
 	}
-	if ips == nil {
-		ips = []LANIP{}
-	}
-	return ips, rows.Err()
+	return ips, nil
 }
 
 func checkLANIP(userID, ip string) error {
-	var count int
-	err := store.exec.QueryRow("SELECT COUNT(*) FROM user_lan_ips WHERE user_id = ? AND ip = ?", userID, ip).Scan(&count)
+	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
+	results, err := ReadAllLANIP(qb)
 	if err != nil {
-		return err
+		return ErrInvalidCredentials
 	}
-	if count == 0 {
+	if len(results) == 0 {
 		return ErrInvalidCredentials
 	}
 	return nil

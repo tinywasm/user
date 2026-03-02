@@ -18,11 +18,9 @@ modules into `tinywasm/site`. The auth backend (`//go:build !wasm`) and UI modul
 - **Identity-based authentication:** `Login` routes through `user_identities` — only users
   with a `local` identity can authenticate via email+password. OAuth-only and LAN-only
   users have no local identity, so password login is structurally unreachable.
-- **Shared Executor:** Uses the same `DBExecutor` passed to `site.SetDB` — no separate DB config.
-- **Opaque userID for rbac:** `rbac` has no knowledge of the `users` table. The bridge is
-  the `userID` string — `user` provides it, `rbac` uses it as an opaque key.
-- **Session cache:** In-memory read-through cache (same pattern as `rbac/cache.go`).
-  Zero DB I/O on the hot path for session lookups.
+- **Shared ORM Connection:** Uses the injected `*orm.DB` passed from `main.go`. No separate DB config, entirely handled by `tinywasm/orm`.
+- **Integrated RBAC:** RBAC logic is fully integrated into the `user` domain. `User` structs are explicitly hydrated with their `Roles` and `Permissions` via sequential queries from `tinywasm/orm`.
+- **Integrated Cache:** An in-memory read-through cache manages both HTTP sessions and up to 1000 hydrated users. Mutations immediately trigger cache invalidations based on role ID or permission ID.
 - **Unified identity model:** Local auth, OAuth providers, and LAN auth share the same
   `user_identities` table. One `user_id` can have multiple identities. Passwords are
   stored as bcrypt hashes in `provider_id` for `provider='local'` — the `users` table
@@ -40,71 +38,17 @@ modules into `tinywasm/site`. The auth backend (`//go:build !wasm`) and UI modul
 
 ## Schema
 
-### Migration M001 — Initial schema
+### Automated ORM DDL
 
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    id         TEXT PRIMARY KEY,
-    email      TEXT UNIQUE,            -- nullable: LAN-only users may have no email
-    name       TEXT NOT NULL DEFAULT '',
-    phone      TEXT NOT NULL DEFAULT '',
-    status     TEXT NOT NULL DEFAULT 'active'
-               CHECK (status IN ('active', 'suspended')),
-    created_at INTEGER NOT NULL        -- Unix timestamp
-);
--- Note: NO password_hash column. Passwords live in user_identities (provider='local').
+Raw SQL migrations are obsolete. The `initSchema` method iterates through all the `tinywasm/orm` compliant struct models (`User`, `Role`, `Permission`, `Identity`, `Session`, `LANIP`, `OAuthState`, `UserRole`, `RolePermission`) and utilizes `db.CreateTable(m)` to initialize or alter the database cleanly.
 
-CREATE TABLE IF NOT EXISTS user_sessions (
-    id         TEXT PRIMARY KEY,       -- session token (unixid)
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at INTEGER NOT NULL,       -- Unix timestamp
-    ip         TEXT NOT NULL DEFAULT '',
-    user_agent TEXT NOT NULL DEFAULT '',
-    created_at INTEGER NOT NULL        -- Unix timestamp
-);
-
--- Unified identity table: ALL auth providers, including local passwords
--- One user_id can have multiple identities (local, google, microsoft, lan)
--- provider='local':  provider_id = bcrypt hash, email = NULL (uses users.email)
--- provider='google': provider_id = Google user ID, email = Google email
--- provider='lan':    provider_id = normalized RUT (e.g. "12345678-9"), email = NULL
-CREATE TABLE IF NOT EXISTS user_identities (
-    id          TEXT PRIMARY KEY,
-    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    provider    TEXT NOT NULL,         -- 'local', 'google', 'microsoft', 'lan', or custom
-    provider_id TEXT NOT NULL,         -- bcrypt hash (local), OAuth user ID, or RUT (lan)
-    email       TEXT,                  -- email from OAuth provider (informational)
-    UNIQUE (provider, provider_id)
-);
--- Note: UNIQUE(provider, provider_id) for local means one bcrypt hash = one identity.
--- This prevents sharing passwords across users (each hash is unique due to bcrypt salt).
-
--- Ephemeral CSRF protection for OAuth flows (TTL 10 min, single-use)
-CREATE TABLE IF NOT EXISTS oauth_states (
-    state      TEXT PRIMARY KEY,       -- random 32 bytes, hex-encoded
-    provider   TEXT NOT NULL,
-    created_at INTEGER NOT NULL        -- Unix; expired if now - created_at > 600s
-);
--- Cleanup: PurgeExpiredOAuthStates deletes rows where now - created_at > 600s.
-```
-
-### Migration M002 — LAN provider
-
-```sql
--- SQLite does not support ALTER COLUMN. M002 recreates the users table inside a
--- transaction (rename → insert → drop) to drop the NOT NULL constraint on email.
--- Existing rows are unaffected: their email values are preserved.
-
--- LAN IP allowlist: one RUT may be authenticated from multiple assigned IPs.
--- One IP belongs to exactly one user (UNIQUE prevents sharing).
-CREATE TABLE IF NOT EXISTS user_lan_ips (
-    id         TEXT PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    ip         TEXT NOT NULL UNIQUE,   -- IPv4 or IPv6, no port
-    label      TEXT NOT NULL DEFAULT '',
-    created_at INTEGER NOT NULL        -- Unix timestamp
-);
-```
+The entities translate logically to the following legacy structures, but mapping is fully automated via the `ormc` generated `models_orm.go`:
+- `users`: Managed by `User` struct (supports explicit hydration of Roles and Permissions).
+- `user_sessions`: Managed by `Session` struct.
+- `user_identities`: Unified identities across providers (local, google, microsoft, lan).
+- `user_oauth_states`: Ephemeral state validation.
+- `user_lan_ips`: Whitelisted IPs per LAN RUT.
+- `rbac_*`: Direct graph representation mapping roles, permissions, and users.
 
 Note: `users.email` is nullable; local-auth and OAuth users always have an email;
 LAN-only users may omit it entirely (stored as NULL, not `""`).
@@ -137,8 +81,8 @@ var ProfileModule  // /profile — edit name, phone, password
 var LANModule      // /lan     — LAN IP management
 var OAuthCallback  // /oauth/callback
 
-// Init — runs migrations, warms session cache, applies config. Called once at Serve time by site.
-func Init(exec Executor, cfg Config) error
+// Init — creates tables via ORM, warms session cache, applies config. Called once at Serve time.
+func Init(db *orm.DB, cfg Config) error
 
 // User CRUD
 func CreateUser(email, name, phone string) (User, error)  // no password — use SetPassword separately
@@ -271,21 +215,6 @@ var (
 
 ---
 
-## DB Interfaces
-
-Same pattern as `rbac/sql.go` — satisfied by `*sql.DB` adapters:
-
-```go
-type Executor interface {
-    Exec(query string, args ...any) error
-    QueryRow(query string, args ...any) Scanner
-    Query(query string, args ...any) (Rows, error)
-}
-type Scanner interface{ Scan(dest ...any) error }
-type Rows interface{ Next() bool; Scan(dest ...any) error; Close() error; Err() error }
-```
-
----
 
 ## Integration with tinywasm/site
 

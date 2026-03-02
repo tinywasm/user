@@ -2,18 +2,23 @@
 
 package user
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/tinywasm/orm"
+)
 
 type Store struct {
-	exec   Executor
-	cache  *sessionCache
-	config Config
-	mu     sync.RWMutex
+	db        *orm.DB
+	cache     *sessionCache
+	userCache *userCache
+	config    Config
+	mu        sync.RWMutex
 }
 
 var store *Store
 
-func Init(exec Executor, cfg Config) error {
+func Init(db *orm.DB, cfg Config) error {
 	if cfg.SessionCookieName == "" {
 		cfg.SessionCookieName = "session"
 	}
@@ -22,18 +27,19 @@ func Init(exec Executor, cfg Config) error {
 	if cfg.SessionTTL == 0 {
 		cfg.SessionTTL = 86400
 	}
-	if err := runMigrations(exec); err != nil {
-		return err
-	}
 	store = &Store{
-		exec:   exec,
-		cache:  newSessionCache(),
-		config: cfg,
+		db:        db,
+		cache:     newSessionCache(),
+		userCache: newUserCache(),
+		config:    cfg,
+	}
+	if err := initSchema(db); err != nil {
+		return err
 	}
 	for _, p := range cfg.OAuthProviders {
 		registerProvider(p)
 	}
-	return store.cache.warmUp(exec)
+	return store.cache.warmUp()
 }
 
 // Global providers registry

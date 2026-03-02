@@ -4,45 +4,29 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"runtime"
 	"testing"
 
+	"github.com/tinywasm/orm"
+	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 )
 
-type TestExecutor struct {
-	*sql.DB
-}
-
-func (e *TestExecutor) Exec(query string, args ...any) error {
-	_, err := e.DB.Exec(query, args...)
-	return err
-}
-
-func (e *TestExecutor) Query(query string, args ...any) (user.Rows, error) {
-	return e.DB.Query(query, args...)
-}
-
-func (e *TestExecutor) QueryRow(query string, args ...any) user.Scanner {
-	return e.DB.QueryRow(query, args...)
-}
-
-func newTestDB(t *testing.T) *TestExecutor {
+func newTestDB(t *testing.T) *orm.DB {
 	if runtime.GOARCH == "wasm" {
 		t.Skip("SQLite not supported in WASM")
 	}
-	db, err := sql.Open("sqlite", ":memory:")
+	db, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
 	t.Cleanup(func() {
 		db.Close()
 	})
-	return &TestExecutor{db}
+	return db
 }
 
 func RunUserTests(t *testing.T) {
@@ -172,7 +156,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Instant expire via SQL
-	if err := db.Exec("UPDATE user_sessions SET expires_at = 0 WHERE id = ?", sess.ID); err != nil {
+	if err := db.RawExecutor().Exec("UPDATE user_sessions SET expires_at = 0 WHERE id = ?", sess.ID); err != nil {
 		t.Fatalf("failed to expire session in DB: %v", err)
 	}
 

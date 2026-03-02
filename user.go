@@ -22,32 +22,11 @@ var (
 	ErrIPTaken            = fmt.Err("ip", "registered")             // EN: Ip Registered                    / ES: Ip Registrado
 )
 
-type User struct {
-	ID        string `json:"id"`
-	Email     string `json:"email,omitempty"`
-	Name      string `json:"name"`
-	Phone     string `json:"phone,omitempty"`
-	Status    string `json:"status"` // "active", "suspended"
-	CreatedAt int64  `json:"created_at"`
-}
 
-type Session struct {
-	ID        string `json:"id"`
-	UserID    string `json:"user_id"`
-	ExpiresAt int64  `json:"expires_at"`
-	IP        string `json:"ip,omitempty"`
-	UserAgent string `json:"user_agent,omitempty"`
-	CreatedAt int64  `json:"created_at"`
-}
 
-type Identity struct {
-	ID         string `json:"id"`
-	UserID     string `json:"user_id"`
-	Provider   string `json:"provider"`
-	ProviderID string `json:"provider_id"`
-	Email      string `json:"email,omitempty"`
-	CreatedAt  int64  `json:"created_at"`
-}
+
+
+
 
 type OAuthUserInfo struct {
 	ID    string

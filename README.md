@@ -13,8 +13,8 @@ Applications import `tinywasm/user` directly to configure session behaviour and 
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — What & Why: schema, contracts, design principles
 - [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — How: file layout, reference code, test strategy
-- [docs/RBAC_ARCHITECTURE.md](docs/RBAC_ARCHITECTURE.md) — RBAC What & Why: Access levels, core components definition
-- [docs/RBAC_IMPLEMENTATION.md](docs/RBAC_IMPLEMENTATION.md) — RBAC How: Assignment handling and store structure
+
+> **Note**: RBAC is now integrated into the User module (see ARCHITECTURE.md).
 
 ## Diagrams
 
@@ -24,8 +24,6 @@ Applications import `tinywasm/user` directly to configure session behaviour and 
 - [docs/diagrams/OAUTH_FLOW.md](docs/diagrams/OAUTH_FLOW.md) — OAuth begin/callback flow (all branches)
 - [docs/diagrams/LAN_AUTH_FLOW.md](docs/diagrams/LAN_AUTH_FLOW.md) — LAN login: RUT validation + IP allowlist check
 - [docs/diagrams/LAN_IP_FLOW.md](docs/diagrams/LAN_IP_FLOW.md) — LAN IP management: RegisterLAN, AssignLANIP, RevokeLANIP, GetLANIPs, UnregisterLAN
-- [docs/diagrams/RBAC_ASSIGNMENT_FLOW.md](docs/diagrams/RBAC_ASSIGNMENT_FLOW.md) — Role & Permission assignment and cache propagation
-- [docs/diagrams/RBAC_CHECK_FLOW.md](docs/diagrams/RBAC_CHECK_FLOW.md) — In-memory fast path authorization check
 
 ## Integration
 
@@ -63,10 +61,9 @@ site.RegisterHandlers(
 
 site.Serve(":8080")
 // site.Serve internally calls:  applyUser() → user.Init(dbExecutor, cfg)
-//                                applyRBAC() → rbac.Init(dbExecutor)
 
 // After user registration/OAuth, assign default role:
-// site.AssignRole(u.ID, 'v')  // rbac — completely independent of user lib
+// site.AssignRole(u.ID, 'v')
 ```
 
 ## Status
