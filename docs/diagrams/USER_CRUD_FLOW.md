@@ -44,6 +44,10 @@ sequenceDiagram
         user-->>App: ErrNotFound
     else found
         DB-->>user: User row
+        Note over user,DB: RBAC Hydration
+        user->>DB: SELECT Roles and Permissions
+        DB-->>user: RBAC data
+        user->>user: Hydrate User model (Roles, Permissions)
         user-->>App: User
     end
 
