@@ -108,12 +108,11 @@ tinywasm/user
 
 ## Related Documentation
 
-- [IMPLEMENTATION.md](IMPLEMENTATION.md) — File layout, reference code, test strategy
 - [diagrams/AUTH_FLOW.md](diagrams/AUTH_FLOW.md) — Local login credential validation
 - [diagrams/SESSION_FLOW.md](diagrams/SESSION_FLOW.md) — Session lifecycle
 - [diagrams/USER_CRUD_FLOW.md](diagrams/USER_CRUD_FLOW.md) — User creation pipeline
 - [diagrams/OAUTH_FLOW.md](diagrams/OAUTH_FLOW.md) — OAuth begin/callback flow (all branches)
 - [diagrams/LAN_AUTH_FLOW.md](diagrams/LAN_AUTH_FLOW.md) — LAN login: RUT validation + IP allowlist check
 - [diagrams/LAN_IP_FLOW.md](diagrams/LAN_IP_FLOW.md) — LAN IP management: RegisterLAN, AssignLANIP, RevokeLANIP, GetLANIPs, UnregisterLAN
-- [tinywasm/site ACCESS_CONTROL.md](../../site/docs/ACCESS_CONTROL.md) — How site exposes user operations
-- [tinywasm/rbac ARCHITECTURE.md](../../rbac/docs/ARCHITECTURE.md) — rbac design (user↔rbac bridge)
+- [tinywasm/site ARCHITECTURE.md](../../site/docs/ARCHITECTURE.md) — How site exposes user operations
+- [tinywasm/rbac ARQUITECTURE.md](../../rbac/docs/ARQUITECTURE.md) — rbac design (user↔rbac bridge)

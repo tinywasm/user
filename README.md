@@ -12,7 +12,7 @@ Applications import `tinywasm/user` directly to configure session behaviour, and
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — What & Why: schema, contracts, design principles
-- [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — How: file layout, reference code, test strategy
+- [docs/SKILL.md](docs/SKILL.md) — API contract, configuration, UI modules, and usage snippets
 
 > **Note**: RBAC is now integrated into the User module (see ARCHITECTURE.md).
 
