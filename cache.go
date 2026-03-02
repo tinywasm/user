@@ -18,24 +18,20 @@ func newSessionCache() *sessionCache {
 	}
 }
 
-func (c *sessionCache) warmUp(exec Executor) error {
-	rows, err := exec.Query("SELECT id, user_id, expires_at, ip, user_agent, created_at FROM user_sessions WHERE expires_at > ?", time.Now().Unix())
+func (c *sessionCache) warmUp() error {
+	qb := store.db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Gt(time.Now().Unix())
+	sessions, err := ReadAllSession(qb)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for rows.Next() {
-		var s Session
-		if err := rows.Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.IP, &s.UserAgent, &s.CreatedAt); err != nil {
-			return err
-		}
-		c.items[s.ID] = s
+	for _, s := range sessions {
+		c.items[s.ID] = *s
 	}
-	return rows.Err()
+	return nil
 }
 
 func (c *sessionCache) set(id string, s Session) {

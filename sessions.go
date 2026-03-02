@@ -3,7 +3,6 @@
 package user
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tinywasm/unixid"
@@ -30,11 +29,7 @@ func CreateSession(userID, ip, userAgent string) (Session, error) {
 		CreatedAt: now,
 	}
 
-	if err := store.exec.Exec(
-		`INSERT INTO user_sessions (id, user_id, expires_at, ip, user_agent, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-		sess.ID, sess.UserID, sess.ExpiresAt, sess.IP, sess.UserAgent, sess.CreatedAt,
-	); err != nil {
+	if err := store.db.Create(&sess); err != nil {
 		return Session{}, err
 	}
 	store.cache.set(sess.ID, sess)
@@ -50,18 +45,16 @@ func GetSession(id string) (Session, error) {
 		return s, nil
 	}
 
-	var s Session
-	err := store.exec.QueryRow(
-		"SELECT id, user_id, expires_at, ip, user_agent, created_at FROM user_sessions WHERE id = ?",
-		id,
-	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.IP, &s.UserAgent, &s.CreatedAt)
+	qb := store.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
+	results, err := ReadAllSession(qb)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return Session{}, ErrNotFound
-		}
 		return Session{}, err
 	}
+	if len(results) == 0 {
+		return Session{}, ErrNotFound
+	}
+	s := *results[0]
 
 	if s.ExpiresAt < time.Now().Unix() {
 		return Session{}, ErrSessionExpired
@@ -73,7 +66,12 @@ func GetSession(id string) (Session, error) {
 
 func DeleteSession(id string) error {
 	store.cache.delete(id)
-	return store.exec.Exec("DELETE FROM user_sessions WHERE id = ?", id)
+	qb := store.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
+	results, err := ReadAllSession(qb)
+	if err == nil && len(results) > 0 {
+		return store.db.Delete(results[0])
+	}
+	return err
 }
 
 func PurgeExpiredSessions() error {
@@ -87,5 +85,11 @@ func PurgeExpiredSessions() error {
 	}
 	store.cache.mu.Unlock()
 
-	return store.exec.Exec("DELETE FROM user_sessions WHERE expires_at < ?", now)
+	qb := store.db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Lt(now)
+	sessions, _ := ReadAllSession(qb)
+	for _, s := range sessions {
+		store.db.Delete(s)
+	}
+
+	return nil
 }

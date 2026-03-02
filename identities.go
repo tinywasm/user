@@ -3,7 +3,6 @@
 package user
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tinywasm/unixid"
@@ -18,11 +17,16 @@ func CreateIdentity(userID, provider, providerID, email string) error {
 	id := u.GetNewID()
 	now := time.Now().Unix()
 
-	if err := store.exec.Exec(
-		`INSERT INTO user_identities (id, user_id, provider, provider_id, email, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		id, userID, provider, providerID, nullableStr(email), now,
-	); err != nil {
+	i := &Identity{
+		ID:         id,
+		UserID:     userID,
+		Provider:   provider,
+		ProviderID: providerID,
+		Email:      email,
+		CreatedAt:  now,
+	}
+
+	if err := store.db.Create(i); err != nil {
 		if isUniqueViolation(err) {
 			return err
 		}
@@ -32,61 +36,61 @@ func CreateIdentity(userID, provider, providerID, email string) error {
 }
 
 func GetIdentityByProvider(provider, providerID string) (Identity, error) {
-	var i Identity
-	err := store.exec.QueryRow(
-		"SELECT id, user_id, provider, provider_id, COALESCE(email, ''), created_at FROM user_identities WHERE provider = ? AND provider_id = ?",
-		provider, providerID,
-	).Scan(&i.ID, &i.UserID, &i.Provider, &i.ProviderID, &i.Email, &i.CreatedAt)
+	qb := store.db.Query(&Identity{}).
+		Where(IdentityMeta.Provider).Eq(provider).
+		Where(IdentityMeta.ProviderID).Eq(providerID)
+
+	results, err := ReadAllIdentity(qb)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return Identity{}, ErrNotFound
-		}
 		return Identity{}, err
 	}
-	return i, nil
+	if len(results) == 0 {
+		return Identity{}, ErrNotFound
+	}
+	return *results[0], nil
 }
 
 func getIdentityByUserAndProvider(userID, provider string) (Identity, error) {
-	var i Identity
-	err := store.exec.QueryRow(
-		"SELECT id, user_id, provider, provider_id, COALESCE(email, ''), created_at FROM user_identities WHERE user_id = ? AND provider = ?",
-		userID, provider,
-	).Scan(&i.ID, &i.UserID, &i.Provider, &i.ProviderID, &i.Email, &i.CreatedAt)
+	qb := store.db.Query(&Identity{}).
+		Where(IdentityMeta.UserID).Eq(userID).
+		Where(IdentityMeta.Provider).Eq(provider)
+
+	results, err := ReadAllIdentity(qb)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return Identity{}, ErrNotFound
-		}
 		return Identity{}, err
 	}
-	return i, nil
+	if len(results) == 0 {
+		return Identity{}, ErrNotFound
+	}
+	return *results[0], nil
 }
 
 func GetUserIdentities(userID string) ([]Identity, error) {
-	rows, err := store.exec.Query(
-		"SELECT id, user_id, provider, provider_id, COALESCE(email, ''), created_at FROM user_identities WHERE user_id = ?",
-		userID,
-	)
+	qb := store.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID)
+	results, err := ReadAllIdentity(qb)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var identities []Identity
-	for rows.Next() {
-		var i Identity
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Provider, &i.ProviderID, &i.Email, &i.CreatedAt); err != nil {
-			return nil, err
-		}
-		identities = append(identities, i)
+	for _, i := range results {
+		identities = append(identities, *i)
 	}
-	return identities, rows.Err()
+	return identities, nil
 }
 
 func upsertIdentity(userID, provider, providerID, email string) error {
-	_, err := getIdentityByUserAndProvider(userID, provider)
-	if err == nil {
-		return store.exec.Exec("UPDATE user_identities SET provider_id = ?, email = ? WHERE user_id = ? AND provider = ?", providerID, nullableStr(email), userID, provider)
-	} else if err == ErrNotFound {
+	qb := store.db.Query(&Identity{}).
+		Where(IdentityMeta.UserID).Eq(userID).
+		Where(IdentityMeta.Provider).Eq(provider)
+
+	results, err := ReadAllIdentity(qb)
+	if err == nil && len(results) > 0 {
+		i := results[0]
+		i.ProviderID = providerID
+		i.Email = email
+		return store.db.Update(i)
+	} else if len(results) == 0 {
 		return CreateIdentity(userID, provider, providerID, email)
 	} else {
 		return err
@@ -114,5 +118,13 @@ func UnlinkIdentity(userID, provider string) error {
 		return ErrCannotUnlink
 	}
 
-	return store.exec.Exec("DELETE FROM user_identities WHERE user_id = ? AND provider = ?", userID, provider)
+	qb := store.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq(provider)
+	results, err := ReadAllIdentity(qb)
+	if err != nil {
+		return err
+	}
+	if len(results) > 0 {
+		return store.db.Delete(results[0])
+	}
+	return ErrNotFound
 }

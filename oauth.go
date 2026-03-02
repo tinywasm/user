@@ -3,7 +3,6 @@
 package user
 
 import (
-	"database/sql"
 	"net/http"
 	"time"
 
@@ -25,10 +24,14 @@ func BeginOAuth(providerName string) (string, error) {
 	now := time.Now().Unix()
 	expiresAt := now + 600 // 10 minutes
 
-	if err := store.exec.Exec(
-		"INSERT INTO user_oauth_states (state, provider, expires_at, created_at) VALUES (?, ?, ?, ?)",
-		state, providerName, expiresAt, now,
-	); err != nil {
+	stateObj := &OAuthState{
+		State:     state,
+		Provider:  providerName,
+		ExpiresAt: expiresAt,
+		CreatedAt: now,
+	}
+
+	if err := store.db.Create(stateObj); err != nil {
 		return "", err
 	}
 
@@ -77,26 +80,26 @@ func CompleteOAuth(providerName string, r *http.Request, ip, ua string) (User, b
 }
 
 func consumeState(state, provider string) error {
-	var expiresAt int64
-	var dbProvider string
-	err := store.exec.QueryRow("SELECT expires_at, provider FROM user_oauth_states WHERE state = ?", state).Scan(&expiresAt, &dbProvider)
+	qb := store.db.Query(&OAuthState{}).Where(OAuthStateMeta.State).Eq(state)
+	results, err := ReadAllOAuthState(qb)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return ErrInvalidOAuthState
-		}
 		return err
 	}
+	if len(results) == 0 {
+		return ErrInvalidOAuthState
+	}
+	stateObj := results[0]
 
-	if dbProvider != provider {
+	if stateObj.Provider != provider {
 		return ErrInvalidOAuthState
 	}
 
 	// Delete state (single use) - done regardless of expiration to prevent reuse
-	if err := store.exec.Exec("DELETE FROM user_oauth_states WHERE state = ?", state); err != nil {
+	if err := store.db.Delete(stateObj); err != nil {
 		return err
 	}
 
-	if expiresAt < time.Now().Unix() {
+	if stateObj.ExpiresAt < time.Now().Unix() {
 		return ErrInvalidOAuthState
 	}
 
@@ -104,5 +107,10 @@ func consumeState(state, provider string) error {
 }
 
 func PurgeExpiredOAuthStates() error {
-	return store.exec.Exec("DELETE FROM user_oauth_states WHERE expires_at < ?", time.Now().Unix())
+	qb := store.db.Query(&OAuthState{}).Where(OAuthStateMeta.ExpiresAt).Lt(time.Now().Unix())
+	states, _ := ReadAllOAuthState(qb)
+	for _, s := range states {
+		store.db.Delete(s)
+	}
+	return nil
 }
