@@ -7,7 +7,7 @@ The `tinywasm/user` library manages user entities, authentication (password, OAu
 - **Identity-based authentication:** The `users` table holds no auth secrets. Passwords are in `user_identities` (`provider='local'`). OAuth and LAN users have no local password.
 - **Integrated RBAC:** `User` structs are explicitly hydrated with their `Roles` and `Permissions` via sequential queries from `tinywasm/orm`.
 - **Integrated Cache:** An in-memory cache manages HTTP sessions and up to 1000 hydrated users. Mutations immediately trigger cache invalidations.
-- **Isomorphic Modules:** UI modules implement `site.Module` via duck typing.
+- **Isomorphic Modules:** UI modules implement standard handler interfaces via duck typing.
 
 ## Public API Contract
 
@@ -26,7 +26,7 @@ func Init(db *orm.DB, cfg Config) error
 ```
 
 ### UI Modules
-Register into `site.RegisterHandlers()`:
+Exposes the following standard UI modules:
 - `user.LoginModule`: `/login` (email+password form + OAuth buttons)
 - `user.RegisterModule`: `/register`
 - `user.ProfileModule`: `/profile` (edit name, phone, password)
@@ -75,29 +75,27 @@ func RevokeLANIP(userID, ip string) error
 func GetLANIPs(userID string) ([]LANIP, error)
 ```
 
-## Integration with `tinywasm/site`
+## Initialization
 
 ```go
-// main.go setup
+import "github.com/tinywasm/user"
 
-// 1. Configure site
-site.SetDB(db)
-site.SetUserID(extractUserID) // e.g. reads session cookie, calls user.GetSession
+// ...
 
-// 2. Configure user
-site.SetUserConfig(user.Config{
-    SessionTTL: 86400,
+// Initialize the user module directly with an ORM db instance
+err := user.Init(db, user.Config{
+    SessionCookieName: "session_id", // default: "session"
+    SessionTTL:        86400,        // default: 86400 (24h)
+    TrustProxy:        true,         // default: false
+    OAuthProviders: []user.OAuthProvider{
+        &user.GoogleProvider{
+            ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+            ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+            RedirectURL:  "https://example.com/oauth/callback",
+        },
+    },
 })
-
-// 3. Register UI modules
-site.RegisterHandlers(
-    user.LoginModule,
-    user.RegisterModule,
-    user.ProfileModule,
-    user.LANModule,
-    &myapp.Dashboard{},
-)
-
-// 4. Serve
-site.Serve(":8080") // internal: applies DB and User configs
+if err != nil {
+    // handle error
+}
 ```
