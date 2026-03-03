@@ -9,14 +9,6 @@ import (
 	"github.com/tinywasm/unixid"
 )
 
-// nullableStr converts "" to nil so SQLite stores NULL instead of an empty string.
-func nullableStr(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
 func CreateUser(email, name, phone string) (User, error) {
 	u, err := unixid.NewUnixID()
 	if err != nil {

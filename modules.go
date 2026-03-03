@@ -1,7 +1,6 @@
 package user
 
 import (
-	_ "github.com/tinywasm/fmt/dictionary"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/form/input"
 )

@@ -5,7 +5,7 @@ go 1.25.2
 require (
 	github.com/tinywasm/fmt v0.18.5
 	github.com/tinywasm/form v0.0.26
-	github.com/tinywasm/orm v0.1.4
+	github.com/tinywasm/orm v0.1.6
 	github.com/tinywasm/sqlite v0.1.2
 	github.com/tinywasm/unixid v0.2.22
 	golang.org/x/crypto v0.48.0

@@ -5,7 +5,6 @@ package tests
 import (
 	"context"
 	"net/http"
-	"runtime"
 	"testing"
 
 	"github.com/tinywasm/orm"
@@ -16,9 +15,6 @@ import (
 )
 
 func newTestDB(t *testing.T) *orm.DB {
-	if runtime.GOARCH == "wasm" {
-		t.Skip("SQLite not supported in WASM")
-	}
 	db, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
