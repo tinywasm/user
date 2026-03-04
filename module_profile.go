@@ -3,6 +3,8 @@ package user
 import "github.com/tinywasm/form"
 
 type profileModule struct {
+	m *Module
+
 	form         *form.Form
 	passwordForm *form.Form
 }

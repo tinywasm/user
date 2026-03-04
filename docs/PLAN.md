@@ -300,20 +300,14 @@ import (
 type contextKey int
 const userKey contextKey = iota
 
-// RegisterMCP registers user authentication context funcs on the MCP server.
-// Covers both SSE and HTTP transports in one call.
-// The module knows which MCP hooks to register — the caller does not need to
-// know about mcp.WithHTTPContextFunc or mcp.WithSSEContextFunc.
+// RegisterMCP envuelve el handler MCP con middleware de sesión.
+// Alternativa limpia a registrar hooks en el MCPServer (que no existe en tinywasm/mcp).
 //
-// Call after mcp.NewMCPServer() and before serving.
-//
-// Example:
-//   srv := mcp.NewMCPServer("app", "1.0.0")
-//   m.RegisterMCP(srv)
-func (m *Module) RegisterMCP(srv *mcplib.MCPServer) {
-    fn := m.mcpContextFunc()
-    srv.SetHTTPContextFunc(fn)
-    srv.SetSSEContextFunc(fn)
+// Ejemplo:
+//   mcpHandler := mcp.NewStreamableHTTPServer(srv)
+//   mux.Handle("/mcp", m.RegisterMCP(mcpHandler))
+func (m *Module) RegisterMCP(next http.Handler) http.Handler {
+    return m.Middleware(next)
 }
 
 // Middleware protects HTTP routes. Validates the session cookie and injects

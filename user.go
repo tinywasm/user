@@ -22,12 +22,6 @@ var (
 	ErrIPTaken            = fmt.Err("ip", "registered")             // EN: Ip Registered                    / ES: Ip Registrado
 )
 
-
-
-
-
-
-
 type OAuthUserInfo struct {
 	ID    string
 	Email string
@@ -46,10 +40,4 @@ type Config struct {
 	SessionTTL        int    // default: 86400 (24h)
 	TrustProxy        bool   // default: false
 	OAuthProviders    []OAuthProvider
-}
-
-var sessionCookieName = "session"
-
-func SessionCookieName() string {
-	return sessionCookieName
 }

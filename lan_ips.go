@@ -5,18 +5,17 @@ package user
 import (
 	"time"
 
+	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
 )
 
-
-
-func RegisterLAN(userID, rut string) error {
+func (m *Module) RegisterLAN(userID, rut string) error {
 	normalized, err := validateRUT(rut)
 	if err != nil {
 		return ErrInvalidRUT
 	}
 
-	id, err := GetIdentityByProvider("lan", normalized)
+	id, err := getIdentityByProvider(m.db, "lan", normalized)
 	if err == nil {
 		if id.UserID != userID {
 			return ErrRUTTaken
@@ -26,11 +25,11 @@ func RegisterLAN(userID, rut string) error {
 		return err
 	}
 
-	return CreateIdentity(userID, "lan", normalized, "")
+	return createIdentity(m.db, userID, "lan", normalized, "")
 }
 
-func UnregisterLAN(userID string) error {
-	_, err := getIdentityByUserAndProvider(userID, "lan")
+func (m *Module) UnregisterLAN(userID string) error {
+	_, err := getIdentityByUserAndProvider(m.db, userID, "lan")
 	if err == ErrNotFound {
 		return ErrNotFound
 	}
@@ -38,22 +37,22 @@ func UnregisterLAN(userID string) error {
 		return err
 	}
 
-	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID)
+	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID)
 	ips, _ := ReadAllLANIP(qb)
 	for _, ip := range ips {
-		store.db.Delete(ip)
+		m.db.Delete(ip)
 	}
 
-	qbId := store.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq("lan")
+	qbId := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq("lan")
 	ids, _ := ReadAllIdentity(qbId)
 	for _, id := range ids {
-		store.db.Delete(id)
+		m.db.Delete(id)
 	}
 	return nil
 }
 
-func AssignLANIP(userID, ip, label string) error {
-	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.IP).Eq(ip)
+func (m *Module) AssignLANIP(userID, ip, label string) error {
+	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.IP).Eq(ip)
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return err
@@ -76,11 +75,11 @@ func AssignLANIP(userID, ip, label string) error {
 		Label:     label,
 		CreatedAt: now,
 	}
-	return store.db.Create(i)
+	return m.db.Create(i)
 }
 
-func RevokeLANIP(userID, ip string) error {
-	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
+func (m *Module) RevokeLANIP(userID, ip string) error {
+	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return err
@@ -89,11 +88,11 @@ func RevokeLANIP(userID, ip string) error {
 		return ErrNotFound
 	}
 
-	return store.db.Delete(results[0])
+	return m.db.Delete(results[0])
 }
 
-func GetLANIPs(userID string) ([]LANIP, error) {
-	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).OrderBy(LANIPMeta.CreatedAt).Asc()
+func (m *Module) GetLANIPs(userID string) ([]LANIP, error) {
+	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).OrderBy(LANIPMeta.CreatedAt).Asc()
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return nil, err
@@ -106,8 +105,8 @@ func GetLANIPs(userID string) ([]LANIP, error) {
 	return ips, nil
 }
 
-func checkLANIP(userID, ip string) error {
-	qb := store.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
+func checkLANIP(db *orm.DB, userID, ip string) error {
+	qb := db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return ErrInvalidCredentials

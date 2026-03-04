@@ -22,17 +22,17 @@ func (m *profileModule) Update(id string, data ...any) error {
 
 	switch d := data[0].(type) {
 	case *ProfileData:
-		return UpdateUser(id, d.Name, d.Phone)
+		return updateUser(m.m.db, m.m.ucache, id, d.Name, d.Phone)
 	case *PasswordData:
 		// Verify current password first?
 		// PasswordData has Current, New, Confirm.
 		if d.New != d.Confirm {
 			return ErrInvalidCredentials // Password mismatch
 		}
-		if err := VerifyPassword(id, d.Current); err != nil {
+		if err := m.m.VerifyPassword(id, d.Current); err != nil {
 			return err
 		}
-		return SetPassword(id, d.New)
+		return m.m.SetPassword(id, d.New)
 	}
 	return nil
 }

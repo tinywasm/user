@@ -8,13 +8,13 @@ import (
 	"github.com/tinywasm/unixid"
 )
 
-func CreateSession(userID, ip, userAgent string) (Session, error) {
+func (m *Module) CreateSession(userID, ip, userAgent string) (Session, error) {
 	u, err := unixid.NewUnixID()
 	if err != nil {
 		return Session{}, err
 	}
 
-	ttl := store.config.SessionTTL
+	ttl := m.config.SessionTTL
 	if ttl == 0 {
 		ttl = 86400
 	}
@@ -29,23 +29,23 @@ func CreateSession(userID, ip, userAgent string) (Session, error) {
 		CreatedAt: now,
 	}
 
-	if err := store.db.Create(&sess); err != nil {
+	if err := m.db.Create(&sess); err != nil {
 		return Session{}, err
 	}
-	store.cache.set(sess.ID, sess)
+	m.cache.set(sess.ID, sess)
 	return sess, nil
 }
 
-func GetSession(id string) (Session, error) {
-	if s, ok := store.cache.get(id); ok {
+func (m *Module) GetSession(id string) (Session, error) {
+	if s, ok := m.cache.get(id); ok {
 		if s.ExpiresAt < time.Now().Unix() {
-			store.cache.delete(id)
+			m.cache.delete(id)
 			return Session{}, ErrSessionExpired
 		}
 		return s, nil
 	}
 
-	qb := store.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
+	qb := m.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
 	results, err := ReadAllSession(qb)
 
 	if err != nil {
@@ -60,35 +60,35 @@ func GetSession(id string) (Session, error) {
 		return Session{}, ErrSessionExpired
 	}
 
-	store.cache.set(s.ID, s)
+	m.cache.set(s.ID, s)
 	return s, nil
 }
 
-func DeleteSession(id string) error {
-	store.cache.delete(id)
-	qb := store.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
+func (m *Module) DeleteSession(id string) error {
+	m.cache.delete(id)
+	qb := m.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
 	results, err := ReadAllSession(qb)
 	if err == nil && len(results) > 0 {
-		return store.db.Delete(results[0])
+		return m.db.Delete(results[0])
 	}
 	return err
 }
 
-func PurgeExpiredSessions() error {
+func (m *Module) PurgeExpiredSessions() error {
 	now := time.Now().Unix()
 
-	store.cache.mu.Lock()
-	for k, v := range store.cache.items {
+	m.cache.mu.Lock()
+	for k, v := range m.cache.items {
 		if v.ExpiresAt < now {
-			delete(store.cache.items, k)
+			delete(m.cache.items, k)
 		}
 	}
-	store.cache.mu.Unlock()
+	m.cache.mu.Unlock()
 
-	qb := store.db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Lt(now)
+	qb := m.db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Lt(now)
 	sessions, _ := ReadAllSession(qb)
 	for _, s := range sessions {
-		store.db.Delete(s)
+		m.db.Delete(s)
 	}
 
 	return nil

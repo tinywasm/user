@@ -42,19 +42,19 @@ func (m *User) Pointers() []any {
 
 var UserMeta = struct {
 	TableName string
-	ID string
-	Email string
-	Name string
-	Phone string
-	Status string
+	ID        string
+	Email     string
+	Name      string
+	Phone     string
+	Status    string
 	CreatedAt string
 }{
 	TableName: "users",
-	ID: "id",
-	Email: "email",
-	Name: "name",
-	Phone: "phone",
-	Status: "status",
+	ID:        "id",
+	Email:     "email",
+	Name:      "name",
+	Phone:     "phone",
+	Status:    "status",
 	CreatedAt: "created_at",
 }
 
@@ -110,18 +110,18 @@ func (m *Session) Pointers() []any {
 
 var SessionMeta = struct {
 	TableName string
-	ID string
-	UserID string
+	ID        string
+	UserID    string
 	ExpiresAt string
-	IP string
+	IP        string
 	UserAgent string
 	CreatedAt string
 }{
 	TableName: "user_sessions",
-	ID: "id",
-	UserID: "user_id",
+	ID:        "id",
+	UserID:    "user_id",
 	ExpiresAt: "expires_at",
-	IP: "ip",
+	IP:        "ip",
 	UserAgent: "user_agent",
 	CreatedAt: "created_at",
 }
@@ -177,21 +177,21 @@ func (m *Identity) Pointers() []any {
 }
 
 var IdentityMeta = struct {
-	TableName string
-	ID string
-	UserID string
-	Provider string
+	TableName  string
+	ID         string
+	UserID     string
+	Provider   string
 	ProviderID string
-	Email string
-	CreatedAt string
+	Email      string
+	CreatedAt  string
 }{
-	TableName: "user_identities",
-	ID: "id",
-	UserID: "user_id",
-	Provider: "provider",
+	TableName:  "user_identities",
+	ID:         "id",
+	UserID:     "user_id",
+	Provider:   "provider",
 	ProviderID: "provider_id",
-	Email: "email",
-	CreatedAt: "created_at",
+	Email:      "email",
+	CreatedAt:  "created_at",
 }
 
 func ReadOneIdentity(qb *orm.QB, model *Identity) (*Identity, error) {
@@ -239,16 +239,16 @@ func (m *Role) Pointers() []any {
 }
 
 var RoleMeta = struct {
-	TableName string
-	ID string
-	Code string
-	Name string
+	TableName   string
+	ID          string
+	Code        string
+	Name        string
 	Description string
 }{
-	TableName: "rbac_roles",
-	ID: "id",
-	Code: "code",
-	Name: "name",
+	TableName:   "rbac_roles",
+	ID:          "id",
+	Code:        "code",
+	Name:        "name",
 	Description: "description",
 }
 
@@ -292,12 +292,12 @@ func (m *UserRole) Pointers() []any {
 
 var UserRoleMeta = struct {
 	TableName string
-	UserID string
-	RoleID string
+	UserID    string
+	RoleID    string
 }{
 	TableName: "rbac_user_roles",
-	UserID: "user_id",
-	RoleID: "role_id",
+	UserID:    "user_id",
+	RoleID:    "role_id",
 }
 
 func ReadOneUserRole(qb *orm.QB, model *UserRole) (*UserRole, error) {
@@ -346,16 +346,16 @@ func (m *Permission) Pointers() []any {
 
 var PermissionMeta = struct {
 	TableName string
-	ID string
-	Name string
-	Resource string
-	Action string
+	ID        string
+	Name      string
+	Resource  string
+	Action    string
 }{
 	TableName: "rbac_permissions",
-	ID: "id",
-	Name: "name",
-	Resource: "resource",
-	Action: "action",
+	ID:        "id",
+	Name:      "name",
+	Resource:  "resource",
+	Action:    "action",
 }
 
 func ReadOnePermission(qb *orm.QB, model *Permission) (*Permission, error) {
@@ -397,12 +397,12 @@ func (m *RolePermission) Pointers() []any {
 }
 
 var RolePermissionMeta = struct {
-	TableName string
-	RoleID string
+	TableName    string
+	RoleID       string
 	PermissionID string
 }{
-	TableName: "rbac_role_permissions",
-	RoleID: "role_id",
+	TableName:    "rbac_role_permissions",
+	RoleID:       "role_id",
 	PermissionID: "permission_id",
 }
 
@@ -455,17 +455,17 @@ func (m *LANIP) Pointers() []any {
 
 var LANIPMeta = struct {
 	TableName string
-	ID string
-	UserID string
-	IP string
-	Label string
+	ID        string
+	UserID    string
+	IP        string
+	Label     string
 	CreatedAt string
 }{
 	TableName: "user_lan_ips",
-	ID: "id",
-	UserID: "user_id",
-	IP: "ip",
-	Label: "label",
+	ID:        "id",
+	UserID:    "user_id",
+	IP:        "ip",
+	Label:     "label",
 	CreatedAt: "created_at",
 }
 
@@ -515,14 +515,14 @@ func (m *OAuthState) Pointers() []any {
 
 var OAuthStateMeta = struct {
 	TableName string
-	State string
-	Provider string
+	State     string
+	Provider  string
 	ExpiresAt string
 	CreatedAt string
 }{
 	TableName: "user_oauth_states",
-	State: "state",
-	Provider: "provider",
+	State:     "state",
+	Provider:  "provider",
 	ExpiresAt: "expires_at",
 	CreatedAt: "created_at",
 }
