@@ -6,7 +6,7 @@ require (
 	github.com/tinywasm/fmt v0.18.6
 	github.com/tinywasm/form v0.0.27
 	github.com/tinywasm/orm v0.2.4
-	github.com/tinywasm/sqlite v0.1.8
+	github.com/tinywasm/sqlite v0.1.9
 	github.com/tinywasm/unixid v0.2.22
 	golang.org/x/crypto v0.48.0
 	golang.org/x/oauth2 v0.35.0
