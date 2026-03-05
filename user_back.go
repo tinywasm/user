@@ -24,11 +24,11 @@ type Module struct {
 // New initializes the user/rbac schema, warms the cache, and returns a Module handle.
 // This is the ONLY entry point for this package on the backend.
 func New(db *orm.DB, cfg Config) (*Module, error) {
-	if cfg.SessionCookieName == "" {
-		cfg.SessionCookieName = "session"
+	if cfg.CookieName == "" {
+		cfg.CookieName = "session"
 	}
-	if cfg.SessionTTL == 0 {
-		cfg.SessionTTL = 86400
+	if cfg.TokenTTL == 0 {
+		cfg.TokenTTL = 86400
 	}
 	m := &Module{
 		db:        db,
@@ -37,14 +37,16 @@ func New(db *orm.DB, cfg Config) (*Module, error) {
 		config:    cfg,
 		providers: make(map[string]OAuthProvider),
 	}
-	if err := initSchema(db); err != nil {
+	if err := initSchema(db, cfg.AuthMode); err != nil {
 		return nil, err
 	}
 	for _, p := range cfg.OAuthProviders {
 		m.registerProvider(p)
 	}
-	if err := m.cache.warmUp(db); err != nil {
-		return nil, err
+	if cfg.AuthMode == AuthModeCookie {
+		if err := m.cache.warmUp(db); err != nil {
+			return nil, err
+		}
 	}
 	return m, nil
 }

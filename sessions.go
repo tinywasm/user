@@ -14,7 +14,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (Session, error) {
 		return Session{}, err
 	}
 
-	ttl := m.config.SessionTTL
+	ttl := m.config.TokenTTL
 	if ttl == 0 {
 		ttl = 86400
 	}

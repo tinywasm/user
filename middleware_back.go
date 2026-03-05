@@ -79,9 +79,21 @@ func (m *Module) mcpContextFunc() func(context.Context, *http.Request) context.C
 }
 
 func (m *Module) validateSession(r *http.Request) (*User, error) {
-	cookie, err := r.Cookie(m.config.SessionCookieName)
+	cookie, err := r.Cookie(m.config.CookieName)
 	if err != nil {
 		return nil, ErrSessionExpired
+	}
+
+	if m.config.AuthMode == AuthModeJWT {
+		userID, err := validateJWT(m.config.JWTSecret, cookie.Value)
+		if err != nil {
+			return nil, err
+		}
+		u, err := m.GetUser(userID)
+		if err != nil {
+			return nil, err
+		}
+		return &u, nil
 	}
 
 	sess, err := m.GetSession(cookie.Value)

@@ -15,11 +15,16 @@ The `tinywasm/user` library manages user entities, authentication (password, OAu
 ```go
 // Config — pass to Init. Zero values use defaults.
 type Config struct {
-    SessionCookieName string          // default: "session"
-    SessionTTL        int             // default: 86400 (24h), in seconds
-    TrustProxy        bool            // default: false
-    OAuthProviders    []OAuthProvider // optional; register before Init
+    AuthMode   AuthMode // AuthModeCookie (default) | AuthModeJWT
+    CookieName string   // default: "session" — used in both modes
+    TokenTTL   int      // default: 86400s — session TTL or JWT expiry
+    JWTSecret  []byte   // required for AuthModeJWT
+    TrustProxy bool
+    OAuthProviders []OAuthProvider // optional; register before Init
 }
+
+// AuthModeCookie: session ID in HttpOnly cookie → DB lookup per request. Immediate revocation.
+// AuthModeJWT:    signed JWT in HttpOnly cookie → crypto validation only. Stateless, SPA/PWA-ready.
 
 // Init — creates tables via ORM, warms session cache, applies config.
 func Init(db *orm.DB, cfg Config) error
@@ -84,9 +89,9 @@ import "github.com/tinywasm/user"
 
 // Initialize the user module directly with an ORM db instance
 err := user.Init(db, user.Config{
-    SessionCookieName: "session_id", // default: "session"
-    SessionTTL:        86400,        // default: 86400 (24h)
-    TrustProxy:        true,         // default: false
+    CookieName: "session_id", // default: "session"
+    TokenTTL:   86400,        // default: 86400 (24h)
+    TrustProxy: true,         // default: false
     OAuthProviders: []user.OAuthProvider{
         &user.GoogleProvider{
             ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),

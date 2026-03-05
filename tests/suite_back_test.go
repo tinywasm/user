@@ -33,13 +33,63 @@ func RunUserTests(t *testing.T) {
 	t.Run("TestSessions", testSessions)
 	t.Run("TestOAuth", testOAuth)
 	t.Run("TestLAN", testLAN)
+	t.Run("TestJWTCookieMode", testJWTCookieMode)
+}
+
+func testJWTCookieMode(t *testing.T) {
+	db := newTestDB(t)
+	secret := []byte("test-secret-32-bytes-minimum-len")
+	m, err := user.New(db, user.Config{
+		AuthMode:  user.AuthModeJWT,
+		JWTSecret: secret,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	u, _ := m.CreateUser("jwt@test.com", "JWT User", "")
+	_ = m.SetPassword(u.ID, "password123")
+	logged, err := m.Login("jwt@test.com", "password123")
+	if err != nil {
+		t.Fatal("login failed:", err)
+	}
+
+	// Generar JWT como lo haría SetCookie
+	token, err := user.GenerateJWT(secret, logged.ID, 86400)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Request con JWT en cookie → debe autenticar
+	req := httptest.NewRequest("GET", "/", nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rec := httptest.NewRecorder()
+	var ctxUser *user.User
+	m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctxUser, _ = m.FromContext(r.Context())
+	})).ServeHTTP(rec, req)
+	if ctxUser == nil || ctxUser.ID != logged.ID {
+		t.Errorf("JWT middleware: expected user %s, got %v", logged.ID, ctxUser)
+	}
+
+	// Token inválido → 401
+	req2 := httptest.NewRequest("GET", "/", nil)
+	req2.AddCookie(&http.Cookie{Name: "session", Value: "invalid.jwt.token"})
+	rec2 := httptest.NewRecorder()
+	called := false
+	m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})).ServeHTTP(rec2, req2)
+	if called || rec2.Code != http.StatusUnauthorized {
+		t.Errorf("want 401 for invalid JWT, got %d (called=%v)", rec2.Code, called)
+	}
 }
 
 func testInit(t *testing.T) {
 	db := newTestDB(t)
 	cfg := user.Config{
-		SessionCookieName: "test_session",
-		SessionTTL:        3600,
+		CookieName: "test_session",
+		TokenTTL:   3600,
 	}
 	m, err := user.New(db, cfg)
 	if err != nil {
@@ -146,7 +196,7 @@ func testAuth(t *testing.T) {
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	m, err := user.New(db, user.Config{SessionTTL: 3600})
+	m, err := user.New(db, user.Config{TokenTTL: 3600})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +228,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Re-init to flush memory cache
-	m, _ = user.New(db, user.Config{SessionTTL: 3600})
+	m, _ = user.New(db, user.Config{TokenTTL: 3600})
 
 	_, err = m.GetSession(sess.ID)
 	if err != user.ErrSessionExpired {

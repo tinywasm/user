@@ -34,9 +34,9 @@ import "github.com/tinywasm/user"
 
 // Initialize the user module directly with an ORM db instance
 err := user.Init(db, user.Config{
-    SessionCookieName: "session_id", // default: "session"
-    SessionTTL:        86400,        // default: 86400 (24h)
-    TrustProxy:        true,         // default: false
+    CookieName: "session_id", // default: "session"
+    TokenTTL:   86400,        // default: 86400 (24h)
+    TrustProxy: true,         // default: false
     OAuthProviders: []user.OAuthProvider{
         &user.GoogleProvider{
             ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),

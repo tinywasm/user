@@ -29,8 +29,8 @@ modules into `tinywasm/site`. The auth backend (`//go:build !wasm`) and UI modul
   links the OAuth identity automatically.
 - **No framework dependencies:** Standard library + `golang.org/x/crypto` + `golang.org/x/oauth2`.
 - **Isomorphic modules:** Auth UI modules implement `site.Module` via duck typing (no import of `tinywasm/site`, no circular dep). Module instances are package-level vars — configured once, registered by the application.
-- **Config struct:** All configuration (`SessionCookieName`, `SessionTTL`, `TrustProxy`,
-  `OAuthProviders`) is passed as a single `Config` struct to `Init`. No call-ordering
+- **Config struct:** All configuration (`CookieName`, `TokenTTL`, `TrustProxy`,
+  `OAuthProviders`, `AuthMode`, `JWTSecret`) is grouped logically and passed during initialization.
   requirements, serializable, easy to test.
 - **Form-backed validation:** Each module holds a `*form.Form`. `ValidateData` (crudp.DataValidator) delegates to the form — same validation rules on frontend and backend, zero duplication.
 
