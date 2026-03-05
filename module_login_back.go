@@ -7,8 +7,10 @@ import "net/http"
 func (m *loginModule) RenderHTML() string {
 	m.form.SetSSR(true)
 	out := m.form.RenderHTML()
-	for _, p := range registeredProviders() {
-		out += `<a href="/oauth/` + p.Name() + `">Login with ` + p.Name() + `</a>`
+	if m.m != nil {
+		for _, p := range m.m.registeredProviders() {
+			out += `<a href="/oauth/` + p.Name() + `">Login with ` + p.Name() + `</a>`
+		}
 	}
 	return out
 }
@@ -21,7 +23,7 @@ func (m *loginModule) Create(data ...any) (any, error) {
 	if !ok {
 		return nil, ErrInvalidCredentials
 	}
-	u, err := Login(d.Email, d.Password)
+	u, err := m.m.Login(d.Email, d.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -29,17 +31,17 @@ func (m *loginModule) Create(data ...any) (any, error) {
 }
 
 func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
-	sess, err := CreateSession(userID, extractClientIP(r, store.config.TrustProxy), r.UserAgent())
+	sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
 	if err != nil {
 		return err
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName(),
+		Name:     m.m.config.SessionCookieName,
 		Value:    sess.ID,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   store.config.SessionTTL,
+		MaxAge:   m.m.config.SessionTTL,
 		Path:     "/",
 	})
 	return nil

@@ -9,18 +9,18 @@ import (
 	"strings"
 )
 
-func LoginLAN(rut string, r *http.Request) (User, error) {
+func (m *Module) LoginLAN(rut string, r *http.Request) (User, error) {
 	normalized, err := validateRUT(rut)
 	if err != nil {
 		return User{}, ErrInvalidRUT
 	}
 
-	identity, err := GetIdentityByProvider("lan", normalized)
+	identity, err := getIdentityByProvider(m.db, "lan", normalized)
 	if err != nil {
 		return User{}, ErrInvalidCredentials
 	}
 
-	u, err := GetUser(identity.UserID)
+	u, err := getUser(m.db, m.ucache, identity.UserID)
 	if err != nil {
 		return User{}, ErrInvalidCredentials
 	}
@@ -28,8 +28,8 @@ func LoginLAN(rut string, r *http.Request) (User, error) {
 		return User{}, ErrSuspended
 	}
 
-	clientIP := extractClientIP(r, store.config.TrustProxy)
-	if err := checkLANIP(identity.UserID, clientIP); err != nil {
+	clientIP := extractClientIP(r, m.config.TrustProxy)
+	if err := checkLANIP(m.db, identity.UserID, clientIP); err != nil {
 		return User{}, ErrInvalidCredentials
 	}
 

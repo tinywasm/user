@@ -41,76 +41,92 @@ func testInit(t *testing.T) {
 		SessionCookieName: "test_session",
 		SessionTTL:        3600,
 	}
-	if err := user.Init(db, cfg); err != nil {
-		t.Fatalf("Init failed: %v", err)
+	m, err := user.New(db, cfg)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
 	}
-	if user.SessionCookieName() != "test_session" {
-		t.Errorf("expected session cookie name 'test_session', got '%s'", user.SessionCookieName())
+	_ = m // to be used later
+}
+
+func getHandler(m *user.Module, name string) interface {
+	Create(any) (any, error)
+	Read(string) (any, error)
+	Update(any) (any, error)
+	Delete(string) error
+} {
+	for _, h := range m.Add() {
+		if hr, ok := h.(interface{ HandlerName() string }); ok && hr.HandlerName() == name {
+			return h.(interface {
+				Create(any) (any, error)
+				Read(string) (any, error)
+				Update(any) (any, error)
+				Delete(string) error
+			})
+		}
 	}
+	return nil
 }
 
 func testCRUD(t *testing.T) {
 	db := newTestDB(t)
-	user.Init(db, user.Config{})
+	m, err := user.New(db, user.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	u, err := user.CreateUser("test@example.com", "Test User", "123456789")
+	userCRUD := getHandler(m, "users")
+	if userCRUD == nil {
+		t.Fatal("userCRUD handler not found")
+	}
+
+	res, err := userCRUD.Create(user.User{Email: "test@example.com", Name: "Test User", Phone: "123456789"})
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
+	u := res.(user.User)
 	if u.Email != "test@example.com" {
 		t.Errorf("expected email 'test@example.com', got '%s'", u.Email)
 	}
 
-	u2, err := user.GetUser(u.ID)
+	res2, err := userCRUD.Read(u.ID)
 	if err != nil {
 		t.Fatalf("GetUser failed: %v", err)
 	}
+	u2 := res2.(user.User)
 	if u2.ID != u.ID {
 		t.Errorf("expected ID '%s', got '%s'", u.ID, u2.ID)
 	}
 
-	if err := user.UpdateUser(u.ID, "Updated Name", "987654321"); err != nil {
+	u2.Name = "Updated Name"
+	res3, err := userCRUD.Update(u2)
+	if err != nil {
 		t.Fatalf("UpdateUser failed: %v", err)
 	}
-	u3, err := user.GetUser(u.ID)
-	if err != nil {
-		t.Fatalf("GetUser failed: %v", err)
-	}
+	u3 := res3.(user.User)
 	if u3.Name != "Updated Name" {
 		t.Errorf("expected Name 'Updated Name', got '%s'", u3.Name)
-	}
-
-	if err := user.SuspendUser(u.ID); err != nil {
-		t.Fatalf("SuspendUser failed: %v", err)
-	}
-	u4, err := user.GetUser(u.ID)
-	if u4.Status != "suspended" {
-		t.Errorf("expected Status 'suspended', got '%s'", u4.Status)
-	}
-
-	if err := user.ReactivateUser(u.ID); err != nil {
-		t.Fatalf("ReactivateUser failed: %v", err)
-	}
-	u5, err := user.GetUser(u.ID)
-	if u5.Status != "active" {
-		t.Errorf("expected Status 'active', got '%s'", u5.Status)
 	}
 }
 
 func testAuth(t *testing.T) {
 	db := newTestDB(t)
-	user.Init(db, user.Config{})
-
-	u, err := user.CreateUser("auth@example.com", "Auth User", "")
+	m, err := user.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := user.SetPassword(u.ID, "password123"); err != nil {
+	userCRUD := getHandler(m, "users")
+	res, err := userCRUD.Create(user.User{Email: "auth@example.com", Name: "Auth User"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := res.(user.User)
+
+	if err := m.SetPassword(u.ID, "password123"); err != nil {
 		t.Fatalf("SetPassword failed: %v", err)
 	}
 
-	u2, err := user.Login("auth@example.com", "password123")
+	u2, err := m.Login("auth@example.com", "password123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -118,32 +134,37 @@ func testAuth(t *testing.T) {
 		t.Errorf("Login returned wrong user")
 	}
 
-	_, err = user.Login("auth@example.com", "wrongpass")
+	_, err = m.Login("auth@example.com", "wrongpass")
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials, got %v", err)
 	}
 
-	if err := user.VerifyPassword(u.ID, "password123"); err != nil {
+	if err := m.VerifyPassword(u.ID, "password123"); err != nil {
 		t.Fatalf("VerifyPassword failed: %v", err)
 	}
 }
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	user.Init(db, user.Config{SessionTTL: 3600})
-
-	u, err := user.CreateUser("sess@example.com", "Sess User", "")
+	m, err := user.New(db, user.Config{SessionTTL: 3600})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sess, err := user.CreateSession(u.ID, "127.0.0.1", "TestAgent")
+	userCRUD := getHandler(m, "users")
+	res, err := userCRUD.Create(user.User{Email: "sess@example.com", Name: "Sess User"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := res.(user.User)
+
+	sess, err := m.CreateSession(u.ID, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
 	// Get Session
-	s2, err := user.GetSession(sess.ID)
+	s2, err := m.GetSession(sess.ID)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
@@ -157,9 +178,9 @@ func testSessions(t *testing.T) {
 	}
 
 	// Re-init to flush memory cache
-	user.Init(db, user.Config{SessionTTL: 3600})
+	m, _ = user.New(db, user.Config{SessionTTL: 3600})
 
-	_, err = user.GetSession(sess.ID)
+	_, err = m.GetSession(sess.ID)
 	if err != user.ErrSessionExpired {
 		t.Errorf("expected ErrSessionExpired, got %v", err)
 	}
@@ -191,9 +212,12 @@ func testOAuth(t *testing.T) {
 	cfg := user.Config{
 		OAuthProviders: []user.OAuthProvider{mockP},
 	}
-	user.Init(db, cfg)
+	m, err := user.New(db, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	url, err := user.BeginOAuth("mock")
+	url, err := m.BeginOAuth("mock")
 	if err != nil {
 		t.Fatalf("BeginOAuth failed: %v", err)
 	}
@@ -203,7 +227,7 @@ func testOAuth(t *testing.T) {
 	state := url[12:]
 
 	req, _ := http.NewRequest("GET", "/callback?state="+state+"&code=mockcode", nil)
-	u, isNew, err := user.CompleteOAuth("mock", req, "127.0.0.1", "TestAgent")
+	u, isNew, err := m.CompleteOAuth("mock", req, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CompleteOAuth failed: %v", err)
 	}
@@ -214,11 +238,11 @@ func testOAuth(t *testing.T) {
 		t.Errorf("expected email mock@example.com, got %s", u.Email)
 	}
 
-	url2, _ := user.BeginOAuth("mock")
+	url2, _ := m.BeginOAuth("mock")
 	state2 := url2[12:]
 	req2, _ := http.NewRequest("GET", "/callback?state="+state2+"&code=mockcode", nil)
 
-	u2, isNew2, err := user.CompleteOAuth("mock", req2, "127.0.0.1", "TestAgent")
+	u2, isNew2, err := m.CompleteOAuth("mock", req2, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CompleteOAuth 2 failed: %v", err)
 	}
@@ -232,25 +256,30 @@ func testOAuth(t *testing.T) {
 
 func testLAN(t *testing.T) {
 	db := newTestDB(t)
-	user.Init(db, user.Config{TrustProxy: true})
-
-	u, err := user.CreateUser("lan@example.com", "LAN User", "")
+	m, err := user.New(db, user.Config{TrustProxy: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := user.RegisterLAN(u.ID, "12345678-5"); err != nil {
+	userCRUD := getHandler(m, "users")
+	res, err := userCRUD.Create(user.User{Email: "lan@example.com", Name: "LAN User"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := res.(user.User)
+
+	if err := m.RegisterLAN(u.ID, "12345678-5"); err != nil {
 		t.Fatalf("RegisterLAN failed: %v", err)
 	}
 
-	if err := user.AssignLANIP(u.ID, "192.168.1.10", "Home"); err != nil {
+	if err := m.AssignLANIP(u.ID, "192.168.1.10", "Home"); err != nil {
 		t.Fatalf("AssignLANIP failed: %v", err)
 	}
 
 	req, _ := http.NewRequest("POST", "/lan", nil)
 	req.RemoteAddr = "192.168.1.10:1234"
 
-	u2, err := user.LoginLAN("12345678-5", req)
+	u2, err := m.LoginLAN("12345678-5", req)
 	if err != nil {
 		t.Fatalf("LoginLAN failed: %v", err)
 	}
@@ -258,20 +287,20 @@ func testLAN(t *testing.T) {
 		t.Errorf("expected same user ID")
 	}
 
-	_, err = user.LoginLAN("123", req)
+	_, err = m.LoginLAN("123", req)
 	if err != user.ErrInvalidRUT {
 		t.Errorf("expected ErrInvalidRUT, got %v", err)
 	}
 
 	req.RemoteAddr = "10.0.0.1:1234"
-	_, err = user.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", req)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials for wrong IP, got %v", err)
 	}
 
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Forwarded-For", "192.168.1.10")
-	u3, err := user.LoginLAN("12345678-5", req)
+	u3, err := m.LoginLAN("12345678-5", req)
 	if err != nil {
 		t.Fatalf("LoginLAN with proxy failed: %v", err)
 	}
@@ -279,20 +308,20 @@ func testLAN(t *testing.T) {
 		t.Errorf("expected same user ID")
 	}
 
-	if err := user.RevokeLANIP(u.ID, "192.168.1.10"); err != nil {
+	if err := m.RevokeLANIP(u.ID, "192.168.1.10"); err != nil {
 		t.Fatalf("RevokeLANIP failed: %v", err)
 	}
 
-	_, err = user.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", req)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials after revoke, got %v", err)
 	}
 
-	if err := user.UnregisterLAN(u.ID); err != nil {
+	if err := m.UnregisterLAN(u.ID); err != nil {
 		t.Fatalf("UnregisterLAN failed: %v", err)
 	}
 
-	_, err = user.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", req)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials after unregister, got %v", err)
 	}

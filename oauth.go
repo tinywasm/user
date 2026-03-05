@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
 )
 
-func BeginOAuth(providerName string) (string, error) {
-	p := getProvider(providerName)
+func (m *Module) BeginOAuth(providerName string) (string, error) {
+	p := m.getProvider(providerName)
 	if p == nil {
 		return "", ErrProviderNotFound
 	}
@@ -31,20 +32,20 @@ func BeginOAuth(providerName string) (string, error) {
 		CreatedAt: now,
 	}
 
-	if err := store.db.Create(stateObj); err != nil {
+	if err := m.db.Create(stateObj); err != nil {
 		return "", err
 	}
 
 	return p.AuthCodeURL(state), nil
 }
 
-func CompleteOAuth(providerName string, r *http.Request, ip, ua string) (User, bool, error) {
+func (m *Module) CompleteOAuth(providerName string, r *http.Request, ip, ua string) (User, bool, error) {
 	state := r.URL.Query().Get("state")
-	if err := consumeState(state, providerName); err != nil {
+	if err := consumeState(m.db, state, providerName); err != nil {
 		return User{}, false, ErrInvalidOAuthState
 	}
 
-	p := getProvider(providerName)
+	p := m.getProvider(providerName)
 	if p == nil {
 		return User{}, false, ErrProviderNotFound
 	}
@@ -59,28 +60,28 @@ func CompleteOAuth(providerName string, r *http.Request, ip, ua string) (User, b
 		return User{}, false, err
 	}
 
-	identity, err := GetIdentityByProvider(providerName, info.ID)
+	identity, err := getIdentityByProvider(m.db, providerName, info.ID)
 	if err == nil {
-		u, err := GetUser(identity.UserID)
+		u, err := getUser(m.db, m.ucache, identity.UserID)
 		return u, false, err
 	}
 
-	u, err := GetUserByEmail(info.Email)
+	u, err := getUserByEmail(m.db, m.ucache, info.Email)
 	if err == nil {
-		_ = CreateIdentity(u.ID, providerName, info.ID, info.Email)
+		_ = createIdentity(m.db, u.ID, providerName, info.ID, info.Email)
 		return u, false, nil
 	}
 
-	u, err = CreateUser(info.Email, info.Name, "")
+	u, err = createUser(m.db, info.Email, info.Name, "")
 	if err != nil {
 		return User{}, false, err
 	}
-	_ = CreateIdentity(u.ID, providerName, info.ID, info.Email)
+	_ = createIdentity(m.db, u.ID, providerName, info.ID, info.Email)
 	return u, true, nil
 }
 
-func consumeState(state, provider string) error {
-	qb := store.db.Query(&OAuthState{}).Where(OAuthStateMeta.State).Eq(state)
+func consumeState(db *orm.DB, state, provider string) error {
+	qb := db.Query(&OAuthState{}).Where(OAuthStateMeta.State).Eq(state)
 	results, err := ReadAllOAuthState(qb)
 	if err != nil {
 		return err
@@ -95,7 +96,7 @@ func consumeState(state, provider string) error {
 	}
 
 	// Delete state (single use) - done regardless of expiration to prevent reuse
-	if err := store.db.Delete(stateObj); err != nil {
+	if err := db.Delete(stateObj); err != nil {
 		return err
 	}
 
@@ -106,11 +107,11 @@ func consumeState(state, provider string) error {
 	return nil
 }
 
-func PurgeExpiredOAuthStates() error {
-	qb := store.db.Query(&OAuthState{}).Where(OAuthStateMeta.ExpiresAt).Lt(time.Now().Unix())
+func (m *Module) PurgeExpiredOAuthStates() error {
+	qb := m.db.Query(&OAuthState{}).Where(OAuthStateMeta.ExpiresAt).Lt(time.Now().Unix())
 	states, _ := ReadAllOAuthState(qb)
 	for _, s := range states {
-		store.db.Delete(s)
+		m.db.Delete(s)
 	}
 	return nil
 }

@@ -5,10 +5,11 @@ package user
 import (
 	"time"
 
+	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
 )
 
-func CreateIdentity(userID, provider, providerID, email string) error {
+func createIdentity(db *orm.DB, userID, provider, providerID, email string) error {
 	u, err := unixid.NewUnixID()
 	if err != nil {
 		return err
@@ -26,7 +27,7 @@ func CreateIdentity(userID, provider, providerID, email string) error {
 		CreatedAt:  now,
 	}
 
-	if err := store.db.Create(i); err != nil {
+	if err := db.Create(i); err != nil {
 		if isUniqueViolation(err) {
 			return err
 		}
@@ -35,8 +36,8 @@ func CreateIdentity(userID, provider, providerID, email string) error {
 	return nil
 }
 
-func GetIdentityByProvider(provider, providerID string) (Identity, error) {
-	qb := store.db.Query(&Identity{}).
+func getIdentityByProvider(db *orm.DB, provider, providerID string) (Identity, error) {
+	qb := db.Query(&Identity{}).
 		Where(IdentityMeta.Provider).Eq(provider).
 		Where(IdentityMeta.ProviderID).Eq(providerID)
 
@@ -50,8 +51,8 @@ func GetIdentityByProvider(provider, providerID string) (Identity, error) {
 	return *results[0], nil
 }
 
-func getIdentityByUserAndProvider(userID, provider string) (Identity, error) {
-	qb := store.db.Query(&Identity{}).
+func getIdentityByUserAndProvider(db *orm.DB, userID, provider string) (Identity, error) {
+	qb := db.Query(&Identity{}).
 		Where(IdentityMeta.UserID).Eq(userID).
 		Where(IdentityMeta.Provider).Eq(provider)
 
@@ -65,8 +66,8 @@ func getIdentityByUserAndProvider(userID, provider string) (Identity, error) {
 	return *results[0], nil
 }
 
-func GetUserIdentities(userID string) ([]Identity, error) {
-	qb := store.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID)
+func (m *Module) GetUserIdentities(userID string) ([]Identity, error) {
+	qb := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID)
 	results, err := ReadAllIdentity(qb)
 	if err != nil {
 		return nil, err
@@ -79,8 +80,8 @@ func GetUserIdentities(userID string) ([]Identity, error) {
 	return identities, nil
 }
 
-func upsertIdentity(userID, provider, providerID, email string) error {
-	qb := store.db.Query(&Identity{}).
+func upsertIdentity(db *orm.DB, userID, provider, providerID, email string) error {
+	qb := db.Query(&Identity{}).
 		Where(IdentityMeta.UserID).Eq(userID).
 		Where(IdentityMeta.Provider).Eq(provider)
 
@@ -89,16 +90,16 @@ func upsertIdentity(userID, provider, providerID, email string) error {
 		i := results[0]
 		i.ProviderID = providerID
 		i.Email = email
-		return store.db.Update(i)
+		return db.Update(i)
 	} else if len(results) == 0 {
-		return CreateIdentity(userID, provider, providerID, email)
+		return createIdentity(db, userID, provider, providerID, email)
 	} else {
 		return err
 	}
 }
 
-func UnlinkIdentity(userID, provider string) error {
-	identities, err := GetUserIdentities(userID)
+func (m *Module) UnlinkIdentity(userID, provider string) error {
+	identities, err := m.GetUserIdentities(userID)
 	if err != nil {
 		return err
 	}
@@ -118,13 +119,13 @@ func UnlinkIdentity(userID, provider string) error {
 		return ErrCannotUnlink
 	}
 
-	qb := store.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq(provider)
+	qb := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq(provider)
 	results, err := ReadAllIdentity(qb)
 	if err != nil {
 		return err
 	}
 	if len(results) > 0 {
-		return store.db.Delete(results[0])
+		return m.db.Delete(results[0])
 	}
 	return ErrNotFound
 }

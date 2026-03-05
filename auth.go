@@ -3,13 +3,15 @@
 package user
 
 import (
+	"github.com/tinywasm/orm"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
 var PasswordHashCost = bcrypt.DefaultCost
 
-func Login(email, password string) (User, error) {
-	u, err := GetUserByEmail(email)
+func (m *Module) Login(email, password string) (User, error) {
+	u, err := getUserByEmail(m.db, m.ucache, email)
 	if err != nil {
 		return User{}, ErrInvalidCredentials
 	}
@@ -17,7 +19,7 @@ func Login(email, password string) (User, error) {
 		return User{}, ErrSuspended
 	}
 
-	identity, err := getLocalIdentity(u.ID)
+	identity, err := getLocalIdentity(m.db, u.ID)
 	if err != nil {
 		return User{}, ErrInvalidCredentials
 	}
@@ -28,11 +30,11 @@ func Login(email, password string) (User, error) {
 	return u, nil
 }
 
-func getLocalIdentity(userID string) (Identity, error) {
-	return getIdentityByUserAndProvider(userID, "local")
+func getLocalIdentity(db *orm.DB, userID string) (Identity, error) {
+	return getIdentityByUserAndProvider(db, userID, "local")
 }
 
-func SetPassword(userID, password string) error {
+func (m *Module) SetPassword(userID, password string) error {
 	if len(password) < 8 {
 		return ErrWeakPassword
 	}
@@ -40,11 +42,11 @@ func SetPassword(userID, password string) error {
 	if err != nil {
 		return err
 	}
-	return upsertIdentity(userID, "local", string(hash), "")
+	return upsertIdentity(m.db, userID, "local", string(hash), "")
 }
 
-func VerifyPassword(userID, password string) error {
-	identity, err := getLocalIdentity(userID)
+func (m *Module) VerifyPassword(userID, password string) error {
+	identity, err := getLocalIdentity(m.db, userID)
 	if err != nil {
 		return ErrInvalidCredentials
 	}

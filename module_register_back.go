@@ -17,28 +17,28 @@ func (m *registerModule) Create(data ...any) (any, error) {
 	if !ok {
 		return nil, ErrInvalidCredentials
 	}
-	u, err := CreateUser(d.Email, d.Name, d.Phone)
+	u, err := createUser(m.m.db, d.Email, d.Name, d.Phone)
 	if err != nil {
 		return nil, err
 	}
-	if err := SetPassword(u.ID, d.Password); err != nil {
+	if err := m.m.SetPassword(u.ID, d.Password); err != nil {
 		return nil, err
 	}
 	return u, nil
 }
 
 func (m *registerModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
-	sess, err := CreateSession(userID, extractClientIP(r, store.config.TrustProxy), r.UserAgent())
+	sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
 	if err != nil {
 		return err
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName(),
+		Name:     m.m.config.SessionCookieName,
 		Value:    sess.ID,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   store.config.SessionTTL,
+		MaxAge:   m.m.config.SessionTTL,
 		Path:     "/",
 	})
 	return nil
