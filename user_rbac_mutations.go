@@ -4,6 +4,8 @@ package user
 
 import (
 	"database/sql"
+
+	"github.com/tinywasm/orm"
 )
 
 func (m *Module) CreateRole(id string, code string, name, description string) error {
@@ -23,7 +25,7 @@ func (m *Module) CreateRole(id string, code string, name, description string) er
 		existingR.Code = code
 		existingR.Name = name
 		existingR.Description = description
-		return m.db.Update(existingR)
+		return m.db.Update(existingR, orm.Eq(RoleMeta.ID, existingR.ID))
 	}
 	return err
 }
@@ -48,16 +50,16 @@ func (m *Module) DeleteRole(id string) error {
 	urQb := m.db.Query(&UserRole{}).Where(UserRoleMeta.RoleID).Eq(id)
 	urs, _ := ReadAllUserRole(urQb)
 	for _, ur := range urs {
-		m.db.Delete(ur)
+		m.db.Delete(ur, orm.Eq(UserRoleMeta.UserID, ur.UserID), orm.Eq(UserRoleMeta.RoleID, ur.RoleID))
 	}
 
 	rpQb := m.db.Query(&RolePermission{}).Where(RolePermissionMeta.RoleID).Eq(id)
 	rps, _ := ReadAllRolePermission(rpQb)
 	for _, rp := range rps {
-		m.db.Delete(rp)
+		m.db.Delete(rp, orm.Eq(RolePermissionMeta.RoleID, rp.RoleID), orm.Eq(RolePermissionMeta.PermissionID, rp.PermissionID))
 	}
 
-	err = m.db.Delete(r)
+	err = m.db.Delete(r, orm.Eq(RoleMeta.ID, r.ID))
 	if err == nil {
 		m.ucache.InvalidateByRole(id)
 	}
@@ -81,7 +83,7 @@ func (m *Module) CreatePermission(id, name, resource string, action string) erro
 		existingP.Name = name
 		existingP.Resource = resource
 		existingP.Action = action
-		return m.db.Update(existingP)
+		return m.db.Update(existingP, orm.Eq(PermissionMeta.ID, existingP.ID))
 	}
 	return err
 }
@@ -98,7 +100,7 @@ func (m *Module) DeletePermission(id string) error {
 		return err
 	}
 
-	err = m.db.Delete(p)
+	err = m.db.Delete(p, orm.Eq(PermissionMeta.ID, p.ID))
 	if err == nil {
 		m.ucache.InvalidateByPermission(id)
 	}
@@ -126,7 +128,7 @@ func (m *Module) RevokeRole(userID, roleID string) error {
 	if err != nil {
 		return err
 	}
-	err = m.db.Delete(ur)
+	err = m.db.Delete(ur, orm.Eq(UserRoleMeta.UserID, ur.UserID), orm.Eq(UserRoleMeta.RoleID, ur.RoleID))
 	if err == nil {
 		m.ucache.Delete(userID)
 	}

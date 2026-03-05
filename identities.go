@@ -90,7 +90,7 @@ func upsertIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 		i := results[0]
 		i.ProviderID = providerID
 		i.Email = email
-		return db.Update(i)
+		return db.Update(i, orm.Eq(IdentityMeta.ID, i.ID))
 	} else if len(results) == 0 {
 		return createIdentity(db, userID, provider, providerID, email)
 	} else {
@@ -125,7 +125,7 @@ func (m *Module) UnlinkIdentity(userID, provider string) error {
 		return err
 	}
 	if len(results) > 0 {
-		return m.db.Delete(results[0])
+		return m.db.Delete(results[0], orm.Eq(IdentityMeta.ID, results[0].ID))
 	}
 	return ErrNotFound
 }

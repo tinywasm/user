@@ -31,7 +31,7 @@ func (m *registerModule) SetCookie(userID string, w http.ResponseWriter, r *http
 	var value string
 
 	if m.m.config.AuthMode == AuthModeJWT {
-		token, err := generateJWT(m.m.config.JWTSecret, userID, m.m.config.TokenTTL)
+		token, err := GenerateJWT(m.m.config.JWTSecret, userID, m.m.config.TokenTTL)
 		if err != nil {
 			return err
 		}

@@ -5,6 +5,7 @@ package tests
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/tinywasm/orm"
@@ -47,7 +48,12 @@ func testJWTCookieMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u, _ := m.CreateUser("jwt@test.com", "JWT User", "")
+	userCRUD := getHandler(m, "users")
+	res, err := userCRUD.Create(user.User{Email: "jwt@test.com", Name: "JWT User"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := res.(user.User)
 	_ = m.SetPassword(u.ID, "password123")
 	logged, err := m.Login("jwt@test.com", "password123")
 	if err != nil {

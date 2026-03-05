@@ -173,7 +173,7 @@ func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
 	u := results[0]
 	u.Name = name
 	u.Phone = phone
-	return db.Update(u)
+	return db.Update(u, orm.Eq(UserMeta.ID, u.ID))
 }
 
 func suspendUser(db *orm.DB, cache *userCache, id string) error {
@@ -187,7 +187,7 @@ func suspendUser(db *orm.DB, cache *userCache, id string) error {
 	}
 	u := results[0]
 	u.Status = "suspended"
-	return db.Update(u)
+	return db.Update(u, orm.Eq(UserMeta.ID, u.ID))
 }
 
 func reactivateUser(db *orm.DB, cache *userCache, id string) error {
@@ -201,7 +201,7 @@ func reactivateUser(db *orm.DB, cache *userCache, id string) error {
 	}
 	u := results[0]
 	u.Status = "active"
-	return db.Update(u)
+	return db.Update(u, orm.Eq(UserMeta.ID, u.ID))
 }
 
 func listUsers(db *orm.DB) ([]User, error) {
@@ -227,7 +227,8 @@ func deleteUser(db *orm.DB, cache *userCache, id string) error {
 	if err != nil || len(results) == 0 {
 		return ErrNotFound
 	}
-	return db.Delete(results[0])
+	u := results[0]
+	return db.Delete(u, orm.Eq(UserMeta.ID, u.ID))
 }
 
 func isUniqueViolation(err error) bool {

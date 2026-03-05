@@ -85,7 +85,7 @@ func (m *Module) validateSession(r *http.Request) (*User, error) {
 	}
 
 	if m.config.AuthMode == AuthModeJWT {
-		userID, err := validateJWT(m.config.JWTSecret, cookie.Value)
+		userID, err := ValidateJWT(m.config.JWTSecret, cookie.Value)
 		if err != nil {
 			return nil, err
 		}

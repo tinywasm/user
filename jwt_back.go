@@ -26,7 +26,7 @@ type jwtPayload struct {
 	Iat int64  `json:"iat"`
 }
 
-func generateJWT(secret []byte, userID string, ttl int) (string, error) {
+func GenerateJWT(secret []byte, userID string, ttl int) (string, error) {
 	if ttl == 0 {
 		ttl = 86400
 	}
@@ -39,7 +39,7 @@ func generateJWT(secret []byte, userID string, ttl int) (string, error) {
 	return header + "." + payload + "." + sig, nil
 }
 
-func validateJWT(secret []byte, token string) (string, error) {
+func ValidateJWT(secret []byte, token string) (string, error) {
 	parts := strings.SplitN(token, ".", 3)
 	if len(parts) != 3 {
 		return "", ErrInvalidToken
