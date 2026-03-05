@@ -35,9 +35,30 @@ type OAuthProvider interface {
 	GetUserInfo(ctx context.Context, token *oauth2.Token) (OAuthUserInfo, error)
 }
 
+// AuthMode selects the session strategy.
+type AuthMode uint8
+
+const (
+	// AuthModeCookie stores a session ID in an HttpOnly cookie.
+	// Stateful: requires user_sessions table. Supports immediate revocation.
+	AuthModeCookie AuthMode = iota // default
+
+	// AuthModeJWT stores a signed JWT in an HttpOnly cookie.
+	// Stateless: no DB lookup per request. No immediate revocation.
+	// Ideal for SPA/PWA and multi-server deployments.
+	AuthModeJWT
+)
+
 type Config struct {
-	SessionCookieName string // default: "session"
-	SessionTTL        int    // default: 86400 (24h)
-	TrustProxy        bool   // default: false
-	OAuthProviders    []OAuthProvider
+	AuthMode AuthMode // default: AuthModeCookie
+
+	// Shared by both modes
+	CookieName string // default: "session"
+	TokenTTL   int    // default: 86400 (seconds). Session TTL in cookie mode, JWT expiry in JWT mode.
+
+	// JWT mode only — required when AuthMode == AuthModeJWT
+	JWTSecret []byte
+
+	TrustProxy     bool
+	OAuthProviders []OAuthProvider
 }

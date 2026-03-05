@@ -5,6 +5,7 @@ package user
 import (
 	"time"
 
+	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
 )
 
@@ -14,7 +15,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (Session, error) {
 		return Session{}, err
 	}
 
-	ttl := m.config.SessionTTL
+	ttl := m.config.TokenTTL
 	if ttl == 0 {
 		ttl = 86400
 	}
@@ -69,7 +70,7 @@ func (m *Module) DeleteSession(id string) error {
 	qb := m.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
 	results, err := ReadAllSession(qb)
 	if err == nil && len(results) > 0 {
-		return m.db.Delete(results[0])
+		return m.db.Delete(results[0], orm.Eq(SessionMeta.ID, results[0].ID))
 	}
 	return err
 }
@@ -88,7 +89,7 @@ func (m *Module) PurgeExpiredSessions() error {
 	qb := m.db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Lt(now)
 	sessions, _ := ReadAllSession(qb)
 	for _, s := range sessions {
-		m.db.Delete(s)
+		m.db.Delete(s, orm.Eq(SessionMeta.ID, s.ID))
 	}
 
 	return nil

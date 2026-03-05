@@ -40,13 +40,13 @@ func (m *Module) UnregisterLAN(userID string) error {
 	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID)
 	ips, _ := ReadAllLANIP(qb)
 	for _, ip := range ips {
-		m.db.Delete(ip)
+		m.db.Delete(ip, orm.Eq(LANIPMeta.ID, ip.ID))
 	}
 
 	qbId := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq("lan")
 	ids, _ := ReadAllIdentity(qbId)
 	for _, id := range ids {
-		m.db.Delete(id)
+		m.db.Delete(id, orm.Eq(IdentityMeta.ID, id.ID))
 	}
 	return nil
 }
@@ -88,7 +88,7 @@ func (m *Module) RevokeLANIP(userID, ip string) error {
 		return ErrNotFound
 	}
 
-	return m.db.Delete(results[0])
+	return m.db.Delete(results[0], orm.Eq(LANIPMeta.ID, results[0].ID))
 }
 
 func (m *Module) GetLANIPs(userID string) ([]LANIP, error) {

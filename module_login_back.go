@@ -31,17 +31,29 @@ func (m *loginModule) Create(data ...any) (any, error) {
 }
 
 func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
-	sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
-	if err != nil {
-		return err
+	var value string
+
+	if m.m.config.AuthMode == AuthModeJWT {
+		token, err := GenerateJWT(m.m.config.JWTSecret, userID, m.m.config.TokenTTL)
+		if err != nil {
+			return err
+		}
+		value = token
+	} else {
+		sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
+		if err != nil {
+			return err
+		}
+		value = sess.ID
 	}
+
 	http.SetCookie(w, &http.Cookie{
-		Name:     m.m.config.SessionCookieName,
-		Value:    sess.ID,
+		Name:     m.m.config.CookieName,
+		Value:    value,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   m.m.config.SessionTTL,
+		MaxAge:   m.m.config.TokenTTL,
 		Path:     "/",
 	})
 	return nil
