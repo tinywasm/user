@@ -46,7 +46,7 @@ func (m *Module) GetSession(id string) (Session, error) {
 		return s, nil
 	}
 
-	qb := m.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
+	qb := m.db.Query(&Session{}).Where(Session_.ID).Eq(id)
 	results, err := ReadAllSession(qb)
 
 	if err != nil {
@@ -67,10 +67,10 @@ func (m *Module) GetSession(id string) (Session, error) {
 
 func (m *Module) DeleteSession(id string) error {
 	m.cache.delete(id)
-	qb := m.db.Query(&Session{}).Where(SessionMeta.ID).Eq(id)
+	qb := m.db.Query(&Session{}).Where(Session_.ID).Eq(id)
 	results, err := ReadAllSession(qb)
 	if err == nil && len(results) > 0 {
-		return m.db.Delete(results[0], orm.Eq(SessionMeta.ID, results[0].ID))
+		return m.db.Delete(results[0], orm.Eq(Session_.ID, results[0].ID))
 	}
 	return err
 }
@@ -86,10 +86,10 @@ func (m *Module) PurgeExpiredSessions() error {
 	}
 	m.cache.mu.Unlock()
 
-	qb := m.db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Lt(now)
+	qb := m.db.Query(&Session{}).Where(Session_.ExpiresAt).Lt(now)
 	sessions, _ := ReadAllSession(qb)
 	for _, s := range sessions {
-		m.db.Delete(s, orm.Eq(SessionMeta.ID, s.ID))
+		m.db.Delete(s, orm.Eq(Session_.ID, s.ID))
 	}
 
 	return nil

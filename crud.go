@@ -39,7 +39,7 @@ func createUser(db *orm.DB, email, name, phone string) (User, error) {
 
 func hydrateUser(db *orm.DB, u *User) error {
 	// 1. Fetch UserRoles to get Role IDs
-	qbUserRoles := db.Query(&UserRole{}).Where(UserRoleMeta.UserID).Eq(u.ID)
+	qbUserRoles := db.Query(&UserRole{}).Where(UserRole_.UserID).Eq(u.ID)
 	userRoles, err := ReadAllUserRole(qbUserRoles)
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func hydrateUser(db *orm.DB, u *User) error {
 
 	if len(roleIDs) > 0 {
 		// 2. Fetch Roles
-		qbRoles := db.Query(&Role{}).Where(RoleMeta.ID).In(roleIDs)
+		qbRoles := db.Query(&Role{}).Where(Role_.ID).In(roleIDs)
 		roles, err := ReadAllRole(qbRoles)
 		if err != nil {
 			return err
@@ -63,7 +63,7 @@ func hydrateUser(db *orm.DB, u *User) error {
 		}
 
 		// 3. Fetch RolePermissions to get Permission IDs
-		qbRolePerms := db.Query(&RolePermission{}).Where(RolePermissionMeta.RoleID).In(roleIDs)
+		qbRolePerms := db.Query(&RolePermission{}).Where(RolePermission_.RoleID).In(roleIDs)
 		rolePerms, err := ReadAllRolePermission(qbRolePerms)
 		if err != nil {
 			return err
@@ -76,7 +76,7 @@ func hydrateUser(db *orm.DB, u *User) error {
 
 		if len(permIDs) > 0 {
 			// 4. Fetch Permissions
-			qbPerms := db.Query(&Permission{}).Where(PermissionMeta.ID).In(permIDs)
+			qbPerms := db.Query(&Permission{}).Where(Permission_.ID).In(permIDs)
 			perms, err := ReadAllPermission(qbPerms)
 			if err != nil {
 				return err
@@ -114,7 +114,7 @@ func getUser(db *orm.DB, cache *userCache, id string) (User, error) {
 		}
 	}
 
-	qb := db.Query(&User{}).Where(UserMeta.ID).Eq(id)
+	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
 	results, err := ReadAllUser(qb)
 	if err != nil {
 		return User{}, err
@@ -135,7 +135,7 @@ func getUser(db *orm.DB, cache *userCache, id string) (User, error) {
 }
 
 func getUserByEmail(db *orm.DB, cache *userCache, email string) (User, error) {
-	qb := db.Query(&User{}).Where(UserMeta.Email).Eq(email)
+	qb := db.Query(&User{}).Where(User_.Email).Eq(email)
 	results, err := ReadAllUser(qb)
 	if err != nil {
 		return User{}, err
@@ -165,7 +165,7 @@ func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(UserMeta.ID).Eq(id)
+	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
 	results, err := ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
 		return ErrNotFound
@@ -173,35 +173,35 @@ func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
 	u := results[0]
 	u.Name = name
 	u.Phone = phone
-	return db.Update(u, orm.Eq(UserMeta.ID, u.ID))
+	return db.Update(u, orm.Eq(User_.ID, u.ID))
 }
 
 func suspendUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(UserMeta.ID).Eq(id)
+	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
 	results, err := ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
 		return ErrNotFound
 	}
 	u := results[0]
 	u.Status = "suspended"
-	return db.Update(u, orm.Eq(UserMeta.ID, u.ID))
+	return db.Update(u, orm.Eq(User_.ID, u.ID))
 }
 
 func reactivateUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(UserMeta.ID).Eq(id)
+	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
 	results, err := ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
 		return ErrNotFound
 	}
 	u := results[0]
 	u.Status = "active"
-	return db.Update(u, orm.Eq(UserMeta.ID, u.ID))
+	return db.Update(u, orm.Eq(User_.ID, u.ID))
 }
 
 func listUsers(db *orm.DB) ([]User, error) {
@@ -222,13 +222,13 @@ func deleteUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(UserMeta.ID).Eq(id)
+	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
 	results, err := ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
 		return ErrNotFound
 	}
 	u := results[0]
-	return db.Delete(u, orm.Eq(UserMeta.ID, u.ID))
+	return db.Delete(u, orm.Eq(User_.ID, u.ID))
 }
 
 func isUniqueViolation(err error) bool {

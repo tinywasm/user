@@ -21,7 +21,7 @@ func newSessionCache() *sessionCache {
 }
 
 func (c *sessionCache) warmUp(db *orm.DB) error {
-	qb := db.Query(&Session{}).Where(SessionMeta.ExpiresAt).Gt(time.Now().Unix())
+	qb := db.Query(&Session{}).Where(Session_.ExpiresAt).Gt(time.Now().Unix())
 	sessions, err := ReadAllSession(qb)
 	if err != nil {
 		return err

@@ -103,7 +103,7 @@ func (h *lanipCRUD) Create(payload any) (any, error) {
 	return ip, err
 }
 func (h *lanipCRUD) Read(id string) (any, error) {
-	qb := h.m.db.Query(&LANIP{}).Where(LANIPMeta.ID).Eq(id)
+	qb := h.m.db.Query(&LANIP{}).Where(LANIP_.ID).Eq(id)
 	results, err := ReadAllLANIP(qb)
 	if err != nil || len(results) == 0 {
 		return LANIP{}, err
@@ -126,7 +126,7 @@ func (h *lanipCRUD) Update(payload any) (any, error) {
 	return payload, nil // update isn't strictly defined for LANIPs beyond assigning
 }
 func (h *lanipCRUD) Delete(id string) error {
-	qb := h.m.db.Query(&LANIP{}).Where(LANIPMeta.ID).Eq(id)
+	qb := h.m.db.Query(&LANIP{}).Where(LANIP_.ID).Eq(id)
 	results, err := ReadAllLANIP(qb)
 	if err != nil || len(results) == 0 {
 		return err

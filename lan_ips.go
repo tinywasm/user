@@ -37,22 +37,22 @@ func (m *Module) UnregisterLAN(userID string) error {
 		return err
 	}
 
-	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID)
+	qb := m.db.Query(&LANIP{}).Where(LANIP_.UserID).Eq(userID)
 	ips, _ := ReadAllLANIP(qb)
 	for _, ip := range ips {
-		m.db.Delete(ip, orm.Eq(LANIPMeta.ID, ip.ID))
+		m.db.Delete(ip, orm.Eq(LANIP_.ID, ip.ID))
 	}
 
-	qbId := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq("lan")
+	qbId := m.db.Query(&Identity{}).Where(Identity_.UserID).Eq(userID).Where(Identity_.Provider).Eq("lan")
 	ids, _ := ReadAllIdentity(qbId)
 	for _, id := range ids {
-		m.db.Delete(id, orm.Eq(IdentityMeta.ID, id.ID))
+		m.db.Delete(id, orm.Eq(Identity_.ID, id.ID))
 	}
 	return nil
 }
 
 func (m *Module) AssignLANIP(userID, ip, label string) error {
-	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.IP).Eq(ip)
+	qb := m.db.Query(&LANIP{}).Where(LANIP_.IP).Eq(ip)
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func (m *Module) AssignLANIP(userID, ip, label string) error {
 }
 
 func (m *Module) RevokeLANIP(userID, ip string) error {
-	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
+	qb := m.db.Query(&LANIP{}).Where(LANIP_.UserID).Eq(userID).Where(LANIP_.IP).Eq(ip)
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return err
@@ -88,11 +88,11 @@ func (m *Module) RevokeLANIP(userID, ip string) error {
 		return ErrNotFound
 	}
 
-	return m.db.Delete(results[0], orm.Eq(LANIPMeta.ID, results[0].ID))
+	return m.db.Delete(results[0], orm.Eq(LANIP_.ID, results[0].ID))
 }
 
 func (m *Module) GetLANIPs(userID string) ([]LANIP, error) {
-	qb := m.db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).OrderBy(LANIPMeta.CreatedAt).Asc()
+	qb := m.db.Query(&LANIP{}).Where(LANIP_.UserID).Eq(userID).OrderBy(LANIP_.CreatedAt).Asc()
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (m *Module) GetLANIPs(userID string) ([]LANIP, error) {
 }
 
 func checkLANIP(db *orm.DB, userID, ip string) error {
-	qb := db.Query(&LANIP{}).Where(LANIPMeta.UserID).Eq(userID).Where(LANIPMeta.IP).Eq(ip)
+	qb := db.Query(&LANIP{}).Where(LANIP_.UserID).Eq(userID).Where(LANIP_.IP).Eq(ip)
 	results, err := ReadAllLANIP(qb)
 	if err != nil {
 		return ErrInvalidCredentials

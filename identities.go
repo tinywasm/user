@@ -38,8 +38,8 @@ func createIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 
 func getIdentityByProvider(db *orm.DB, provider, providerID string) (Identity, error) {
 	qb := db.Query(&Identity{}).
-		Where(IdentityMeta.Provider).Eq(provider).
-		Where(IdentityMeta.ProviderID).Eq(providerID)
+		Where(Identity_.Provider).Eq(provider).
+		Where(Identity_.ProviderID).Eq(providerID)
 
 	results, err := ReadAllIdentity(qb)
 	if err != nil {
@@ -53,8 +53,8 @@ func getIdentityByProvider(db *orm.DB, provider, providerID string) (Identity, e
 
 func getIdentityByUserAndProvider(db *orm.DB, userID, provider string) (Identity, error) {
 	qb := db.Query(&Identity{}).
-		Where(IdentityMeta.UserID).Eq(userID).
-		Where(IdentityMeta.Provider).Eq(provider)
+		Where(Identity_.UserID).Eq(userID).
+		Where(Identity_.Provider).Eq(provider)
 
 	results, err := ReadAllIdentity(qb)
 	if err != nil {
@@ -67,7 +67,7 @@ func getIdentityByUserAndProvider(db *orm.DB, userID, provider string) (Identity
 }
 
 func (m *Module) GetUserIdentities(userID string) ([]Identity, error) {
-	qb := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID)
+	qb := m.db.Query(&Identity{}).Where(Identity_.UserID).Eq(userID)
 	results, err := ReadAllIdentity(qb)
 	if err != nil {
 		return nil, err
@@ -82,15 +82,15 @@ func (m *Module) GetUserIdentities(userID string) ([]Identity, error) {
 
 func upsertIdentity(db *orm.DB, userID, provider, providerID, email string) error {
 	qb := db.Query(&Identity{}).
-		Where(IdentityMeta.UserID).Eq(userID).
-		Where(IdentityMeta.Provider).Eq(provider)
+		Where(Identity_.UserID).Eq(userID).
+		Where(Identity_.Provider).Eq(provider)
 
 	results, err := ReadAllIdentity(qb)
 	if err == nil && len(results) > 0 {
 		i := results[0]
 		i.ProviderID = providerID
 		i.Email = email
-		return db.Update(i, orm.Eq(IdentityMeta.ID, i.ID))
+		return db.Update(i, orm.Eq(Identity_.ID, i.ID))
 	} else if len(results) == 0 {
 		return createIdentity(db, userID, provider, providerID, email)
 	} else {
@@ -119,13 +119,13 @@ func (m *Module) UnlinkIdentity(userID, provider string) error {
 		return ErrCannotUnlink
 	}
 
-	qb := m.db.Query(&Identity{}).Where(IdentityMeta.UserID).Eq(userID).Where(IdentityMeta.Provider).Eq(provider)
+	qb := m.db.Query(&Identity{}).Where(Identity_.UserID).Eq(userID).Where(Identity_.Provider).Eq(provider)
 	results, err := ReadAllIdentity(qb)
 	if err != nil {
 		return err
 	}
 	if len(results) > 0 {
-		return m.db.Delete(results[0], orm.Eq(IdentityMeta.ID, results[0].ID))
+		return m.db.Delete(results[0], orm.Eq(Identity_.ID, results[0].ID))
 	}
 	return ErrNotFound
 }

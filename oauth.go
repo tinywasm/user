@@ -81,7 +81,7 @@ func (m *Module) CompleteOAuth(providerName string, r *http.Request, ip, ua stri
 }
 
 func consumeState(db *orm.DB, state, provider string) error {
-	qb := db.Query(&OAuthState{}).Where(OAuthStateMeta.State).Eq(state)
+	qb := db.Query(&OAuthState{}).Where(OAuthState_.State).Eq(state)
 	results, err := ReadAllOAuthState(qb)
 	if err != nil {
 		return err
@@ -96,7 +96,7 @@ func consumeState(db *orm.DB, state, provider string) error {
 	}
 
 	// Delete state (single use) - done regardless of expiration to prevent reuse
-	if err := db.Delete(stateObj, orm.Eq(OAuthStateMeta.State, stateObj.State)); err != nil {
+	if err := db.Delete(stateObj, orm.Eq(OAuthState_.State, stateObj.State)); err != nil {
 		return err
 	}
 
@@ -108,10 +108,10 @@ func consumeState(db *orm.DB, state, provider string) error {
 }
 
 func (m *Module) PurgeExpiredOAuthStates() error {
-	qb := m.db.Query(&OAuthState{}).Where(OAuthStateMeta.ExpiresAt).Lt(time.Now().Unix())
+	qb := m.db.Query(&OAuthState{}).Where(OAuthState_.ExpiresAt).Lt(time.Now().Unix())
 	states, _ := ReadAllOAuthState(qb)
 	for _, s := range states {
-		m.db.Delete(s, orm.Eq(OAuthStateMeta.State, s.State))
+		m.db.Delete(s, orm.Eq(OAuthState_.State, s.State))
 	}
 	return nil
 }
