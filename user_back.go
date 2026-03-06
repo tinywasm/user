@@ -4,6 +4,7 @@ package user
 
 import (
 	"sync"
+	"time"
 
 	"github.com/tinywasm/orm"
 )
@@ -59,6 +60,44 @@ func New(db *orm.DB, cfg Config) (*Module, error) {
 //	m.SetLog(func(msg ...any) { log.Println(msg...) })
 func (m *Module) SetLog(fn func(...any)) {
 	m.log = fn
+}
+
+func (m *Module) notify(e SecurityEvent) {
+	if e.Timestamp == 0 {
+		e.Timestamp = time.Now().Unix()
+	}
+	if m.config.OnSecurityEvent != nil {
+		m.config.OnSecurityEvent(e)
+		return
+	}
+	if m.log != nil {
+		m.log("security_event", e.Type, e.IP, e.UserID)
+	}
+}
+
+// SuspendUser sets Status = "suspended". Evicts user from cache.
+func (m *Module) SuspendUser(id string) error {
+	return suspendUser(m.db, m.ucache, id)
+}
+
+// ReactivateUser sets Status = "active". Evicts user from cache.
+func (m *Module) ReactivateUser(id string) error {
+	return reactivateUser(m.db, m.ucache, id)
+}
+
+// PurgeSessionsByUser deletes all sessions belonging to userID from cache and DB.
+func (m *Module) PurgeSessionsByUser(userID string) error {
+	// First from DB
+	qb := m.db.Query(&Session{}).Where(Session_.UserID).Eq(userID)
+	sessions, err := ReadAllSession(qb)
+	if err != nil {
+		return err
+	}
+	for _, s := range sessions {
+		m.db.Delete(s, orm.Eq(Session_.ID, s.ID))
+		m.cache.delete(s.ID)
+	}
+	return nil
 }
 
 func (m *Module) registerProvider(p OAuthProvider) {

@@ -9,18 +9,32 @@ import (
 )
 
 var PasswordHashCost = bcrypt.DefaultCost
+var dummyHashOnce []byte
+
+func getDummyHash() []byte {
+	if len(dummyHashOnce) == 0 {
+		dummyHashOnce, _ = bcrypt.GenerateFromPassword([]byte("dummy"), PasswordHashCost)
+	}
+	return dummyHashOnce
+}
 
 func (m *Module) Login(email, password string) (User, error) {
 	u, err := getUserByEmail(m.db, m.ucache, email)
 	if err != nil {
+		// Dummy bcrypt: constant-time regardless of user existence.
+		// Dynamically generate a valid dummy hash for the configured cost to match timing exactly.
+		bcrypt.CompareHashAndPassword(getDummyHash(), []byte(password))
 		return User{}, ErrInvalidCredentials
 	}
-	if u.Status == "suspended" {
+	if u.Status != "active" {
+		m.notify(SecurityEvent{Type: EventNonActiveAccess, UserID: u.ID})
+		bcrypt.CompareHashAndPassword(getDummyHash(), []byte(password))
 		return User{}, ErrSuspended
 	}
 
 	identity, err := getLocalIdentity(m.db, u.ID)
 	if err != nil {
+		bcrypt.CompareHashAndPassword(getDummyHash(), []byte(password))
 		return User{}, ErrInvalidCredentials
 	}
 
@@ -37,6 +51,11 @@ func getLocalIdentity(db *orm.DB, userID string) (Identity, error) {
 func (m *Module) SetPassword(userID, password string) error {
 	if len(password) < 8 {
 		return ErrWeakPassword
+	}
+	if m.config.OnPasswordValidate != nil {
+		if err := m.config.OnPasswordValidate(password); err != nil {
+			return err
+		}
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), PasswordHashCost)
 	if err != nil {

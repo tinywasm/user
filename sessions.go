@@ -9,6 +9,23 @@ import (
 	"github.com/tinywasm/unixid"
 )
 
+// RotateSession atomically deletes the old session and creates a new one
+// with the same userID, updated IP/UserAgent, and a fresh TTL.
+// Prevents session fixation attacks when called post-login.
+func (m *Module) RotateSession(oldID, ip, userAgent string) (Session, error) {
+	oldSess, err := m.GetSession(oldID)
+	if err != nil {
+		return Session{}, err
+	}
+
+	err = m.DeleteSession(oldID)
+	if err != nil {
+		return Session{}, err
+	}
+
+	return m.CreateSession(oldSess.UserID, ip, userAgent)
+}
+
 func (m *Module) CreateSession(userID, ip, userAgent string) (Session, error) {
 	u, err := unixid.NewUnixID()
 	if err != nil {
