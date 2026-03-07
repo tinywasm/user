@@ -5,6 +5,8 @@ package user
 import (
 	"context"
 	"net/http"
+	"strings"
+	"time"
 )
 
 type contextKey int
@@ -78,22 +80,78 @@ func (m *Module) mcpContextFunc() func(context.Context, *http.Request) context.C
 	}
 }
 
+// InjectIdentity implements mcp.Authorizer.
+// Delegates to validateSession (respects configured AuthMode).
+// On failure: returns ctx unchanged — CanExecute will deny.
+func (m *Module) InjectIdentity(ctx context.Context, r *http.Request) context.Context {
+	u, err := m.validateSession(r)
+	if err != nil {
+		m.notify(SecurityEvent{
+			Type:      EventUnauthorizedAccess,
+			IP:        clientIP(r),
+			Timestamp: time.Now().Unix(),
+		})
+		return ctx
+	}
+	return context.WithValue(ctx, userKey, u)
+}
+
+// CanExecute implements mcp.Authorizer.
+// Reads identity injected by InjectIdentity and checks RBAC.
+func (m *Module) CanExecute(ctx context.Context, resource string, action byte) bool {
+	u, ok := ctx.Value(userKey).(*User)
+	if !ok || u == nil {
+		return false
+	}
+	ok2, _ := m.HasPermission(u.ID, resource, action)
+	if !ok2 {
+		m.notify(SecurityEvent{
+			Type:      EventAccessDenied,
+			UserID:    u.ID,
+			Resource:  resource,
+			Timestamp: time.Now().Unix(),
+		})
+	}
+	return ok2
+}
+
+// validateJWT validates a raw JWT string and returns the active user.
+func (m *Module) validateJWT(token string) (*User, error) {
+	userID, err := ValidateJWT(m.config.JWTSecret, token)
+	if err != nil {
+		m.notify(SecurityEvent{Type: EventJWTTampered, Timestamp: time.Now().Unix()})
+		return nil, err
+	}
+	u, err := m.GetUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	if u.Status != "active" {
+		m.notify(SecurityEvent{Type: EventNonActiveAccess, UserID: u.ID, Timestamp: time.Now().Unix()})
+		return nil, ErrSuspended
+	}
+	return &u, nil
+}
+
 func (m *Module) validateSession(r *http.Request) (*User, error) {
+	// AuthModeBearer: API/MCP clients — JWT in Authorization header, no cookie.
+	if m.config.AuthMode == AuthModeBearer {
+		const prefix = "Bearer "
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, prefix) {
+			return nil, ErrSessionExpired
+		}
+		return m.validateJWT(auth[len(prefix):])
+	}
+
+	// Cookie modes: browser clients.
 	cookie, err := r.Cookie(m.config.CookieName)
 	if err != nil {
 		return nil, ErrSessionExpired
 	}
 
 	if m.config.AuthMode == AuthModeJWT {
-		userID, err := ValidateJWT(m.config.JWTSecret, cookie.Value)
-		if err != nil {
-			return nil, err
-		}
-		u, err := m.GetUser(userID)
-		if err != nil {
-			return nil, err
-		}
-		return &u, nil
+		return m.validateJWT(cookie.Value)
 	}
 
 	sess, err := m.GetSession(cookie.Value)
