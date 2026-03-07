@@ -22,6 +22,28 @@ var (
 	ErrIPTaken            = fmt.Err("ip", "registered")             // EN: Ip Registered                    / ES: Ip Registrado
 )
 
+type SecurityEventType uint8
+
+const (
+	EventJWTTampered        SecurityEventType = iota // ValidateJWT: HMAC mismatch
+	EventOAuthReplay                                 // consumeState: state already consumed (2nd use)
+	EventOAuthExpiredState                           // consumeState: state found but past ExpiresAt
+	EventOAuthCrossProvider                          // consumeState: provider mismatch (state preserved)
+	EventIPMismatch                                  // LoginLAN: IP not registered
+	EventNonActiveAccess                             // Login/LoginLAN: status != "active"
+	EventUnauthorizedAccess                          // validateSession: cookie present but session invalid
+	EventAccessDenied                                // AccessCheck: RBAC denied with valid session
+)
+
+type SecurityEvent struct {
+	Type      SecurityEventType
+	IP        string // client IP, empty if not available
+	UserID    string // empty if user not yet identified
+	Provider  string // OAuth provider name, for OAuth events
+	Resource  string // RBAC resource, for EventAccessDenied
+	Timestamp int64  // time.Now().Unix()
+}
+
 type OAuthUserInfo struct {
 	ID    string
 	Email string
@@ -61,4 +83,12 @@ type Config struct {
 
 	TrustProxy     bool
 	OAuthProviders []OAuthProvider
+
+	// Optional hook for receiving security events (e.g. tampering, brute force)
+	OnSecurityEvent func(SecurityEvent)
+
+	// OnPasswordValidate is called by SetPassword before hashing.
+	// Return a non-nil error to reject the password.
+	// If nil, only the built-in len >= 8 check applies.
+	OnPasswordValidate func(password string) error
 }

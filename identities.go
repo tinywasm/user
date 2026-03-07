@@ -10,6 +10,13 @@ import (
 )
 
 func createIdentity(db *orm.DB, userID, provider, providerID, email string) error {
+	// Verify user exists to enforce relationship before insert
+	qb := db.Query(&User{}).Where(User_.ID).Eq(userID)
+	users, errRead := ReadAllUser(qb)
+	if errRead != nil || len(users) == 0 {
+		return ErrNotFound
+	}
+
 	u, err := unixid.NewUnixID()
 	if err != nil {
 		return err
