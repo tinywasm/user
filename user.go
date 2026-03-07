@@ -69,16 +69,23 @@ const (
 	// Stateless: no DB lookup per request. No immediate revocation.
 	// Ideal for SPA/PWA and multi-server deployments.
 	AuthModeJWT
+
+	// AuthModeBearer reads a signed JWT from the "Authorization: Bearer <token>" header.
+	// Stateless: for API clients (MCP servers, IDEs, LLMs) that cannot use cookies.
+	// Structurally implements mcp.Authorizer via InjectIdentity + CanExecute methods.
+	// Requires JWTSecret.
+	AuthModeBearer
 )
 
 type Config struct {
 	AuthMode AuthMode // default: AuthModeCookie
 
-	// Shared by both modes
+	// Shared by all modes
 	CookieName string // default: "session"
 	TokenTTL   int    // default: 86400 (seconds). Session TTL in cookie mode, JWT expiry in JWT mode.
 
-	// JWT mode only — required when AuthMode == AuthModeJWT
+	// Required when AuthMode == AuthModeJWT or AuthMode == AuthModeBearer.
+	// Also required to call GenerateAPIToken regardless of AuthMode.
 	JWTSecret []byte
 
 	TrustProxy     bool
