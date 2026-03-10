@@ -18,12 +18,12 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/tinywasm/dom v0.5.7 h1:U6XbKIR7shRo5XfUGF0t7T3vHTk6jtEk1aCieDwF+OQ=
 github.com/tinywasm/dom v0.5.7/go.mod h1:494d7xvjO9xOk47fVRIq/jwdZ1LepKj/E982OEgbKDc=
-github.com/tinywasm/fmt v0.18.9 h1:M8t54VnB6ZBbxph9AF3vbmda366MIlGKRw48SKAdCfA=
-github.com/tinywasm/fmt v0.18.9/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
+github.com/tinywasm/fmt v0.18.12 h1:Von8ovka9CI/g687MoEovtqENxa/IBZd6e8lplwdgEE=
+github.com/tinywasm/fmt v0.18.12/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
 github.com/tinywasm/form v0.0.29 h1:Kr29EOqDEiZmrtI1KZDTYJVxc5VoJ7JVY8pYnjhobqg=
 github.com/tinywasm/form v0.0.29/go.mod h1:0GRy0FGoVRwbvJLD3mJWHSVwiPHn8t91NiIN2E0oaaA=
-github.com/tinywasm/orm v0.2.4 h1:8AGW6lhVzPT6Pm0oDIY+dIiDNUPaBscrhF7QBpujVp4=
-github.com/tinywasm/orm v0.2.4/go.mod h1:qFyB/t+maZPwXq65FysOoo4QrjDh68nCWy90lh0a5KM=
+github.com/tinywasm/orm v0.2.7 h1:6dE8p4tFtByM20d0EuW7+9JFzJgNkmpagp2+yHKC8pE=
+github.com/tinywasm/orm v0.2.7/go.mod h1:tOfI/eqPT4bqvuN9VdRL5ybeX00WMR7NT+hEim0ZzV4=
 github.com/tinywasm/sqlite v0.1.9 h1:6lKVcOOk1c2OEAHNhngw+CMF1v/H8S4rwt9JcEPZClo=
 github.com/tinywasm/sqlite v0.1.9/go.mod h1:KFdlrkPhKorFbMms0pC2MmHY9GYnYWzzd99vOAbyqg4=
 github.com/tinywasm/time v0.3.9 h1:ifK6B9CLxoBn8Z8iTxiZz8Q9zITvFYi2ykqjrotTVWc=
