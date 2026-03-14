@@ -1,6 +1,9 @@
 package user
 
-import "github.com/tinywasm/form"
+import (
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/form"
+)
 
 type profileModule struct {
 	m *Module
@@ -17,11 +20,16 @@ func (m *profileModule) ValidateData(action byte, data ...any) error {
 		return nil
 	}
 
+	fielder, ok := data[0].(fmt.Fielder)
+	if !ok {
+		return nil
+	}
+
 	switch data[0].(type) {
 	case *ProfileData:
-		return m.form.ValidateData(action, data...)
+		return m.form.ValidateData(action, fielder)
 	case *PasswordData:
-		return m.passwordForm.ValidateData(action, data...)
+		return m.passwordForm.ValidateData(action, fielder)
 	}
 	return nil
 }

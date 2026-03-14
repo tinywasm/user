@@ -1,6 +1,9 @@
 package user
 
-import "github.com/tinywasm/form"
+import (
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/form"
+)
 
 type registerModule struct {
 	m *Module
@@ -12,5 +15,12 @@ func (m *registerModule) HandlerName() string { return "register" }
 func (m *registerModule) ModuleTitle() string { return "Register" }
 
 func (m *registerModule) ValidateData(action byte, data ...any) error {
-	return m.form.ValidateData(action, data...)
+	if len(data) == 0 {
+		return nil
+	}
+	fielder, ok := data[0].(fmt.Fielder)
+	if !ok {
+		return nil
+	}
+	return m.form.ValidateData(action, fielder)
 }
