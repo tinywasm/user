@@ -3,9 +3,9 @@ module github.com/tinywasm/user
 go 1.25.2
 
 require (
-	github.com/tinywasm/fmt v0.18.17
-	github.com/tinywasm/form v0.0.29
-	github.com/tinywasm/orm v0.3.1
+	github.com/tinywasm/fmt v0.18.18
+	github.com/tinywasm/form v0.0.31
+	github.com/tinywasm/orm v0.3.2
 	github.com/tinywasm/sqlite v0.1.9
 	github.com/tinywasm/unixid v0.2.22
 	golang.org/x/crypto v0.48.0
