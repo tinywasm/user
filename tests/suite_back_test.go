@@ -229,7 +229,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Instant expire via SQL
-	if err := db.RawExecutor().Exec("UPDATE user_sessions SET expires_at = 0 WHERE id = ?", sess.ID); err != nil {
+	if err := db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess.ID); err != nil {
 		t.Fatalf("failed to expire session in DB: %v", err)
 	}
 

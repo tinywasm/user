@@ -10,9 +10,9 @@ var uiModules []any
 
 func init() {
 	form.RegisterInput(
-		input.Password("", "current"),
-		input.Password("", "new"),
-		input.Password("", "confirm"),
+		input.Password(),
+		input.Password(),
+		input.Password(),
 	)
 	uiModules = []any{
 		&loginModule{form: mustForm("login", &LoginData{})},

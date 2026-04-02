@@ -7,17 +7,17 @@ import (
 	"github.com/tinywasm/orm"
 )
 
-func (m *User) FormName() string {
+func (m *User) ModelName() string {
 	return "user"
 }
 
 var _schemaUser = []fmt.Field{
-		{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"},
-		{Name: "email", Type: fmt.FieldText, Unique: true, JSON: "email,omitempty"},
-		{Name: "name", Type: fmt.FieldText, JSON: "name"},
-		{Name: "phone", Type: fmt.FieldText, JSON: "phone,omitempty"},
-		{Name: "status", Type: fmt.FieldText, JSON: "status"},
-		{Name: "created_at", Type: fmt.FieldInt, JSON: "created_at"},
+		{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "email", Type: fmt.FieldText, DB: &fmt.FieldDB{Unique: true}, OmitEmpty: true},
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "phone", Type: fmt.FieldText, OmitEmpty: true},
+		{Name: "status", Type: fmt.FieldText},
+		{Name: "created_at", Type: fmt.FieldInt},
 	}
 
 func (m *User) Schema() []fmt.Field { return _schemaUser }
@@ -34,7 +34,7 @@ func (m *User) Pointers() []any {
 }
 
 var User_ = struct {
-	TableName string
+	ModelName string
 	ID string
 	Email string
 	Name string
@@ -42,7 +42,7 @@ var User_ = struct {
 	Status string
 	CreatedAt string
 }{
-	TableName: "users",
+	ModelName: "user",
 	ID: "id",
 	Email: "email",
 	Name: "name",
@@ -62,23 +62,23 @@ func ReadOneUser(qb *orm.QB, model *User) (*User, error) {
 func ReadAllUser(qb *orm.QB) ([]*User, error) {
 	var results []*User
 	err := qb.ReadAll(
-		func() orm.Model { return &User{} },
-		func(m orm.Model) { results = append(results, m.(*User)) },
+		func() fmt.Model { return &User{} },
+		func(m fmt.Model) { results = append(results, m.(*User)) },
 	)
 	return results, err
 }
 
-func (m *Session) FormName() string {
+func (m *Session) ModelName() string {
 	return "session"
 }
 
 var _schemaSession = []fmt.Field{
-		{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"},
-		{Name: "user_id", Type: fmt.FieldText, JSON: "user_id"},
-		{Name: "expires_at", Type: fmt.FieldInt, JSON: "expires_at"},
-		{Name: "ip", Type: fmt.FieldText, JSON: "ip,omitempty"},
-		{Name: "user_agent", Type: fmt.FieldText, JSON: "user_agent,omitempty"},
-		{Name: "created_at", Type: fmt.FieldInt, JSON: "created_at"},
+		{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "user_id", Type: fmt.FieldText},
+		{Name: "expires_at", Type: fmt.FieldInt},
+		{Name: "ip", Type: fmt.FieldText, OmitEmpty: true},
+		{Name: "user_agent", Type: fmt.FieldText, OmitEmpty: true},
+		{Name: "created_at", Type: fmt.FieldInt},
 	}
 
 func (m *Session) Schema() []fmt.Field { return _schemaSession }
@@ -95,7 +95,7 @@ func (m *Session) Pointers() []any {
 }
 
 var Session_ = struct {
-	TableName string
+	ModelName string
 	ID string
 	UserID string
 	ExpiresAt string
@@ -103,7 +103,7 @@ var Session_ = struct {
 	UserAgent string
 	CreatedAt string
 }{
-	TableName: "user_sessions",
+	ModelName: "session",
 	ID: "id",
 	UserID: "user_id",
 	ExpiresAt: "expires_at",
@@ -123,23 +123,215 @@ func ReadOneSession(qb *orm.QB, model *Session) (*Session, error) {
 func ReadAllSession(qb *orm.QB) ([]*Session, error) {
 	var results []*Session
 	err := qb.ReadAll(
-		func() orm.Model { return &Session{} },
-		func(m orm.Model) { results = append(results, m.(*Session)) },
+		func() fmt.Model { return &Session{} },
+		func(m fmt.Model) { results = append(results, m.(*Session)) },
 	)
 	return results, err
 }
 
-func (m *Identity) FormName() string {
+func (m *LoginData) ModelName() string {
+	return "login_data"
+}
+
+var _schemaLoginData = []fmt.Field{
+		{Name: "email", Type: fmt.FieldText},
+		{Name: "password", Type: fmt.FieldText},
+	}
+
+func (m *LoginData) Schema() []fmt.Field { return _schemaLoginData }
+
+func (m *LoginData) Pointers() []any {
+	return []any{
+		&m.Email,
+		&m.Password,
+	}
+}
+
+var LoginData_ = struct {
+	ModelName string
+	Email string
+	Password string
+}{
+	ModelName: "login_data",
+	Email: "email",
+	Password: "password",
+}
+
+func ReadOneLoginData(qb *orm.QB, model *LoginData) (*LoginData, error) {
+	err := qb.ReadOne()
+	if err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func ReadAllLoginData(qb *orm.QB) ([]*LoginData, error) {
+	var results []*LoginData
+	err := qb.ReadAll(
+		func() fmt.Model { return &LoginData{} },
+		func(m fmt.Model) { results = append(results, m.(*LoginData)) },
+	)
+	return results, err
+}
+
+func (m *RegisterData) ModelName() string {
+	return "register_data"
+}
+
+var _schemaRegisterData = []fmt.Field{
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "email", Type: fmt.FieldText},
+		{Name: "password", Type: fmt.FieldText},
+		{Name: "phone", Type: fmt.FieldText},
+	}
+
+func (m *RegisterData) Schema() []fmt.Field { return _schemaRegisterData }
+
+func (m *RegisterData) Pointers() []any {
+	return []any{
+		&m.Name,
+		&m.Email,
+		&m.Password,
+		&m.Phone,
+	}
+}
+
+var RegisterData_ = struct {
+	ModelName string
+	Name string
+	Email string
+	Password string
+	Phone string
+}{
+	ModelName: "register_data",
+	Name: "name",
+	Email: "email",
+	Password: "password",
+	Phone: "phone",
+}
+
+func ReadOneRegisterData(qb *orm.QB, model *RegisterData) (*RegisterData, error) {
+	err := qb.ReadOne()
+	if err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func ReadAllRegisterData(qb *orm.QB) ([]*RegisterData, error) {
+	var results []*RegisterData
+	err := qb.ReadAll(
+		func() fmt.Model { return &RegisterData{} },
+		func(m fmt.Model) { results = append(results, m.(*RegisterData)) },
+	)
+	return results, err
+}
+
+func (m *ProfileData) ModelName() string {
+	return "profile_data"
+}
+
+var _schemaProfileData = []fmt.Field{
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "phone", Type: fmt.FieldText},
+	}
+
+func (m *ProfileData) Schema() []fmt.Field { return _schemaProfileData }
+
+func (m *ProfileData) Pointers() []any {
+	return []any{
+		&m.Name,
+		&m.Phone,
+	}
+}
+
+var ProfileData_ = struct {
+	ModelName string
+	Name string
+	Phone string
+}{
+	ModelName: "profile_data",
+	Name: "name",
+	Phone: "phone",
+}
+
+func ReadOneProfileData(qb *orm.QB, model *ProfileData) (*ProfileData, error) {
+	err := qb.ReadOne()
+	if err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func ReadAllProfileData(qb *orm.QB) ([]*ProfileData, error) {
+	var results []*ProfileData
+	err := qb.ReadAll(
+		func() fmt.Model { return &ProfileData{} },
+		func(m fmt.Model) { results = append(results, m.(*ProfileData)) },
+	)
+	return results, err
+}
+
+func (m *PasswordData) ModelName() string {
+	return "password_data"
+}
+
+var _schemaPasswordData = []fmt.Field{
+		{Name: "current", Type: fmt.FieldText},
+		{Name: "new", Type: fmt.FieldText},
+		{Name: "confirm", Type: fmt.FieldText},
+	}
+
+func (m *PasswordData) Schema() []fmt.Field { return _schemaPasswordData }
+
+func (m *PasswordData) Pointers() []any {
+	return []any{
+		&m.Current,
+		&m.New,
+		&m.Confirm,
+	}
+}
+
+var PasswordData_ = struct {
+	ModelName string
+	Current string
+	New string
+	Confirm string
+}{
+	ModelName: "password_data",
+	Current: "current",
+	New: "new",
+	Confirm: "confirm",
+}
+
+func ReadOnePasswordData(qb *orm.QB, model *PasswordData) (*PasswordData, error) {
+	err := qb.ReadOne()
+	if err != nil {
+		return nil, err
+	}
+	return model, nil
+}
+
+func ReadAllPasswordData(qb *orm.QB) ([]*PasswordData, error) {
+	var results []*PasswordData
+	err := qb.ReadAll(
+		func() fmt.Model { return &PasswordData{} },
+		func(m fmt.Model) { results = append(results, m.(*PasswordData)) },
+	)
+	return results, err
+}
+
+func (m *Identity) ModelName() string {
 	return "identity"
 }
 
 var _schemaIdentity = []fmt.Field{
-		{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"},
-		{Name: "user_id", Type: fmt.FieldText, JSON: "user_id"},
-		{Name: "provider", Type: fmt.FieldText, JSON: "provider"},
-		{Name: "provider_id", Type: fmt.FieldText, JSON: "provider_id"},
-		{Name: "email", Type: fmt.FieldText, JSON: "email,omitempty"},
-		{Name: "created_at", Type: fmt.FieldInt, JSON: "created_at"},
+		{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "user_id", Type: fmt.FieldText},
+		{Name: "provider", Type: fmt.FieldText},
+		{Name: "provider_id", Type: fmt.FieldText},
+		{Name: "email", Type: fmt.FieldText, OmitEmpty: true},
+		{Name: "created_at", Type: fmt.FieldInt},
 	}
 
 func (m *Identity) Schema() []fmt.Field { return _schemaIdentity }
@@ -156,7 +348,7 @@ func (m *Identity) Pointers() []any {
 }
 
 var Identity_ = struct {
-	TableName string
+	ModelName string
 	ID string
 	UserID string
 	Provider string
@@ -164,7 +356,7 @@ var Identity_ = struct {
 	Email string
 	CreatedAt string
 }{
-	TableName: "user_identities",
+	ModelName: "identity",
 	ID: "id",
 	UserID: "user_id",
 	Provider: "provider",
@@ -184,21 +376,21 @@ func ReadOneIdentity(qb *orm.QB, model *Identity) (*Identity, error) {
 func ReadAllIdentity(qb *orm.QB) ([]*Identity, error) {
 	var results []*Identity
 	err := qb.ReadAll(
-		func() orm.Model { return &Identity{} },
-		func(m orm.Model) { results = append(results, m.(*Identity)) },
+		func() fmt.Model { return &Identity{} },
+		func(m fmt.Model) { results = append(results, m.(*Identity)) },
 	)
 	return results, err
 }
 
-func (m *Role) FormName() string {
+func (m *Role) ModelName() string {
 	return "role"
 }
 
 var _schemaRole = []fmt.Field{
-		{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"},
-		{Name: "code", Type: fmt.FieldText, JSON: "code"},
-		{Name: "name", Type: fmt.FieldText, JSON: "name"},
-		{Name: "description", Type: fmt.FieldText, JSON: "description"},
+		{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "code", Type: fmt.FieldText},
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "description", Type: fmt.FieldText},
 	}
 
 func (m *Role) Schema() []fmt.Field { return _schemaRole }
@@ -213,13 +405,13 @@ func (m *Role) Pointers() []any {
 }
 
 var Role_ = struct {
-	TableName string
+	ModelName string
 	ID string
 	Code string
 	Name string
 	Description string
 }{
-	TableName: "rbac_roles",
+	ModelName: "role",
 	ID: "id",
 	Code: "code",
 	Name: "name",
@@ -237,19 +429,19 @@ func ReadOneRole(qb *orm.QB, model *Role) (*Role, error) {
 func ReadAllRole(qb *orm.QB) ([]*Role, error) {
 	var results []*Role
 	err := qb.ReadAll(
-		func() orm.Model { return &Role{} },
-		func(m orm.Model) { results = append(results, m.(*Role)) },
+		func() fmt.Model { return &Role{} },
+		func(m fmt.Model) { results = append(results, m.(*Role)) },
 	)
 	return results, err
 }
 
-func (m *UserRole) FormName() string {
+func (m *UserRole) ModelName() string {
 	return "user_role"
 }
 
 var _schemaUserRole = []fmt.Field{
-		{Name: "user_id", Type: fmt.FieldText, JSON: "user_id"},
-		{Name: "role_id", Type: fmt.FieldText, JSON: "role_id"},
+		{Name: "user_id", Type: fmt.FieldText},
+		{Name: "role_id", Type: fmt.FieldText},
 	}
 
 func (m *UserRole) Schema() []fmt.Field { return _schemaUserRole }
@@ -262,11 +454,11 @@ func (m *UserRole) Pointers() []any {
 }
 
 var UserRole_ = struct {
-	TableName string
+	ModelName string
 	UserID string
 	RoleID string
 }{
-	TableName: "rbac_user_roles",
+	ModelName: "user_role",
 	UserID: "user_id",
 	RoleID: "role_id",
 }
@@ -282,21 +474,21 @@ func ReadOneUserRole(qb *orm.QB, model *UserRole) (*UserRole, error) {
 func ReadAllUserRole(qb *orm.QB) ([]*UserRole, error) {
 	var results []*UserRole
 	err := qb.ReadAll(
-		func() orm.Model { return &UserRole{} },
-		func(m orm.Model) { results = append(results, m.(*UserRole)) },
+		func() fmt.Model { return &UserRole{} },
+		func(m fmt.Model) { results = append(results, m.(*UserRole)) },
 	)
 	return results, err
 }
 
-func (m *Permission) FormName() string {
+func (m *Permission) ModelName() string {
 	return "permission"
 }
 
 var _schemaPermission = []fmt.Field{
-		{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"},
-		{Name: "name", Type: fmt.FieldText, JSON: "name"},
-		{Name: "resource", Type: fmt.FieldText, JSON: "resource"},
-		{Name: "action", Type: fmt.FieldText, JSON: "action"},
+		{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "name", Type: fmt.FieldText},
+		{Name: "resource", Type: fmt.FieldText},
+		{Name: "action", Type: fmt.FieldText},
 	}
 
 func (m *Permission) Schema() []fmt.Field { return _schemaPermission }
@@ -311,13 +503,13 @@ func (m *Permission) Pointers() []any {
 }
 
 var Permission_ = struct {
-	TableName string
+	ModelName string
 	ID string
 	Name string
 	Resource string
 	Action string
 }{
-	TableName: "rbac_permissions",
+	ModelName: "permission",
 	ID: "id",
 	Name: "name",
 	Resource: "resource",
@@ -335,19 +527,19 @@ func ReadOnePermission(qb *orm.QB, model *Permission) (*Permission, error) {
 func ReadAllPermission(qb *orm.QB) ([]*Permission, error) {
 	var results []*Permission
 	err := qb.ReadAll(
-		func() orm.Model { return &Permission{} },
-		func(m orm.Model) { results = append(results, m.(*Permission)) },
+		func() fmt.Model { return &Permission{} },
+		func(m fmt.Model) { results = append(results, m.(*Permission)) },
 	)
 	return results, err
 }
 
-func (m *RolePermission) FormName() string {
+func (m *RolePermission) ModelName() string {
 	return "role_permission"
 }
 
 var _schemaRolePermission = []fmt.Field{
-		{Name: "role_id", Type: fmt.FieldText, JSON: "role_id"},
-		{Name: "permission_id", Type: fmt.FieldText, JSON: "permission_id"},
+		{Name: "role_id", Type: fmt.FieldText},
+		{Name: "permission_id", Type: fmt.FieldText},
 	}
 
 func (m *RolePermission) Schema() []fmt.Field { return _schemaRolePermission }
@@ -360,11 +552,11 @@ func (m *RolePermission) Pointers() []any {
 }
 
 var RolePermission_ = struct {
-	TableName string
+	ModelName string
 	RoleID string
 	PermissionID string
 }{
-	TableName: "rbac_role_permissions",
+	ModelName: "role_permission",
 	RoleID: "role_id",
 	PermissionID: "permission_id",
 }
@@ -380,22 +572,22 @@ func ReadOneRolePermission(qb *orm.QB, model *RolePermission) (*RolePermission, 
 func ReadAllRolePermission(qb *orm.QB) ([]*RolePermission, error) {
 	var results []*RolePermission
 	err := qb.ReadAll(
-		func() orm.Model { return &RolePermission{} },
-		func(m orm.Model) { results = append(results, m.(*RolePermission)) },
+		func() fmt.Model { return &RolePermission{} },
+		func(m fmt.Model) { results = append(results, m.(*RolePermission)) },
 	)
 	return results, err
 }
 
-func (m *LANIP) FormName() string {
+func (m *LANIP) ModelName() string {
 	return "lanip"
 }
 
 var _schemaLANIP = []fmt.Field{
-		{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"},
-		{Name: "user_id", Type: fmt.FieldText, JSON: "user_id"},
-		{Name: "ip", Type: fmt.FieldText, JSON: "ip"},
-		{Name: "label", Type: fmt.FieldText, JSON: "label"},
-		{Name: "created_at", Type: fmt.FieldInt, JSON: "created_at"},
+		{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "user_id", Type: fmt.FieldText},
+		{Name: "ip", Type: fmt.FieldText},
+		{Name: "label", Type: fmt.FieldText},
+		{Name: "created_at", Type: fmt.FieldInt},
 	}
 
 func (m *LANIP) Schema() []fmt.Field { return _schemaLANIP }
@@ -411,14 +603,14 @@ func (m *LANIP) Pointers() []any {
 }
 
 var LANIP_ = struct {
-	TableName string
+	ModelName string
 	ID string
 	UserID string
 	IP string
 	Label string
 	CreatedAt string
 }{
-	TableName: "user_lan_ips",
+	ModelName: "lanip",
 	ID: "id",
 	UserID: "user_id",
 	IP: "ip",
@@ -437,21 +629,21 @@ func ReadOneLANIP(qb *orm.QB, model *LANIP) (*LANIP, error) {
 func ReadAllLANIP(qb *orm.QB) ([]*LANIP, error) {
 	var results []*LANIP
 	err := qb.ReadAll(
-		func() orm.Model { return &LANIP{} },
-		func(m orm.Model) { results = append(results, m.(*LANIP)) },
+		func() fmt.Model { return &LANIP{} },
+		func(m fmt.Model) { results = append(results, m.(*LANIP)) },
 	)
 	return results, err
 }
 
-func (m *OAuthState) FormName() string {
+func (m *OAuthState) ModelName() string {
 	return "oauth_state"
 }
 
 var _schemaOAuthState = []fmt.Field{
-		{Name: "state", Type: fmt.FieldText, PK: true, JSON: "state"},
-		{Name: "provider", Type: fmt.FieldText, JSON: "provider"},
-		{Name: "expires_at", Type: fmt.FieldInt, JSON: "expires_at"},
-		{Name: "created_at", Type: fmt.FieldInt, JSON: "created_at"},
+		{Name: "state", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "provider", Type: fmt.FieldText},
+		{Name: "expires_at", Type: fmt.FieldInt},
+		{Name: "created_at", Type: fmt.FieldInt},
 	}
 
 func (m *OAuthState) Schema() []fmt.Field { return _schemaOAuthState }
@@ -466,13 +658,13 @@ func (m *OAuthState) Pointers() []any {
 }
 
 var OAuthState_ = struct {
-	TableName string
+	ModelName string
 	State string
 	Provider string
 	ExpiresAt string
 	CreatedAt string
 }{
-	TableName: "user_oauth_states",
+	ModelName: "oauth_state",
 	State: "state",
 	Provider: "provider",
 	ExpiresAt: "expires_at",
@@ -490,8 +682,8 @@ func ReadOneOAuthState(qb *orm.QB, model *OAuthState) (*OAuthState, error) {
 func ReadAllOAuthState(qb *orm.QB) ([]*OAuthState, error) {
 	var results []*OAuthState
 	err := qb.ReadAll(
-		func() orm.Model { return &OAuthState{} },
-		func(m orm.Model) { results = append(results, m.(*OAuthState)) },
+		func() fmt.Model { return &OAuthState{} },
+		func(m fmt.Model) { results = append(results, m.(*OAuthState)) },
 	)
 	return results, err
 }

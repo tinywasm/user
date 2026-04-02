@@ -1,96 +1,96 @@
 package user
 
-// User
 type User struct {
-	ID          string       `json:"id" db:"pk"`
-	Email       string       `json:"email,omitempty" db:"unique"`
-	Name        string       `json:"name"`
-	Phone       string       `json:"phone,omitempty"`
-	Status      string       `json:"status"` // "active", "suspended"
-	CreatedAt   int64        `json:"created_at"`
-	Roles       []Role       `json:"roles,omitempty" db:"-"`
-	Permissions []Permission `json:"permissions,omitempty" db:"-"`
+	ID          string
+	Email       string `json:",omitempty" db:"unique"`
+	Name        string
+	Phone       string `json:",omitempty"`
+	Status      string // "active", "suspended"
+	CreatedAt   int64
+	Roles       []Role       `json:",omitempty" db:"-"`
+	Permissions []Permission `json:",omitempty" db:"-"`
 }
 
-func (User) TableName() string { return "users" }
-
-// Session
 type Session struct {
-	ID        string `json:"id" db:"pk"`
-	UserID    string `json:"user_id" db:"ref=users"`
-	ExpiresAt int64  `json:"expires_at"`
-	IP        string `json:"ip,omitempty"`
-	UserAgent string `json:"user_agent,omitempty"`
-	CreatedAt int64  `json:"created_at"`
+	ID        string
+	UserID    string `db:"ref=users"`
+	ExpiresAt int64
+	IP        string `json:",omitempty"`
+	UserAgent string `json:",omitempty"`
+	CreatedAt int64
 }
 
-func (Session) TableName() string { return "user_sessions" }
+// LoginData is validated by LoginModule on both frontend and backend.
+type LoginData struct {
+	Email    string
+	Password string
+}
 
-// Identity
+// RegisterData is validated by RegisterModule.
+type RegisterData struct {
+	Name     string
+	Email    string
+	Password string
+	Phone    string
+}
+
+// ProfileData is validated by ProfileModule (name/phone update).
+type ProfileData struct {
+	Name  string
+	Phone string
+}
+
+// PasswordData is validated by ProfileModule (password change sub-form).
+type PasswordData struct {
+	Current string
+	New     string
+	Confirm string
+}
+
 type Identity struct {
-	ID         string `json:"id" db:"pk"`
-	UserID     string `json:"user_id" db:"ref=users"`
-	Provider   string `json:"provider"`
-	ProviderID string `json:"provider_id"`
-	Email      string `json:"email,omitempty"`
-	CreatedAt  int64  `json:"created_at"`
+	ID         string
+	UserID     string `db:"ref=users"`
+	Provider   string
+	ProviderID string
+	Email      string `json:",omitempty"`
+	CreatedAt  int64
 }
 
-func (Identity) TableName() string { return "user_identities" }
-
-// Role
 type Role struct {
-	ID          string `json:"id" db:"pk"`
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID          string
+	Code        string
+	Name        string
+	Description string
 }
 
-func (Role) TableName() string { return "rbac_roles" }
-
-// UserRole
 type UserRole struct {
-	UserID string `json:"user_id"`
-	RoleID string `json:"role_id"`
+	UserID string
+	RoleID string
 }
 
-func (UserRole) TableName() string { return "rbac_user_roles" }
-
-// Permission
 type Permission struct {
-	ID       string `json:"id" db:"pk"`
-	Name     string `json:"name"`
-	Resource string `json:"resource"`
-	Action   string `json:"action"`
+	ID       string
+	Name     string
+	Resource string
+	Action   string
 }
 
-func (Permission) TableName() string { return "rbac_permissions" }
-
-// RolePermission
 type RolePermission struct {
-	RoleID       string `json:"role_id"`
-	PermissionID string `json:"permission_id"`
+	RoleID       string
+	PermissionID string
 }
 
-func (RolePermission) TableName() string { return "rbac_role_permissions" }
-
-// LANIP
 type LANIP struct {
-	ID        string `json:"id" db:"pk"`
-	UserID    string `json:"user_id" db:"ref=users"`
-	IP        string `json:"ip"`
-	Label     string `json:"label"`
-	CreatedAt int64  `json:"created_at"`
+	ID        string
+	UserID    string `db:"ref=users"`
+	IP        string
+	Label     string
+	CreatedAt int64
 }
 
-func (LANIP) TableName() string { return "user_lan_ips" }
-
-// OAuthState
 type OAuthState struct {
-	State     string `json:"state" db:"pk"`
-	Provider  string `json:"provider"`
-	ExpiresAt int64  `json:"expires_at"`
-	CreatedAt int64  `json:"created_at"`
+	State     string `db:"pk"`
+	Provider  string
+	ExpiresAt int64
+	CreatedAt int64
 }
-
-func (OAuthState) TableName() string { return "user_oauth_states" }
