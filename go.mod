@@ -21,7 +21,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/tinywasm/dom v0.6.0 // indirect
-	github.com/tinywasm/time v0.3.9 // indirect
+	github.com/tinywasm/time v0.4.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	modernc.org/libc v1.69.0 // indirect
