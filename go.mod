@@ -3,7 +3,7 @@ module github.com/tinywasm/user
 go 1.25.2
 
 require (
-	github.com/tinywasm/fmt v0.22.2
+	github.com/tinywasm/fmt v0.23.0
 	github.com/tinywasm/form v0.2.1
 	github.com/tinywasm/orm v0.6.0
 	github.com/tinywasm/sqlite v0.2.0
