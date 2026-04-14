@@ -18,8 +18,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/tinywasm/dom v0.6.0 h1:/7r/xIFc4Ka8tWKIkT+mN4mDbSzkyeNBWv1zNbHxTS0=
 github.com/tinywasm/dom v0.6.0/go.mod h1:e/fdWoDnYveIwvmZaaB0UBRmYYUyEebPWEt4x25obqc=
-github.com/tinywasm/fmt v0.23.1 h1:IPH0SnEttevoOFr0KN4A7KoOxLfK8IdxO+cS1KqZN0M=
-github.com/tinywasm/fmt v0.23.1/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
+github.com/tinywasm/fmt v0.23.2 h1:NWHfT3Lpi57V5yMytfCuyM65tqHBNrT5HDeqo+Nh//Q=
+github.com/tinywasm/fmt v0.23.2/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
 github.com/tinywasm/form v0.2.1 h1:oKVq3V6RYuUFgIHkw5Z/KAGBhACi+S3U4UpmKXRfbTg=
 github.com/tinywasm/form v0.2.1/go.mod h1:FTsu+MjL8XWHmPkCbMXdgrLwXxBkk1k5A/DWTmSeorU=
 github.com/tinywasm/orm v0.6.2 h1:qbGfixySiW8MhYnYTTKDhWrf5n1wNP+LOio8ZdPiO8c=
