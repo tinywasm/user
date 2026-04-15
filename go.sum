@@ -16,8 +16,8 @@ github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOF
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
-github.com/tinywasm/dom v0.6.0 h1:/7r/xIFc4Ka8tWKIkT+mN4mDbSzkyeNBWv1zNbHxTS0=
-github.com/tinywasm/dom v0.6.0/go.mod h1:e/fdWoDnYveIwvmZaaB0UBRmYYUyEebPWEt4x25obqc=
+github.com/tinywasm/dom v0.7.0 h1:drVhHRUptrBTLun/uZA3n+lbrS6vX5Q5iIDek2ZnGko=
+github.com/tinywasm/dom v0.7.0/go.mod h1:9c27al9CgnLgQQg1CIhxbfxHSDeYP0R4MasOEW7O2bs=
 github.com/tinywasm/fmt v0.23.2 h1:NWHfT3Lpi57V5yMytfCuyM65tqHBNrT5HDeqo+Nh//Q=
 github.com/tinywasm/fmt v0.23.2/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
 github.com/tinywasm/form v0.2.1 h1:oKVq3V6RYuUFgIHkw5Z/KAGBhACi+S3U4UpmKXRfbTg=
