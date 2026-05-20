@@ -4,7 +4,7 @@ go 1.25.2
 
 require (
 	github.com/tinywasm/fmt v0.23.9
-	github.com/tinywasm/form v0.2.3
+	github.com/tinywasm/form v0.2.4
 	github.com/tinywasm/orm v0.8.1
 	github.com/tinywasm/sqlite v0.2.0
 	github.com/tinywasm/unixid v0.2.22
@@ -20,6 +20,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/tinywasm/css v0.1.0 // indirect
 	github.com/tinywasm/dom v0.9.4 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
