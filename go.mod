@@ -6,7 +6,7 @@ require (
 	github.com/tinywasm/fmt v0.23.9
 	github.com/tinywasm/form v0.2.5
 	github.com/tinywasm/orm v0.8.1
-	github.com/tinywasm/sqlite v0.2.0
+	github.com/tinywasm/sqlite v0.2.1
 	github.com/tinywasm/unixid v0.2.22
 	golang.org/x/crypto v0.48.0
 	golang.org/x/oauth2 v0.35.0
@@ -22,6 +22,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/tinywasm/css v0.1.2 // indirect
 	github.com/tinywasm/dom v0.9.4 // indirect
+	github.com/tinywasm/sqlt v0.0.2 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
