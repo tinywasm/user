@@ -2,21 +2,21 @@ package user
 
 type User struct {
 	ID          string
-	Email       string `json:",omitempty" db:"unique"`
+	Email       string `db:"unique"`
 	Name        string
-	Phone       string `json:",omitempty"`
+	Phone       string ``
 	Status      string // "active", "suspended"
 	CreatedAt   int64
-	Roles       []Role       `json:",omitempty" db:"-"`
-	Permissions []Permission `json:",omitempty" db:"-"`
+	Roles       []Role       `db:"-"`
+	Permissions []Permission `db:"-"`
 }
 
 type Session struct {
 	ID        string
 	UserID    string `db:"ref=users"`
 	ExpiresAt int64
-	IP        string `json:",omitempty"`
-	UserAgent string `json:",omitempty"`
+	IP        string ``
+	UserAgent string ``
 	CreatedAt int64
 }
 
@@ -52,7 +52,7 @@ type Identity struct {
 	UserID     string `db:"ref=users"`
 	Provider   string
 	ProviderID string
-	Email      string `json:",omitempty"`
+	Email      string ``
 	CreatedAt  int64
 }
 
