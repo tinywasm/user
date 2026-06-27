@@ -6,7 +6,7 @@ import "net/http"
 
 func (m *registerModule) RenderHTML() string {
 	m.form.SetSSR(true)
-	return m.form.RenderHTML()
+	return m.form.String()
 }
 
 func (m *registerModule) Create(data ...any) (any, error) {

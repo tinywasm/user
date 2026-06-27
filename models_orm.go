@@ -24,6 +24,26 @@ func (m *User) Schema() []fmt.Field { return _schemaUser }
 
 func (m *User) Pointers() []any { return []any{&m.ID, &m.Email, &m.Name, &m.Phone, &m.Status, &m.CreatedAt} }
 
+func (m *User) IsNil() bool { return m == nil }
+
+func (m *User) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", m.ID)
+	w.String("email", m.Email)
+	w.String("name", m.Name)
+	w.String("phone", m.Phone)
+	w.String("status", m.Status)
+	w.Int("created_at", int64(m.CreatedAt))
+}
+
+func (m *User) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("email"); ok { m.Email = v }
+	if v, ok := r.String("name"); ok { m.Name = v }
+	if v, ok := r.String("phone"); ok { m.Phone = v }
+	if v, ok := r.String("status"); ok { m.Status = v }
+	if v, ok := r.Int("created_at"); ok { m.CreatedAt = int64(v) }
+}
+
 type UserList []*User
 
 func (s *UserList) Schema() []fmt.Field { return nil }
@@ -31,6 +51,25 @@ func (s *UserList) Pointers() []any     { return nil }
 func (s *UserList) Len() int             { return len(*s) }
 func (s *UserList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserList) Append() fmt.Fielder  { v := &User{}; *s = append(*s, v); return v }
+func (s *UserList) IsNil() bool          { return s == nil }
+func (s *UserList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserList) DecodeFields(_ fmt.FieldReader) {}
+
+var User_ = struct {
+	ID string
+	Email string
+	Name string
+	Phone string
+	Status string
+	CreatedAt string
+}{
+	ID: "id",
+	Email: "email",
+	Name: "name",
+	Phone: "phone",
+	Status: "status",
+	CreatedAt: "created_at",
+}
 
 func ReadOneUser(qb *orm.QB, model *User) (*User, error) {
 	err := qb.ReadOne()
@@ -40,13 +79,13 @@ func ReadOneUser(qb *orm.QB, model *User) (*User, error) {
 	return model, nil
 }
 
-func ReadAllUser(qb *orm.QB) (*UserList, error) {
+func ReadAllUser(qb *orm.QB) (UserList, error) {
 	var results UserList
 	err := qb.ReadAll(
 		func() fmt.Model { return &User{} },
 		func(m fmt.Model) { results = append(results, m.(*User)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *Session) ModelName() string {
@@ -66,6 +105,26 @@ func (m *Session) Schema() []fmt.Field { return _schemaSession }
 
 func (m *Session) Pointers() []any { return []any{&m.ID, &m.UserID, &m.ExpiresAt, &m.IP, &m.UserAgent, &m.CreatedAt} }
 
+func (m *Session) IsNil() bool { return m == nil }
+
+func (m *Session) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", m.ID)
+	w.String("user_id", m.UserID)
+	w.Int("expires_at", int64(m.ExpiresAt))
+	w.String("ip", m.IP)
+	w.String("user_agent", m.UserAgent)
+	w.Int("created_at", int64(m.CreatedAt))
+}
+
+func (m *Session) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("user_id"); ok { m.UserID = v }
+	if v, ok := r.Int("expires_at"); ok { m.ExpiresAt = int64(v) }
+	if v, ok := r.String("ip"); ok { m.IP = v }
+	if v, ok := r.String("user_agent"); ok { m.UserAgent = v }
+	if v, ok := r.Int("created_at"); ok { m.CreatedAt = int64(v) }
+}
+
 type SessionList []*Session
 
 func (s *SessionList) Schema() []fmt.Field { return nil }
@@ -73,6 +132,25 @@ func (s *SessionList) Pointers() []any     { return nil }
 func (s *SessionList) Len() int             { return len(*s) }
 func (s *SessionList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *SessionList) Append() fmt.Fielder  { v := &Session{}; *s = append(*s, v); return v }
+func (s *SessionList) IsNil() bool          { return s == nil }
+func (s *SessionList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *SessionList) DecodeFields(_ fmt.FieldReader) {}
+
+var Session_ = struct {
+	ID string
+	UserID string
+	ExpiresAt string
+	IP string
+	UserAgent string
+	CreatedAt string
+}{
+	ID: "id",
+	UserID: "user_id",
+	ExpiresAt: "expires_at",
+	IP: "ip",
+	UserAgent: "user_agent",
+	CreatedAt: "created_at",
+}
 
 func ReadOneSession(qb *orm.QB, model *Session) (*Session, error) {
 	err := qb.ReadOne()
@@ -82,13 +160,13 @@ func ReadOneSession(qb *orm.QB, model *Session) (*Session, error) {
 	return model, nil
 }
 
-func ReadAllSession(qb *orm.QB) (*SessionList, error) {
+func ReadAllSession(qb *orm.QB) (SessionList, error) {
 	var results SessionList
 	err := qb.ReadAll(
 		func() fmt.Model { return &Session{} },
 		func(m fmt.Model) { results = append(results, m.(*Session)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *LoginData) ModelName() string {
@@ -104,6 +182,18 @@ func (m *LoginData) Schema() []fmt.Field { return _schemaLoginData }
 
 func (m *LoginData) Pointers() []any { return []any{&m.Email, &m.Password} }
 
+func (m *LoginData) IsNil() bool { return m == nil }
+
+func (m *LoginData) EncodeFields(w fmt.FieldWriter) {
+	w.String("email", m.Email)
+	w.String("password", m.Password)
+}
+
+func (m *LoginData) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("email"); ok { m.Email = v }
+	if v, ok := r.String("password"); ok { m.Password = v }
+}
+
 type LoginDataList []*LoginData
 
 func (s *LoginDataList) Schema() []fmt.Field { return nil }
@@ -111,23 +201,9 @@ func (s *LoginDataList) Pointers() []any     { return nil }
 func (s *LoginDataList) Len() int             { return len(*s) }
 func (s *LoginDataList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *LoginDataList) Append() fmt.Fielder  { v := &LoginData{}; *s = append(*s, v); return v }
-
-func ReadOneLoginData(qb *orm.QB, model *LoginData) (*LoginData, error) {
-	err := qb.ReadOne()
-	if err != nil {
-		return nil, err
-	}
-	return model, nil
-}
-
-func ReadAllLoginData(qb *orm.QB) (*LoginDataList, error) {
-	var results LoginDataList
-	err := qb.ReadAll(
-		func() fmt.Model { return &LoginData{} },
-		func(m fmt.Model) { results = append(results, m.(*LoginData)) },
-	)
-	return &results, err
-}
+func (s *LoginDataList) IsNil() bool          { return s == nil }
+func (s *LoginDataList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *LoginDataList) DecodeFields(_ fmt.FieldReader) {}
 
 func (m *RegisterData) ModelName() string {
 	return "register_data"
@@ -144,6 +220,22 @@ func (m *RegisterData) Schema() []fmt.Field { return _schemaRegisterData }
 
 func (m *RegisterData) Pointers() []any { return []any{&m.Name, &m.Email, &m.Password, &m.Phone} }
 
+func (m *RegisterData) IsNil() bool { return m == nil }
+
+func (m *RegisterData) EncodeFields(w fmt.FieldWriter) {
+	w.String("name", m.Name)
+	w.String("email", m.Email)
+	w.String("password", m.Password)
+	w.String("phone", m.Phone)
+}
+
+func (m *RegisterData) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("name"); ok { m.Name = v }
+	if v, ok := r.String("email"); ok { m.Email = v }
+	if v, ok := r.String("password"); ok { m.Password = v }
+	if v, ok := r.String("phone"); ok { m.Phone = v }
+}
+
 type RegisterDataList []*RegisterData
 
 func (s *RegisterDataList) Schema() []fmt.Field { return nil }
@@ -151,23 +243,9 @@ func (s *RegisterDataList) Pointers() []any     { return nil }
 func (s *RegisterDataList) Len() int             { return len(*s) }
 func (s *RegisterDataList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *RegisterDataList) Append() fmt.Fielder  { v := &RegisterData{}; *s = append(*s, v); return v }
-
-func ReadOneRegisterData(qb *orm.QB, model *RegisterData) (*RegisterData, error) {
-	err := qb.ReadOne()
-	if err != nil {
-		return nil, err
-	}
-	return model, nil
-}
-
-func ReadAllRegisterData(qb *orm.QB) (*RegisterDataList, error) {
-	var results RegisterDataList
-	err := qb.ReadAll(
-		func() fmt.Model { return &RegisterData{} },
-		func(m fmt.Model) { results = append(results, m.(*RegisterData)) },
-	)
-	return &results, err
-}
+func (s *RegisterDataList) IsNil() bool          { return s == nil }
+func (s *RegisterDataList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *RegisterDataList) DecodeFields(_ fmt.FieldReader) {}
 
 func (m *ProfileData) ModelName() string {
 	return "profile_data"
@@ -182,6 +260,18 @@ func (m *ProfileData) Schema() []fmt.Field { return _schemaProfileData }
 
 func (m *ProfileData) Pointers() []any { return []any{&m.Name, &m.Phone} }
 
+func (m *ProfileData) IsNil() bool { return m == nil }
+
+func (m *ProfileData) EncodeFields(w fmt.FieldWriter) {
+	w.String("name", m.Name)
+	w.String("phone", m.Phone)
+}
+
+func (m *ProfileData) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("name"); ok { m.Name = v }
+	if v, ok := r.String("phone"); ok { m.Phone = v }
+}
+
 type ProfileDataList []*ProfileData
 
 func (s *ProfileDataList) Schema() []fmt.Field { return nil }
@@ -189,23 +279,9 @@ func (s *ProfileDataList) Pointers() []any     { return nil }
 func (s *ProfileDataList) Len() int             { return len(*s) }
 func (s *ProfileDataList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *ProfileDataList) Append() fmt.Fielder  { v := &ProfileData{}; *s = append(*s, v); return v }
-
-func ReadOneProfileData(qb *orm.QB, model *ProfileData) (*ProfileData, error) {
-	err := qb.ReadOne()
-	if err != nil {
-		return nil, err
-	}
-	return model, nil
-}
-
-func ReadAllProfileData(qb *orm.QB) (*ProfileDataList, error) {
-	var results ProfileDataList
-	err := qb.ReadAll(
-		func() fmt.Model { return &ProfileData{} },
-		func(m fmt.Model) { results = append(results, m.(*ProfileData)) },
-	)
-	return &results, err
-}
+func (s *ProfileDataList) IsNil() bool          { return s == nil }
+func (s *ProfileDataList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *ProfileDataList) DecodeFields(_ fmt.FieldReader) {}
 
 func (m *PasswordData) ModelName() string {
 	return "password_data"
@@ -221,6 +297,20 @@ func (m *PasswordData) Schema() []fmt.Field { return _schemaPasswordData }
 
 func (m *PasswordData) Pointers() []any { return []any{&m.Current, &m.New, &m.Confirm} }
 
+func (m *PasswordData) IsNil() bool { return m == nil }
+
+func (m *PasswordData) EncodeFields(w fmt.FieldWriter) {
+	w.String("current", m.Current)
+	w.String("new", m.New)
+	w.String("confirm", m.Confirm)
+}
+
+func (m *PasswordData) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("current"); ok { m.Current = v }
+	if v, ok := r.String("new"); ok { m.New = v }
+	if v, ok := r.String("confirm"); ok { m.Confirm = v }
+}
+
 type PasswordDataList []*PasswordData
 
 func (s *PasswordDataList) Schema() []fmt.Field { return nil }
@@ -228,23 +318,9 @@ func (s *PasswordDataList) Pointers() []any     { return nil }
 func (s *PasswordDataList) Len() int             { return len(*s) }
 func (s *PasswordDataList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *PasswordDataList) Append() fmt.Fielder  { v := &PasswordData{}; *s = append(*s, v); return v }
-
-func ReadOnePasswordData(qb *orm.QB, model *PasswordData) (*PasswordData, error) {
-	err := qb.ReadOne()
-	if err != nil {
-		return nil, err
-	}
-	return model, nil
-}
-
-func ReadAllPasswordData(qb *orm.QB) (*PasswordDataList, error) {
-	var results PasswordDataList
-	err := qb.ReadAll(
-		func() fmt.Model { return &PasswordData{} },
-		func(m fmt.Model) { results = append(results, m.(*PasswordData)) },
-	)
-	return &results, err
-}
+func (s *PasswordDataList) IsNil() bool          { return s == nil }
+func (s *PasswordDataList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *PasswordDataList) DecodeFields(_ fmt.FieldReader) {}
 
 func (m *Identity) ModelName() string {
 	return "identity"
@@ -263,6 +339,26 @@ func (m *Identity) Schema() []fmt.Field { return _schemaIdentity }
 
 func (m *Identity) Pointers() []any { return []any{&m.ID, &m.UserID, &m.Provider, &m.ProviderID, &m.Email, &m.CreatedAt} }
 
+func (m *Identity) IsNil() bool { return m == nil }
+
+func (m *Identity) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", m.ID)
+	w.String("user_id", m.UserID)
+	w.String("provider", m.Provider)
+	w.String("provider_id", m.ProviderID)
+	w.String("email", m.Email)
+	w.Int("created_at", int64(m.CreatedAt))
+}
+
+func (m *Identity) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("user_id"); ok { m.UserID = v }
+	if v, ok := r.String("provider"); ok { m.Provider = v }
+	if v, ok := r.String("provider_id"); ok { m.ProviderID = v }
+	if v, ok := r.String("email"); ok { m.Email = v }
+	if v, ok := r.Int("created_at"); ok { m.CreatedAt = int64(v) }
+}
+
 type IdentityList []*Identity
 
 func (s *IdentityList) Schema() []fmt.Field { return nil }
@@ -270,6 +366,25 @@ func (s *IdentityList) Pointers() []any     { return nil }
 func (s *IdentityList) Len() int             { return len(*s) }
 func (s *IdentityList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *IdentityList) Append() fmt.Fielder  { v := &Identity{}; *s = append(*s, v); return v }
+func (s *IdentityList) IsNil() bool          { return s == nil }
+func (s *IdentityList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *IdentityList) DecodeFields(_ fmt.FieldReader) {}
+
+var Identity_ = struct {
+	ID string
+	UserID string
+	Provider string
+	ProviderID string
+	Email string
+	CreatedAt string
+}{
+	ID: "id",
+	UserID: "user_id",
+	Provider: "provider",
+	ProviderID: "provider_id",
+	Email: "email",
+	CreatedAt: "created_at",
+}
 
 func ReadOneIdentity(qb *orm.QB, model *Identity) (*Identity, error) {
 	err := qb.ReadOne()
@@ -279,13 +394,13 @@ func ReadOneIdentity(qb *orm.QB, model *Identity) (*Identity, error) {
 	return model, nil
 }
 
-func ReadAllIdentity(qb *orm.QB) (*IdentityList, error) {
+func ReadAllIdentity(qb *orm.QB) (IdentityList, error) {
 	var results IdentityList
 	err := qb.ReadAll(
 		func() fmt.Model { return &Identity{} },
 		func(m fmt.Model) { results = append(results, m.(*Identity)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *Role) ModelName() string {
@@ -303,6 +418,22 @@ func (m *Role) Schema() []fmt.Field { return _schemaRole }
 
 func (m *Role) Pointers() []any { return []any{&m.ID, &m.Code, &m.Name, &m.Description} }
 
+func (m *Role) IsNil() bool { return m == nil }
+
+func (m *Role) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", m.ID)
+	w.String("code", m.Code)
+	w.String("name", m.Name)
+	w.String("description", m.Description)
+}
+
+func (m *Role) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("code"); ok { m.Code = v }
+	if v, ok := r.String("name"); ok { m.Name = v }
+	if v, ok := r.String("description"); ok { m.Description = v }
+}
+
 type RoleList []*Role
 
 func (s *RoleList) Schema() []fmt.Field { return nil }
@@ -310,6 +441,21 @@ func (s *RoleList) Pointers() []any     { return nil }
 func (s *RoleList) Len() int             { return len(*s) }
 func (s *RoleList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *RoleList) Append() fmt.Fielder  { v := &Role{}; *s = append(*s, v); return v }
+func (s *RoleList) IsNil() bool          { return s == nil }
+func (s *RoleList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *RoleList) DecodeFields(_ fmt.FieldReader) {}
+
+var Role_ = struct {
+	ID string
+	Code string
+	Name string
+	Description string
+}{
+	ID: "id",
+	Code: "code",
+	Name: "name",
+	Description: "description",
+}
 
 func ReadOneRole(qb *orm.QB, model *Role) (*Role, error) {
 	err := qb.ReadOne()
@@ -319,13 +465,13 @@ func ReadOneRole(qb *orm.QB, model *Role) (*Role, error) {
 	return model, nil
 }
 
-func ReadAllRole(qb *orm.QB) (*RoleList, error) {
+func ReadAllRole(qb *orm.QB) (RoleList, error) {
 	var results RoleList
 	err := qb.ReadAll(
 		func() fmt.Model { return &Role{} },
 		func(m fmt.Model) { results = append(results, m.(*Role)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *UserRole) ModelName() string {
@@ -333,13 +479,25 @@ func (m *UserRole) ModelName() string {
 }
 
 var _schemaUserRole = []fmt.Field{
-		{Name: "user_id", Type: fmt.FieldText},
-		{Name: "role_id", Type: fmt.FieldText},
+		{Name: "user_id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "role_id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
 	}
 
 func (m *UserRole) Schema() []fmt.Field { return _schemaUserRole }
 
 func (m *UserRole) Pointers() []any { return []any{&m.UserID, &m.RoleID} }
+
+func (m *UserRole) IsNil() bool { return m == nil }
+
+func (m *UserRole) EncodeFields(w fmt.FieldWriter) {
+	w.String("user_id", m.UserID)
+	w.String("role_id", m.RoleID)
+}
+
+func (m *UserRole) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("user_id"); ok { m.UserID = v }
+	if v, ok := r.String("role_id"); ok { m.RoleID = v }
+}
 
 type UserRoleList []*UserRole
 
@@ -348,6 +506,17 @@ func (s *UserRoleList) Pointers() []any     { return nil }
 func (s *UserRoleList) Len() int             { return len(*s) }
 func (s *UserRoleList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserRoleList) Append() fmt.Fielder  { v := &UserRole{}; *s = append(*s, v); return v }
+func (s *UserRoleList) IsNil() bool          { return s == nil }
+func (s *UserRoleList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserRoleList) DecodeFields(_ fmt.FieldReader) {}
+
+var UserRole_ = struct {
+	UserID string
+	RoleID string
+}{
+	UserID: "user_id",
+	RoleID: "role_id",
+}
 
 func ReadOneUserRole(qb *orm.QB, model *UserRole) (*UserRole, error) {
 	err := qb.ReadOne()
@@ -357,13 +526,13 @@ func ReadOneUserRole(qb *orm.QB, model *UserRole) (*UserRole, error) {
 	return model, nil
 }
 
-func ReadAllUserRole(qb *orm.QB) (*UserRoleList, error) {
+func ReadAllUserRole(qb *orm.QB) (UserRoleList, error) {
 	var results UserRoleList
 	err := qb.ReadAll(
 		func() fmt.Model { return &UserRole{} },
 		func(m fmt.Model) { results = append(results, m.(*UserRole)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *Permission) ModelName() string {
@@ -381,6 +550,22 @@ func (m *Permission) Schema() []fmt.Field { return _schemaPermission }
 
 func (m *Permission) Pointers() []any { return []any{&m.ID, &m.Name, &m.Resource, &m.Action} }
 
+func (m *Permission) IsNil() bool { return m == nil }
+
+func (m *Permission) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", m.ID)
+	w.String("name", m.Name)
+	w.String("resource", m.Resource)
+	w.String("action", m.Action)
+}
+
+func (m *Permission) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("name"); ok { m.Name = v }
+	if v, ok := r.String("resource"); ok { m.Resource = v }
+	if v, ok := r.String("action"); ok { m.Action = v }
+}
+
 type PermissionList []*Permission
 
 func (s *PermissionList) Schema() []fmt.Field { return nil }
@@ -388,6 +573,21 @@ func (s *PermissionList) Pointers() []any     { return nil }
 func (s *PermissionList) Len() int             { return len(*s) }
 func (s *PermissionList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *PermissionList) Append() fmt.Fielder  { v := &Permission{}; *s = append(*s, v); return v }
+func (s *PermissionList) IsNil() bool          { return s == nil }
+func (s *PermissionList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *PermissionList) DecodeFields(_ fmt.FieldReader) {}
+
+var Permission_ = struct {
+	ID string
+	Name string
+	Resource string
+	Action string
+}{
+	ID: "id",
+	Name: "name",
+	Resource: "resource",
+	Action: "action",
+}
 
 func ReadOnePermission(qb *orm.QB, model *Permission) (*Permission, error) {
 	err := qb.ReadOne()
@@ -397,13 +597,13 @@ func ReadOnePermission(qb *orm.QB, model *Permission) (*Permission, error) {
 	return model, nil
 }
 
-func ReadAllPermission(qb *orm.QB) (*PermissionList, error) {
+func ReadAllPermission(qb *orm.QB) (PermissionList, error) {
 	var results PermissionList
 	err := qb.ReadAll(
 		func() fmt.Model { return &Permission{} },
 		func(m fmt.Model) { results = append(results, m.(*Permission)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *RolePermission) ModelName() string {
@@ -411,13 +611,25 @@ func (m *RolePermission) ModelName() string {
 }
 
 var _schemaRolePermission = []fmt.Field{
-		{Name: "role_id", Type: fmt.FieldText},
-		{Name: "permission_id", Type: fmt.FieldText},
+		{Name: "role_id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
+		{Name: "permission_id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}},
 	}
 
 func (m *RolePermission) Schema() []fmt.Field { return _schemaRolePermission }
 
 func (m *RolePermission) Pointers() []any { return []any{&m.RoleID, &m.PermissionID} }
+
+func (m *RolePermission) IsNil() bool { return m == nil }
+
+func (m *RolePermission) EncodeFields(w fmt.FieldWriter) {
+	w.String("role_id", m.RoleID)
+	w.String("permission_id", m.PermissionID)
+}
+
+func (m *RolePermission) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("role_id"); ok { m.RoleID = v }
+	if v, ok := r.String("permission_id"); ok { m.PermissionID = v }
+}
 
 type RolePermissionList []*RolePermission
 
@@ -426,6 +638,17 @@ func (s *RolePermissionList) Pointers() []any     { return nil }
 func (s *RolePermissionList) Len() int             { return len(*s) }
 func (s *RolePermissionList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *RolePermissionList) Append() fmt.Fielder  { v := &RolePermission{}; *s = append(*s, v); return v }
+func (s *RolePermissionList) IsNil() bool          { return s == nil }
+func (s *RolePermissionList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *RolePermissionList) DecodeFields(_ fmt.FieldReader) {}
+
+var RolePermission_ = struct {
+	RoleID string
+	PermissionID string
+}{
+	RoleID: "role_id",
+	PermissionID: "permission_id",
+}
 
 func ReadOneRolePermission(qb *orm.QB, model *RolePermission) (*RolePermission, error) {
 	err := qb.ReadOne()
@@ -435,13 +658,13 @@ func ReadOneRolePermission(qb *orm.QB, model *RolePermission) (*RolePermission, 
 	return model, nil
 }
 
-func ReadAllRolePermission(qb *orm.QB) (*RolePermissionList, error) {
+func ReadAllRolePermission(qb *orm.QB) (RolePermissionList, error) {
 	var results RolePermissionList
 	err := qb.ReadAll(
 		func() fmt.Model { return &RolePermission{} },
 		func(m fmt.Model) { results = append(results, m.(*RolePermission)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *LANIP) ModelName() string {
@@ -460,6 +683,24 @@ func (m *LANIP) Schema() []fmt.Field { return _schemaLANIP }
 
 func (m *LANIP) Pointers() []any { return []any{&m.ID, &m.UserID, &m.IP, &m.Label, &m.CreatedAt} }
 
+func (m *LANIP) IsNil() bool { return m == nil }
+
+func (m *LANIP) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", m.ID)
+	w.String("user_id", m.UserID)
+	w.String("ip", m.IP)
+	w.String("label", m.Label)
+	w.Int("created_at", int64(m.CreatedAt))
+}
+
+func (m *LANIP) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("user_id"); ok { m.UserID = v }
+	if v, ok := r.String("ip"); ok { m.IP = v }
+	if v, ok := r.String("label"); ok { m.Label = v }
+	if v, ok := r.Int("created_at"); ok { m.CreatedAt = int64(v) }
+}
+
 type LANIPList []*LANIP
 
 func (s *LANIPList) Schema() []fmt.Field { return nil }
@@ -467,6 +708,23 @@ func (s *LANIPList) Pointers() []any     { return nil }
 func (s *LANIPList) Len() int             { return len(*s) }
 func (s *LANIPList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *LANIPList) Append() fmt.Fielder  { v := &LANIP{}; *s = append(*s, v); return v }
+func (s *LANIPList) IsNil() bool          { return s == nil }
+func (s *LANIPList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *LANIPList) DecodeFields(_ fmt.FieldReader) {}
+
+var LANIP_ = struct {
+	ID string
+	UserID string
+	IP string
+	Label string
+	CreatedAt string
+}{
+	ID: "id",
+	UserID: "user_id",
+	IP: "ip",
+	Label: "label",
+	CreatedAt: "created_at",
+}
 
 func ReadOneLANIP(qb *orm.QB, model *LANIP) (*LANIP, error) {
 	err := qb.ReadOne()
@@ -476,13 +734,13 @@ func ReadOneLANIP(qb *orm.QB, model *LANIP) (*LANIP, error) {
 	return model, nil
 }
 
-func ReadAllLANIP(qb *orm.QB) (*LANIPList, error) {
+func ReadAllLANIP(qb *orm.QB) (LANIPList, error) {
 	var results LANIPList
 	err := qb.ReadAll(
 		func() fmt.Model { return &LANIP{} },
 		func(m fmt.Model) { results = append(results, m.(*LANIP)) },
 	)
-	return &results, err
+	return results, err
 }
 
 func (m *OAuthState) ModelName() string {
@@ -500,6 +758,22 @@ func (m *OAuthState) Schema() []fmt.Field { return _schemaOAuthState }
 
 func (m *OAuthState) Pointers() []any { return []any{&m.State, &m.Provider, &m.ExpiresAt, &m.CreatedAt} }
 
+func (m *OAuthState) IsNil() bool { return m == nil }
+
+func (m *OAuthState) EncodeFields(w fmt.FieldWriter) {
+	w.String("state", m.State)
+	w.String("provider", m.Provider)
+	w.Int("expires_at", int64(m.ExpiresAt))
+	w.Int("created_at", int64(m.CreatedAt))
+}
+
+func (m *OAuthState) DecodeFields(r fmt.FieldReader) {
+	if v, ok := r.String("state"); ok { m.State = v }
+	if v, ok := r.String("provider"); ok { m.Provider = v }
+	if v, ok := r.Int("expires_at"); ok { m.ExpiresAt = int64(v) }
+	if v, ok := r.Int("created_at"); ok { m.CreatedAt = int64(v) }
+}
+
 type OAuthStateList []*OAuthState
 
 func (s *OAuthStateList) Schema() []fmt.Field { return nil }
@@ -507,6 +781,21 @@ func (s *OAuthStateList) Pointers() []any     { return nil }
 func (s *OAuthStateList) Len() int             { return len(*s) }
 func (s *OAuthStateList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *OAuthStateList) Append() fmt.Fielder  { v := &OAuthState{}; *s = append(*s, v); return v }
+func (s *OAuthStateList) IsNil() bool          { return s == nil }
+func (s *OAuthStateList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *OAuthStateList) DecodeFields(_ fmt.FieldReader) {}
+
+var OAuthState_ = struct {
+	State string
+	Provider string
+	ExpiresAt string
+	CreatedAt string
+}{
+	State: "state",
+	Provider: "provider",
+	ExpiresAt: "expires_at",
+	CreatedAt: "created_at",
+}
 
 func ReadOneOAuthState(qb *orm.QB, model *OAuthState) (*OAuthState, error) {
 	err := qb.ReadOne()
@@ -516,12 +805,12 @@ func ReadOneOAuthState(qb *orm.QB, model *OAuthState) (*OAuthState, error) {
 	return model, nil
 }
 
-func ReadAllOAuthState(qb *orm.QB) (*OAuthStateList, error) {
+func ReadAllOAuthState(qb *orm.QB) (OAuthStateList, error) {
 	var results OAuthStateList
 	err := qb.ReadAll(
 		func() fmt.Model { return &OAuthState{} },
 		func(m fmt.Model) { results = append(results, m.(*OAuthState)) },
 	)
-	return &results, err
+	return results, err
 }
 

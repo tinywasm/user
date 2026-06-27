@@ -5,7 +5,7 @@ package user
 func (m *profileModule) RenderHTML() string {
 	m.form.SetSSR(true)
 	m.passwordForm.SetSSR(true)
-	return m.form.RenderHTML() + "<hr>" + m.passwordForm.RenderHTML()
+	return m.form.String() + "<hr>" + m.passwordForm.String()
 }
 
 func (m *profileModule) Create(data ...any) (any, error) {

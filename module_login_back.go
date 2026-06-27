@@ -6,7 +6,7 @@ import "net/http"
 
 func (m *loginModule) RenderHTML() string {
 	m.form.SetSSR(true)
-	out := m.form.RenderHTML()
+	out := m.form.String()
 	if m.m != nil {
 		for _, p := range m.m.registeredProviders() {
 			out += `<a href="/oauth/` + p.Name() + `">Login with ` + p.Name() + `</a>`

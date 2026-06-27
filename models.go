@@ -1,22 +1,24 @@
 package user
 
+// orm:typed_fields
 type User struct {
-	ID          string
+	ID          string `db:"pk"`
 	Email       string `db:"unique"`
 	Name        string
-	Phone       string ``
+	Phone       string
 	Status      string // "active", "suspended"
 	CreatedAt   int64
 	Roles       []Role       `db:"-"`
 	Permissions []Permission `db:"-"`
 }
 
+// orm:typed_fields
 type Session struct {
-	ID        string
+	ID        string `db:"pk"`
 	UserID    string `db:"ref=users"`
 	ExpiresAt int64
-	IP        string ``
-	UserAgent string ``
+	IP        string
+	UserAgent string
 	CreatedAt int64
 }
 
@@ -47,47 +49,54 @@ type PasswordData struct {
 	Confirm string
 }
 
+// orm:typed_fields
 type Identity struct {
-	ID         string
+	ID         string `db:"pk"`
 	UserID     string `db:"ref=users"`
 	Provider   string
 	ProviderID string
-	Email      string ``
+	Email      string
 	CreatedAt  int64
 }
 
+// orm:typed_fields
 type Role struct {
-	ID          string
+	ID          string `db:"pk"`
 	Code        string
 	Name        string
 	Description string
 }
 
+// orm:typed_fields
 type UserRole struct {
-	UserID string
-	RoleID string
+	UserID string `db:"pk,ref=users"`
+	RoleID string `db:"pk,ref=roles"`
 }
 
+// orm:typed_fields
 type Permission struct {
-	ID       string
+	ID       string `db:"pk"`
 	Name     string
 	Resource string
 	Action   string
 }
 
+// orm:typed_fields
 type RolePermission struct {
-	RoleID       string
-	PermissionID string
+	RoleID       string `db:"pk,ref=roles"`
+	PermissionID string `db:"pk,ref=permissions"`
 }
 
+// orm:typed_fields
 type LANIP struct {
-	ID        string
+	ID        string `db:"pk"`
 	UserID    string `db:"ref=users"`
 	IP        string
 	Label     string
 	CreatedAt int64
 }
 
+// orm:typed_fields
 type OAuthState struct {
 	State     string `db:"pk"`
 	Provider  string
