@@ -11,7 +11,7 @@ import (
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/user/server"
+	"github.com/tinywasm/user/server"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 )

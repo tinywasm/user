@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/user/server"
+	"github.com/tinywasm/user/server"
 )
 
 func TestSQLBoundary(t *testing.T) {

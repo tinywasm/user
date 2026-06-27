@@ -4,7 +4,7 @@ package tests
 
 import (
 	"testing"
-	"github.com/tinywasm/user/user/ui"
+	"github.com/tinywasm/user/ui"
 )
 
 type wasmModule struct{}

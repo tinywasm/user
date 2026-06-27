@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/user/server"
+	"github.com/tinywasm/user/server"
 )
 
 func TestTimingSafeAuth(t *testing.T) {

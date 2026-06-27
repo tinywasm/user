@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/user/server"
+	"github.com/tinywasm/user/server"
 )
 
 type mockHandler struct {
