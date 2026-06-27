@@ -1,12 +1,13 @@
-package user
+package userui
 
 import (
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/form"
+	"github.com/tinywasm/user"
 )
 
 type profileModule struct {
-	m *Module
+	m any
 
 	form         *form.Form
 	passwordForm *form.Form
@@ -26,10 +27,15 @@ func (m *profileModule) ValidateData(action byte, data ...any) error {
 	}
 
 	switch data[0].(type) {
-	case *ProfileData:
+	case *user.ProfileData:
 		return m.form.ValidateData(action, fielder)
-	case *PasswordData:
+	case *user.PasswordData:
 		return m.passwordForm.ValidateData(action, fielder)
 	}
 	return nil
+}
+
+func (m *profileModule) OnMount() {
+	m.form.OnMount()
+	m.passwordForm.OnMount()
 }

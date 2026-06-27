@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/server"
 )
 
 type mockHandler struct {
@@ -20,7 +21,7 @@ func (h *mockHandler) AllowedRoles(action byte) []byte {
 
 func TestIntegration_FullFlow(t *testing.T) {
 	db := newTestDB(t)
-	m, err := user.New(db, user.Config{})
+	m, err := userserver.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

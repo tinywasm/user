@@ -10,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/server"
 )
 
-func getLoginMod(m *user.Module) interface {
+func getLoginMod(m *userserver.Module) interface {
 	SetCookie(string, http.ResponseWriter, *http.Request) error
 } {
 	for _, mod := range m.UIModules() {
@@ -31,7 +32,7 @@ func TestCookieSecurity(t *testing.T) {
 	db := newTestDB(t)
 
 	t.Run("Cookie Mode Flags", func(t *testing.T) {
-		m, _ := user.New(db, user.Config{TokenTTL: 3600})
+		m, _ := userserver.New(db, user.Config{TokenTTL: 3600})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 
@@ -68,7 +69,7 @@ func TestCookieSecurity(t *testing.T) {
 	})
 
 	t.Run("JWT Mode Cookie", func(t *testing.T) {
-		m, _ := user.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200})
+		m, _ := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 
@@ -90,7 +91,7 @@ func TestCookieSecurity(t *testing.T) {
 	})
 
 	t.Run("Custom Cookie Name", func(t *testing.T) {
-		m, _ := user.New(db, user.Config{CookieName: "custom_auth"})
+		m, _ := userserver.New(db, user.Config{CookieName: "custom_auth"})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 
@@ -106,7 +107,7 @@ func TestCookieSecurity(t *testing.T) {
 
 func TestSessionRotation(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := user.New(db, user.Config{TokenTTL: 3600})
+	m, _ := userserver.New(db, user.Config{TokenTTL: 3600})
 
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "rot@example.com", Name: "Rot"})
@@ -141,7 +142,7 @@ func TestSessionRotation(t *testing.T) {
 		sess3, _ := m.CreateSession(u.ID, "10.0.0.1", "ua1")
 		// Manually expire
 		db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.ID)
-		m, _ = user.New(db, user.Config{TokenTTL: 3600}) // Clear cache
+		m, _ = userserver.New(db, user.Config{TokenTTL: 3600}) // Clear cache
 
 		_, err := m.RotateSession(sess3.ID, "10.0.0.1", "ua1")
 		if err != user.ErrSessionExpired {
@@ -190,7 +191,7 @@ func TestPasswordHook(t *testing.T) {
 			return nil
 		},
 	}
-	m, _ := user.New(db, cfg)
+	m, _ := userserver.New(db, cfg)
 
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "hook@example.com", Name: "Hook"})

@@ -1,7 +1,7 @@
-package user
+package userui
 
 type oauthModule struct {
-	m *Module
+	m any
 }
 
 func (m *oauthModule) HandlerName() string { return "oauth/callback" }

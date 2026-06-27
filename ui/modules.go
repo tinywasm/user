@@ -1,9 +1,10 @@
-package user
+package userui
 
 import (
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/form/input"
+	"github.com/tinywasm/user"
 )
 
 var uiModules []any
@@ -15,11 +16,11 @@ func init() {
 		input.Password(),
 	)
 	uiModules = []any{
-		&loginModule{form: mustForm("login", &LoginData{})},
-		&registerModule{form: mustForm("register", &RegisterData{})},
+		&loginModule{form: mustForm("login", &user.LoginData{})},
+		&registerModule{form: mustForm("register", &user.RegisterData{})},
 		&profileModule{
-			form:         mustForm("profile", &ProfileData{}),
-			passwordForm: mustForm("password", &PasswordData{}),
+			form:         mustForm("profile", &user.ProfileData{}),
+			passwordForm: mustForm("password", &user.PasswordData{}),
 		},
 		&lanModule{},
 		&oauthModule{},

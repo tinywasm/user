@@ -4,7 +4,7 @@ go 1.25.2
 
 require (
 	github.com/tinywasm/fmt v0.24.5
-	github.com/tinywasm/form v0.2.9
+	github.com/tinywasm/form v0.2.10
 	github.com/tinywasm/orm v0.9.16
 	github.com/tinywasm/sqlite v0.2.3
 	github.com/tinywasm/unixid v0.2.23

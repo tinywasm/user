@@ -1,12 +1,13 @@
-//go:build !wasm
-
-package user
+package userserver
 
 import (
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/form"
 	"sync"
 	"time"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/user"
 )
 
 // Module is the user/auth/rbac handle. All backend operations are methods on this type.
@@ -15,16 +16,16 @@ type Module struct {
 	db          *orm.DB
 	cache       *sessionCache
 	ucache      *userCache
-	config      Config
+	config      user.Config
 	log         func(...any)
-	providers   map[string]OAuthProvider
+	providers   map[string]user.OAuthProvider
 	providersMu sync.RWMutex
 	mu          sync.RWMutex
 }
 
 // New initializes the user/rbac schema, warms the cache, and returns a Module handle.
 // This is the ONLY entry point for this package on the backend.
-func New(db *orm.DB, cfg Config) (*Module, error) {
+func New(db *orm.DB, cfg user.Config) (*Module, error) {
 	if cfg.CookieName == "" {
 		cfg.CookieName = "session"
 	}
@@ -36,7 +37,7 @@ func New(db *orm.DB, cfg Config) (*Module, error) {
 		cache:     newSessionCache(),
 		ucache:    newUserCache(),
 		config:    cfg,
-		providers: make(map[string]OAuthProvider),
+		providers: make(map[string]user.OAuthProvider),
 	}
 	if err := initSchema(db, cfg.AuthMode); err != nil {
 		return nil, err
@@ -44,7 +45,7 @@ func New(db *orm.DB, cfg Config) (*Module, error) {
 	for _, p := range cfg.OAuthProviders {
 		m.registerProvider(p)
 	}
-	if cfg.AuthMode == AuthModeCookie {
+	if cfg.AuthMode == user.AuthModeCookie {
 		if err := m.cache.warmUp(db); err != nil {
 			return nil, err
 		}
@@ -62,7 +63,7 @@ func (m *Module) SetLog(fn func(...any)) {
 	m.log = fn
 }
 
-func (m *Module) notify(e SecurityEvent) {
+func (m *Module) notify(e user.SecurityEvent) {
 	if e.Timestamp == 0 {
 		e.Timestamp = time.Now().Unix()
 	}
@@ -88,34 +89,34 @@ func (m *Module) ReactivateUser(id string) error {
 // PurgeSessionsByUser deletes all sessions belonging to userID from cache and DB.
 func (m *Module) PurgeSessionsByUser(userID string) error {
 	// First from DB
-	qb := m.db.Query(&Session{}).Where(Session_.UserID).Eq(userID)
-	sessions, err := ReadAllSession(qb)
+	qb := m.db.Query(&user.Session{}).Where(user.Session_.UserID).Eq(userID)
+	sessions, err := user.ReadAllSession(qb)
 	if err != nil {
 		return err
 	}
 	for _, s := range sessions {
-		m.db.Delete(s, orm.Eq(Session_.ID, s.ID))
+		m.db.Delete(s, orm.Eq(user.Session_.ID, s.ID))
 		m.cache.delete(s.ID)
 	}
 	return nil
 }
 
-func (m *Module) registerProvider(p OAuthProvider) {
+func (m *Module) registerProvider(p user.OAuthProvider) {
 	m.providersMu.Lock()
 	defer m.providersMu.Unlock()
 	m.providers[p.Name()] = p
 }
 
-func (m *Module) getProvider(name string) OAuthProvider {
+func (m *Module) getProvider(name string) user.OAuthProvider {
 	m.providersMu.RLock()
 	defer m.providersMu.RUnlock()
 	return m.providers[name]
 }
 
-func (m *Module) registeredProviders() []OAuthProvider {
+func (m *Module) registeredProviders() []user.OAuthProvider {
 	m.providersMu.RLock()
 	defer m.providersMu.RUnlock()
-	var list []OAuthProvider
+	var list []user.OAuthProvider
 	for _, p := range m.providers {
 		list = append(list, p)
 	}
@@ -136,20 +137,25 @@ func (m *Module) Add() []any {
 }
 
 // UIModules returns all standard authentication UI flow handlers bound to this module.
-// Isomorphic: The signature exists in both WASM and backend. On the backend, it links to the DB.
+// Note: This returns the backend-side modules with SSR capability.
 func (m *Module) UIModules() []any {
-	for _, mod := range uiModules {
-		if lm, ok := mod.(*loginModule); ok {
-			lm.m = m
-		} else if rm, ok := mod.(*registerModule); ok {
-			rm.m = m
-		} else if pm, ok := mod.(*profileModule); ok {
-			pm.m = m
-		} else if lam, ok := mod.(*lanModule); ok {
-			lam.m = m
-		} else if om, ok := mod.(*oauthModule); ok {
-			om.m = m
-		}
+	return []any{
+		&loginModule{m: m, form: mustForm("login", &user.LoginData{})},
+		&registerModule{m: m, form: mustForm("register", &user.RegisterData{})},
+		&profileModule{
+			m:            m,
+			form:         mustForm("profile", &user.ProfileData{}),
+			passwordForm: mustForm("password", &user.PasswordData{}),
+		},
+		&lanModule{m: m},
+		&oauthModule{m: m},
 	}
-	return uiModules
+}
+
+func mustForm(parentID string, s fmt.Fielder) *form.Form {
+	f, err := form.New(parentID, s)
+	if err != nil {
+		panic("userserver: mustForm: " + err.Error())
+	}
+	return f
 }
