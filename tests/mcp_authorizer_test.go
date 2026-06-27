@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/user/server"
 )
 
 func TestMCPAuthorizer(t *testing.T) {
 	db := newTestDB(t)
 	secret := []byte("test-secret-32-bytes-minimum-len")
-	m, err := user.New(db, user.Config{
+	m, err := userserver.New(db, user.Config{
 		AuthMode:  user.AuthModeBearer,
 		JWTSecret: secret,
 	})
@@ -102,14 +103,14 @@ func TestMCPAuthorizer(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Should be valid
-		userID, err := user.ValidateJWT(secret, token)
+		userID, err := userserver.ValidateJWT(secret, token)
 		if err != nil || userID != u.ID {
 			t.Errorf("token invalid: %v", err)
 		}
 	})
 
 	t.Run("TestGenerateAPIToken_NoSecret", func(t *testing.T) {
-		m2, _ := user.New(db, user.Config{})
+		m2, _ := userserver.New(db, user.Config{})
 		_, err := m2.GenerateAPIToken(u.ID, 0)
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing")

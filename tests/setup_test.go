@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/tinywasm/user"
 )
 
 func RunSharedTests(t *testing.T) {
@@ -11,7 +10,7 @@ func RunSharedTests(t *testing.T) {
 }
 
 func testModules(t *testing.T) {
-	modules := user.UIModules()
+	modules := setupModule(t).UIModules()
 	expected := []string{"login", "register", "profile", "lan", "oauth/callback"}
 	for _, name := range expected {
 		found := false

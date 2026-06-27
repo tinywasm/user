@@ -1,15 +1,14 @@
-//go:build !wasm
-
-package user
+package userserver
 
 import (
 	"database/sql"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/user"
 )
 
 func (m *Module) CreateRole(id string, code string, name, description string) error {
-	r := &Role{
+	r := &user.Role{
 		ID:          id,
 		Code:        code,
 		Name:        name,
@@ -17,27 +16,27 @@ func (m *Module) CreateRole(id string, code string, name, description string) er
 	}
 	err := m.db.Create(r)
 	if err != nil && isUniqueViolation(err) {
-		qb := m.db.Query(&Role{}).Where(Role_.ID).Eq(id)
-		existingR, readErr := ReadOneRole(qb, &Role{})
+		qb := m.db.Query(&user.Role{}).Where(user.Role_.ID).Eq(id)
+		existingR, readErr := user.ReadOneRole(qb, &user.Role{})
 		if readErr != nil {
 			return readErr
 		}
 		existingR.Code = code
 		existingR.Name = name
 		existingR.Description = description
-		return m.db.Update(existingR, orm.Eq(Role_.ID, existingR.ID))
+		return m.db.Update(existingR, orm.Eq(user.Role_.ID, existingR.ID))
 	}
 	return err
 }
 
-func (m *Module) GetRole(id string) (*Role, error) {
-	qb := m.db.Query(&Role{}).Where(Role_.ID).Eq(id)
-	return ReadOneRole(qb, &Role{})
+func (m *Module) GetRole(id string) (*user.Role, error) {
+	qb := m.db.Query(&user.Role{}).Where(user.Role_.ID).Eq(id)
+	return user.ReadOneRole(qb, &user.Role{})
 }
 
 func (m *Module) DeleteRole(id string) error {
-	qb := m.db.Query(&Role{}).Where(Role_.ID).Eq(id)
-	roles, err := ReadAllRole(qb)
+	qb := m.db.Query(&user.Role{}).Where(user.Role_.ID).Eq(id)
+	roles, err := user.ReadAllRole(qb)
 	if err != nil {
 		return err
 	}
@@ -47,19 +46,19 @@ func (m *Module) DeleteRole(id string) error {
 	r := roles[0]
 
 	// Delete from link tables first to simulate cascade, since tinywasm/orm doesn't cascade automatically like PRAGMA foreign_keys = ON does unless DB level handles it
-	urQb := m.db.Query(&UserRole{}).Where(UserRole_.RoleID).Eq(id)
-	urs, _ := ReadAllUserRole(urQb)
+	urQb := m.db.Query(&user.UserRole{}).Where(user.UserRole_.RoleID).Eq(id)
+	urs, _ := user.ReadAllUserRole(urQb)
 	for _, ur := range urs {
-		m.db.Delete(ur, orm.Eq(UserRole_.UserID, ur.UserID), orm.Eq(UserRole_.RoleID, ur.RoleID))
+		m.db.Delete(ur, orm.Eq(user.UserRole_.UserID, ur.UserID), orm.Eq(user.UserRole_.RoleID, ur.RoleID))
 	}
 
-	rpQb := m.db.Query(&RolePermission{}).Where(RolePermission_.RoleID).Eq(id)
-	rps, _ := ReadAllRolePermission(rpQb)
+	rpQb := m.db.Query(&user.RolePermission{}).Where(user.RolePermission_.RoleID).Eq(id)
+	rps, _ := user.ReadAllRolePermission(rpQb)
 	for _, rp := range rps {
-		m.db.Delete(rp, orm.Eq(RolePermission_.RoleID, rp.RoleID), orm.Eq(RolePermission_.PermissionID, rp.PermissionID))
+		m.db.Delete(rp, orm.Eq(user.RolePermission_.RoleID, rp.RoleID), orm.Eq(user.RolePermission_.PermissionID, rp.PermissionID))
 	}
 
-	err = m.db.Delete(r, orm.Eq(Role_.ID, r.ID))
+	err = m.db.Delete(r, orm.Eq(user.Role_.ID, r.ID))
 	if err == nil {
 		m.ucache.InvalidateByRole(id)
 	}
@@ -67,7 +66,7 @@ func (m *Module) DeleteRole(id string) error {
 }
 
 func (m *Module) CreatePermission(id, name, resource string, action string) error {
-	p := &Permission{
+	p := &user.Permission{
 		ID:       id,
 		Name:     name,
 		Resource: resource,
@@ -75,32 +74,32 @@ func (m *Module) CreatePermission(id, name, resource string, action string) erro
 	}
 	err := m.db.Create(p)
 	if err != nil && isUniqueViolation(err) {
-		qb := m.db.Query(&Permission{}).Where(Permission_.ID).Eq(id)
-		existingP, readErr := ReadOnePermission(qb, &Permission{})
+		qb := m.db.Query(&user.Permission{}).Where(user.Permission_.ID).Eq(id)
+		existingP, readErr := user.ReadOnePermission(qb, &user.Permission{})
 		if readErr != nil {
 			return readErr
 		}
 		existingP.Name = name
 		existingP.Resource = resource
 		existingP.Action = action
-		return m.db.Update(existingP, orm.Eq(Permission_.ID, existingP.ID))
+		return m.db.Update(existingP, orm.Eq(user.Permission_.ID, existingP.ID))
 	}
 	return err
 }
 
-func (m *Module) GetPermission(id string) (*Permission, error) {
-	qb := m.db.Query(&Permission{}).Where(Permission_.ID).Eq(id)
-	return ReadOnePermission(qb, &Permission{})
+func (m *Module) GetPermission(id string) (*user.Permission, error) {
+	qb := m.db.Query(&user.Permission{}).Where(user.Permission_.ID).Eq(id)
+	return user.ReadOnePermission(qb, &user.Permission{})
 }
 
 func (m *Module) DeletePermission(id string) error {
-	qb := m.db.Query(&Permission{}).Where(Permission_.ID).Eq(id)
-	p, err := ReadOnePermission(qb, &Permission{})
+	qb := m.db.Query(&user.Permission{}).Where(user.Permission_.ID).Eq(id)
+	p, err := user.ReadOnePermission(qb, &user.Permission{})
 	if err != nil {
 		return err
 	}
 
-	err = m.db.Delete(p, orm.Eq(Permission_.ID, p.ID))
+	err = m.db.Delete(p, orm.Eq(user.Permission_.ID, p.ID))
 	if err == nil {
 		m.ucache.InvalidateByPermission(id)
 	}
@@ -108,7 +107,7 @@ func (m *Module) DeletePermission(id string) error {
 }
 
 func (m *Module) AssignRole(userID, roleID string) error {
-	ur := &UserRole{
+	ur := &user.UserRole{
 		UserID: userID,
 		RoleID: roleID,
 	}
@@ -123,21 +122,21 @@ func (m *Module) AssignRole(userID, roleID string) error {
 }
 
 func (m *Module) RevokeRole(userID, roleID string) error {
-	qb := m.db.Query(&UserRole{}).Where(UserRole_.UserID).Eq(userID).Where(UserRole_.RoleID).Eq(roleID)
-	ur, err := ReadOneUserRole(qb, &UserRole{})
+	qb := m.db.Query(&user.UserRole{}).Where(user.UserRole_.UserID).Eq(userID).Where(user.UserRole_.RoleID).Eq(roleID)
+	ur, err := user.ReadOneUserRole(qb, &user.UserRole{})
 	if err != nil {
 		return err
 	}
-	err = m.db.Delete(ur, orm.Eq(UserRole_.UserID, ur.UserID), orm.Eq(UserRole_.RoleID, ur.RoleID))
+	err = m.db.Delete(ur, orm.Eq(user.UserRole_.UserID, ur.UserID), orm.Eq(user.UserRole_.RoleID, ur.RoleID))
 	if err == nil {
 		m.ucache.Delete(userID)
 	}
 	return err
 }
 
-func (m *Module) GetUserRoles(userID string) ([]Role, error) {
-	qbUserRoles := m.db.Query(&UserRole{}).Where(UserRole_.UserID).Eq(userID)
-	userRoles, err := ReadAllUserRole(qbUserRoles)
+func (m *Module) GetUserRoles(userID string) ([]user.Role, error) {
+	qbUserRoles := m.db.Query(&user.UserRole{}).Where(user.UserRole_.UserID).Eq(userID)
+	userRoles, err := user.ReadAllUserRole(qbUserRoles)
 	if err != nil {
 		return nil, err
 	}
@@ -148,16 +147,16 @@ func (m *Module) GetUserRoles(userID string) ([]Role, error) {
 	}
 
 	if len(roleIDs) == 0 {
-		return []Role{}, nil
+		return []user.Role{}, nil
 	}
 
-	qbRoles := m.db.Query(&Role{}).Where(Role_.ID).In(roleIDs)
-	rolesPtrs, err := ReadAllRole(qbRoles)
+	qbRoles := m.db.Query(&user.Role{}).Where(user.Role_.ID).In(roleIDs)
+	rolesPtrs, err := user.ReadAllRole(qbRoles)
 	if err != nil {
 		return nil, err
 	}
 
-	roles := make([]Role, len(rolesPtrs))
+	roles := make([]user.Role, len(rolesPtrs))
 	for i, r := range rolesPtrs {
 		roles[i] = *r
 	}
@@ -165,7 +164,7 @@ func (m *Module) GetUserRoles(userID string) ([]Role, error) {
 }
 
 func (m *Module) AssignPermission(roleID, permissionID string) error {
-	rp := &RolePermission{
+	rp := &user.RolePermission{
 		RoleID:       roleID,
 		PermissionID: permissionID,
 	}
@@ -184,9 +183,9 @@ type RBACObject interface {
 	AllowedRoles(action byte) []byte
 }
 
-func (m *Module) GetRoleByCode(code string) (*Role, error) {
-	qb := m.db.Query(&Role{}).Where(Role_.Code).Eq(code)
-	roles, err := ReadAllRole(qb)
+func (m *Module) GetRoleByCode(code string) (*user.Role, error) {
+	qb := m.db.Query(&user.Role{}).Where(user.Role_.Code).Eq(code)
+	roles, err := user.ReadAllRole(qb)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +231,7 @@ func registerRBAC(m *Module, handlers ...RBACObject) error {
 func (m *Module) HasPermission(userID, resource string, action byte) (bool, error) {
 	u, err := m.GetUser(userID)
 	if err != nil {
-		if err == ErrNotFound || err == sql.ErrNoRows {
+		if err == user.ErrNotFound || err == sql.ErrNoRows {
 			return false, nil
 		}
 		return false, err

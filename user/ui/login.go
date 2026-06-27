@@ -1,4 +1,4 @@
-package user
+package userui
 
 import (
 	"github.com/tinywasm/fmt"
@@ -6,7 +6,7 @@ import (
 )
 
 type loginModule struct {
-	m *Module
+	m any
 
 	form *form.Form
 }
@@ -23,4 +23,8 @@ func (m *loginModule) ValidateData(action byte, data ...any) error {
 		return nil
 	}
 	return m.form.ValidateData(action, fielder)
+}
+
+func (m *loginModule) OnMount() {
+	m.form.OnMount()
 }

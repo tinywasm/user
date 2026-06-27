@@ -1,6 +1,4 @@
-//go:build !wasm
-
-package user
+package userserver
 
 import (
 	"database/sql"

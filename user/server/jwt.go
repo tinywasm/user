@@ -1,6 +1,4 @@
-//go:build !wasm
-
-package user
+package userserver
 
 import (
 	"crypto/hmac"
@@ -11,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/user"
 )
 
 var ErrInvalidToken = fmt.Err("token", "invalid")
@@ -57,7 +56,7 @@ func ValidateJWT(secret []byte, token string) (string, error) {
 		return "", ErrInvalidToken
 	}
 	if time.Now().Unix() > p.Exp {
-		return "", ErrSessionExpired
+		return "", user.ErrSessionExpired
 	}
 	return p.Sub, nil
 }

@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/user/server"
 )
 
 func TestSQLBoundary(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := user.New(db, user.Config{})
+	m, _ := userserver.New(db, user.Config{})
 
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "sql@example.com", Name: "SQL Test"})

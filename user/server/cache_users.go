@@ -1,30 +1,34 @@
-package user
+package userserver
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/tinywasm/user"
+)
 
 const maxCacheUsers = 1000
 
 type userCache struct {
 	mu    sync.RWMutex
-	users map[string]*User
+	users map[string]*user.User
 	keys  []string // Used for simple FIFO eviction
 }
 
 func newUserCache() *userCache {
 	return &userCache{
-		users: make(map[string]*User),
+		users: make(map[string]*user.User),
 		keys:  make([]string, 0, maxCacheUsers),
 	}
 }
 
-func (c *userCache) Get(id string) (*User, bool) {
+func (c *userCache) Get(id string) (*user.User, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	u, ok := c.users[id]
 	return u, ok
 }
 
-func (c *userCache) Set(id string, u *User) {
+func (c *userCache) Set(id string, u *user.User) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -110,6 +114,6 @@ func (c *userCache) InvalidateByPermission(permID string) {
 func (c *userCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.users = make(map[string]*User)
+	c.users = make(map[string]*user.User)
 	c.keys = make([]string, 0, maxCacheUsers)
 }

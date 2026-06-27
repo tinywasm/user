@@ -1,6 +1,4 @@
-//go:build !wasm
-
-package user
+package userserver
 
 import (
 	"strings"
@@ -8,18 +6,19 @@ import (
 
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
+	"github.com/tinywasm/user"
 )
 
-func createUser(db *orm.DB, email, name, phone string) (User, error) {
+func createUser(db *orm.DB, email, name, phone string) (user.User, error) {
 	u, err := unixid.NewUnixID()
 	if err != nil {
-		return User{}, err
+		return user.User{}, err
 	}
 
 	id := u.GetNewID()
 	now := time.Now().Unix()
 
-	newUser := User{
+	newUser := user.User{
 		ID:        id,
 		Email:     email,
 		Name:      name,
@@ -30,17 +29,17 @@ func createUser(db *orm.DB, email, name, phone string) (User, error) {
 
 	if err := db.Create(&newUser); err != nil {
 		if isUniqueViolation(err) {
-			return User{}, ErrEmailTaken
+			return user.User{}, user.ErrEmailTaken
 		}
-		return User{}, err
+		return user.User{}, err
 	}
 	return newUser, nil
 }
 
-func hydrateUser(db *orm.DB, u *User) error {
+func hydrateUser(db *orm.DB, u *user.User) error {
 	// 1. Fetch UserRoles to get Role IDs
-	qbUserRoles := db.Query(&UserRole{}).Where(UserRole_.UserID).Eq(u.ID)
-	userRoles, err := ReadAllUserRole(qbUserRoles)
+	qbUserRoles := db.Query(&user.UserRole{}).Where(user.UserRole_.UserID).Eq(u.ID)
+	userRoles, err := user.ReadAllUserRole(qbUserRoles)
 	if err != nil {
 		return err
 	}
@@ -52,19 +51,19 @@ func hydrateUser(db *orm.DB, u *User) error {
 
 	if len(roleIDs) > 0 {
 		// 2. Fetch Roles
-		qbRoles := db.Query(&Role{}).Where(Role_.ID).In(roleIDs)
-		roles, err := ReadAllRole(qbRoles)
+		qbRoles := db.Query(&user.Role{}).Where(user.Role_.ID).In(roleIDs)
+		roles, err := user.ReadAllRole(qbRoles)
 		if err != nil {
 			return err
 		}
-		u.Roles = make([]Role, len(roles))
+		u.Roles = make([]user.Role, len(roles))
 		for i, r := range roles {
 			u.Roles[i] = *r
 		}
 
 		// 3. Fetch RolePermissions to get Permission IDs
-		qbRolePerms := db.Query(&RolePermission{}).Where(RolePermission_.RoleID).In(roleIDs)
-		rolePerms, err := ReadAllRolePermission(qbRolePerms)
+		qbRolePerms := db.Query(&user.RolePermission{}).Where(user.RolePermission_.RoleID).In(roleIDs)
+		rolePerms, err := user.ReadAllRolePermission(qbRolePerms)
 		if err != nil {
 			return err
 		}
@@ -76,56 +75,56 @@ func hydrateUser(db *orm.DB, u *User) error {
 
 		if len(permIDs) > 0 {
 			// 4. Fetch Permissions
-			qbPerms := db.Query(&Permission{}).Where(Permission_.ID).In(permIDs)
-			perms, err := ReadAllPermission(qbPerms)
+			qbPerms := db.Query(&user.Permission{}).Where(user.Permission_.ID).In(permIDs)
+			perms, err := user.ReadAllPermission(qbPerms)
 			if err != nil {
 				return err
 			}
 
 			// Deduplicate permissions
-			permMap := make(map[string]Permission)
+			permMap := make(map[string]user.Permission)
 			for _, p := range perms {
 				permMap[p.ID] = *p
 			}
 
-			u.Permissions = make([]Permission, 0, len(permMap))
+			u.Permissions = make([]user.Permission, 0, len(permMap))
 			for _, p := range permMap {
 				u.Permissions = append(u.Permissions, p)
 			}
 		} else {
-			u.Permissions = []Permission{}
+			u.Permissions = []user.Permission{}
 		}
 	} else {
-		u.Roles = []Role{}
-		u.Permissions = []Permission{}
+		u.Roles = []user.Role{}
+		u.Permissions = []user.Permission{}
 	}
 
 	return nil
 }
 
-func (m *Module) GetUser(id string) (User, error) {
+func (m *Module) GetUser(id string) (user.User, error) {
 	return getUser(m.db, m.ucache, id)
 }
 
-func getUser(db *orm.DB, cache *userCache, id string) (User, error) {
+func getUser(db *orm.DB, cache *userCache, id string) (user.User, error) {
 	if cache != nil {
 		if cached, ok := cache.Get(id); ok {
 			return *cached, nil
 		}
 	}
 
-	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
-	results, err := ReadAllUser(qb)
+	qb := db.Query(&user.User{}).Where(user.User_.ID).Eq(id)
+	results, err := user.ReadAllUser(qb)
 	if err != nil {
-		return User{}, err
+		return user.User{}, err
 	}
 	if len(results) == 0 {
-		return User{}, ErrNotFound
+		return user.User{}, user.ErrNotFound
 	}
 	u := results[0]
 
 	if err := hydrateUser(db, u); err != nil {
-		return User{}, err
+		return user.User{}, err
 	}
 
 	if cache != nil {
@@ -134,14 +133,14 @@ func getUser(db *orm.DB, cache *userCache, id string) (User, error) {
 	return *u, nil
 }
 
-func getUserByEmail(db *orm.DB, cache *userCache, email string) (User, error) {
-	qb := db.Query(&User{}).Where(User_.Email).Eq(email)
-	results, err := ReadAllUser(qb)
+func getUserByEmail(db *orm.DB, cache *userCache, email string) (user.User, error) {
+	qb := db.Query(&user.User{}).Where(user.User_.Email).Eq(email)
+	results, err := user.ReadAllUser(qb)
 	if err != nil {
-		return User{}, err
+		return user.User{}, err
 	}
 	if len(results) == 0 {
-		return User{}, ErrNotFound
+		return user.User{}, user.ErrNotFound
 	}
 	u := results[0]
 
@@ -152,7 +151,7 @@ func getUserByEmail(db *orm.DB, cache *userCache, email string) (User, error) {
 	}
 
 	if err := hydrateUser(db, u); err != nil {
-		return User{}, err
+		return user.User{}, err
 	}
 
 	if cache != nil {
@@ -165,52 +164,52 @@ func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
-	results, err := ReadAllUser(qb)
+	qb := db.Query(&user.User{}).Where(user.User_.ID).Eq(id)
+	results, err := user.ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
-		return ErrNotFound
+		return user.ErrNotFound
 	}
 	u := results[0]
 	u.Name = name
 	u.Phone = phone
-	return db.Update(u, orm.Eq(User_.ID, u.ID))
+	return db.Update(u, orm.Eq(user.User_.ID, u.ID))
 }
 
 func suspendUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
-	results, err := ReadAllUser(qb)
+	qb := db.Query(&user.User{}).Where(user.User_.ID).Eq(id)
+	results, err := user.ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
-		return ErrNotFound
+		return user.ErrNotFound
 	}
 	u := results[0]
 	u.Status = "suspended"
-	return db.Update(u, orm.Eq(User_.ID, u.ID))
+	return db.Update(u, orm.Eq(user.User_.ID, u.ID))
 }
 
 func reactivateUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
-	results, err := ReadAllUser(qb)
+	qb := db.Query(&user.User{}).Where(user.User_.ID).Eq(id)
+	results, err := user.ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
-		return ErrNotFound
+		return user.ErrNotFound
 	}
 	u := results[0]
 	u.Status = "active"
-	return db.Update(u, orm.Eq(User_.ID, u.ID))
+	return db.Update(u, orm.Eq(user.User_.ID, u.ID))
 }
 
-func listUsers(db *orm.DB) ([]User, error) {
-	qb := db.Query(&User{})
-	users, err := ReadAllUser(qb)
+func listUsers(db *orm.DB) ([]user.User, error) {
+	qb := db.Query(&user.User{})
+	users, err := user.ReadAllUser(qb)
 	if err != nil {
 		return nil, err
 	}
-	var res []User
+	var res []user.User
 	for _, u := range users {
 		hydrateUser(db, u)
 		res = append(res, *u)
@@ -222,13 +221,13 @@ func deleteUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
-	qb := db.Query(&User{}).Where(User_.ID).Eq(id)
-	results, err := ReadAllUser(qb)
+	qb := db.Query(&user.User{}).Where(user.User_.ID).Eq(id)
+	results, err := user.ReadAllUser(qb)
 	if err != nil || len(results) == 0 {
-		return ErrNotFound
+		return user.ErrNotFound
 	}
 	u := results[0]
-	return db.Delete(u, orm.Eq(User_.ID, u.ID))
+	return db.Delete(u, orm.Eq(user.User_.ID, u.ID))
 }
 
 func isUniqueViolation(err error) bool {

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/user"
 	_ "modernc.org/sqlite"
 )
 
@@ -17,7 +16,7 @@ func TestUserBackend(t *testing.T) {
 }
 
 func testModulesSSR(t *testing.T) {
-	modules := user.UIModules()
+	modules := setupModule(t).UIModules()
 	for _, mod := range modules {
 		if h, ok := mod.(interface{ HandlerName() string }); ok {
 			switch h.HandlerName() {
