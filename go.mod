@@ -5,7 +5,7 @@ go 1.25.2
 require (
 	github.com/tinywasm/fmt v0.24.5
 	github.com/tinywasm/form v0.2.10
-	github.com/tinywasm/orm v0.9.16
+	github.com/tinywasm/orm v0.9.18
 	github.com/tinywasm/sqlite v0.2.3
 	github.com/tinywasm/unixid v0.2.23
 	golang.org/x/crypto v0.48.0
@@ -23,7 +23,7 @@ require (
 	github.com/tinywasm/css v0.1.2 // indirect
 	github.com/tinywasm/dom v0.10.1 // indirect
 	github.com/tinywasm/html v0.0.4 // indirect
-	github.com/tinywasm/sqlt v0.0.3 // indirect
+	github.com/tinywasm/sqlt v0.0.4 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
