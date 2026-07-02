@@ -169,6 +169,12 @@ func ReadAllSession(qb *orm.QB) (SessionList, error) {
 	return results, err
 }
 
+func (m *Session) SchemaExt() []orm.FieldExt {
+	return []orm.FieldExt{
+		{Field: _schemaSession[1], Ref: "users", RefColumn: "", OnDelete: ""},
+	}
+}
+
 func (m *LoginData) ModelName() string {
 	return "login_data"
 }
@@ -403,6 +409,12 @@ func ReadAllIdentity(qb *orm.QB) (IdentityList, error) {
 	return results, err
 }
 
+func (m *Identity) SchemaExt() []orm.FieldExt {
+	return []orm.FieldExt{
+		{Field: _schemaIdentity[1], Ref: "users", RefColumn: "", OnDelete: ""},
+	}
+}
+
 func (m *Role) ModelName() string {
 	return "role"
 }
@@ -533,6 +545,13 @@ func ReadAllUserRole(qb *orm.QB) (UserRoleList, error) {
 		func(m fmt.Model) { results = append(results, m.(*UserRole)) },
 	)
 	return results, err
+}
+
+func (m *UserRole) SchemaExt() []orm.FieldExt {
+	return []orm.FieldExt{
+		{Field: _schemaUserRole[0], Ref: "users", RefColumn: "", OnDelete: ""},
+		{Field: _schemaUserRole[1], Ref: "roles", RefColumn: "", OnDelete: ""},
+	}
 }
 
 func (m *Permission) ModelName() string {
@@ -667,6 +686,13 @@ func ReadAllRolePermission(qb *orm.QB) (RolePermissionList, error) {
 	return results, err
 }
 
+func (m *RolePermission) SchemaExt() []orm.FieldExt {
+	return []orm.FieldExt{
+		{Field: _schemaRolePermission[0], Ref: "roles", RefColumn: "", OnDelete: ""},
+		{Field: _schemaRolePermission[1], Ref: "permissions", RefColumn: "", OnDelete: ""},
+	}
+}
+
 func (m *LANIP) ModelName() string {
 	return "lanip"
 }
@@ -741,6 +767,12 @@ func ReadAllLANIP(qb *orm.QB) (LANIPList, error) {
 		func(m fmt.Model) { results = append(results, m.(*LANIP)) },
 	)
 	return results, err
+}
+
+func (m *LANIP) SchemaExt() []orm.FieldExt {
+	return []orm.FieldExt{
+		{Field: _schemaLANIP[1], Ref: "users", RefColumn: "", OnDelete: ""},
+	}
 }
 
 func (m *OAuthState) ModelName() string {
