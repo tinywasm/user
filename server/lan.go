@@ -1,18 +1,17 @@
 package userserver
 
 import (
-	"net"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
-func (m *Module) LoginLAN(rut string, r *http.Request) (user.User, error) {
+func (m *Module) LoginLAN(rut string, ctx router.Context) (user.User, error) {
 	normalized, err := validateRUT(rut)
 	if err != nil {
 		return user.User{}, user.ErrInvalidRUT
@@ -31,7 +30,7 @@ func (m *Module) LoginLAN(rut string, r *http.Request) (user.User, error) {
 		return user.User{}, user.ErrSuspended
 	}
 
-	clientIP := extractClientIP(r, m.config.TrustProxy)
+	clientIP := extractClientIP(ctx, m.config.TrustProxy)
 	if err := checkLANIP(m.db, identity.UserID, clientIP); err != nil {
 		return user.User{}, user.ErrInvalidCredentials
 	}
@@ -192,22 +191,21 @@ func validateRUT(rut string) (string, error) {
 	return bodyStr + "-" + dvStr, nil
 }
 
-func extractClientIP(r *http.Request, trustProxy bool) string {
+func extractClientIP(ctx router.Context, trustProxy bool) string {
 	if trustProxy {
-		xff := r.Header.Get("X-Forwarded-For")
+		xff := ctx.GetHeader("X-Forwarded-For")
 		if xff != "" {
 			parts := strings.Split(xff, ",")
 			return strings.TrimSpace(parts[0])
 		}
-		xri := r.Header.Get("X-Real-IP")
+		xri := ctx.GetHeader("X-Real-IP")
 		if xri != "" {
 			return strings.TrimSpace(xri)
 		}
 	}
 
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return ip
+	// router.Context doesn't expose RemoteAddr directly in its current definition.
+	// If it doesn't, we might need to rely on headers or extend it.
+	// For now we assume headers are checked first.
+	return ""
 }

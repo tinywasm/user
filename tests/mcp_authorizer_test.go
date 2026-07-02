@@ -3,8 +3,6 @@
 package tests
 
 import (
-	"context"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/tinywasm/user"
@@ -35,10 +33,10 @@ func TestMCPAuthorizer(t *testing.T) {
 	}
 
 	t.Run("TestValidateSession_Bearer_ValidJWT", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+		ctx := newMockContext("GET", "/")
+		ctx.SetHeader("Authorization", "Bearer "+token)
 
-		ctx := m.InjectIdentity(context.Background(), req)
+		m.InjectIdentity(ctx)
 		u2, ok := m.FromContext(ctx)
 		if !ok || u2.ID != u.ID {
 			t.Errorf("expected user %s, got %v", u.ID, u2)
@@ -46,9 +44,9 @@ func TestMCPAuthorizer(t *testing.T) {
 	})
 
 	t.Run("TestValidateSession_Bearer_InvalidJWT", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Authorization", "Bearer invalid.token")
-		ctx := m.InjectIdentity(context.Background(), req)
+		ctx := newMockContext("GET", "/")
+		ctx.SetHeader("Authorization", "Bearer invalid.token")
+		m.InjectIdentity(ctx)
 		_, ok := m.FromContext(ctx)
 		if ok {
 			t.Error("expected unauthorized for invalid JWT")
@@ -56,8 +54,8 @@ func TestMCPAuthorizer(t *testing.T) {
 	})
 
 	t.Run("TestValidateSession_Bearer_MissingHeader", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		ctx := m.InjectIdentity(context.Background(), req)
+		ctx := newMockContext("GET", "/")
+		m.InjectIdentity(ctx)
 		_, ok := m.FromContext(ctx)
 		if ok {
 			t.Error("expected unauthorized for missing header")
@@ -82,9 +80,9 @@ func TestMCPAuthorizer(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		ctx := m.InjectIdentity(context.Background(), req)
+		ctx := newMockContext("GET", "/")
+		ctx.SetHeader("Authorization", "Bearer "+token)
+		m.InjectIdentity(ctx)
 
 		if !m.CanExecute(ctx, "data", 'R') {
 			t.Error("expected CanExecute to return true")

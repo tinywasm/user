@@ -1,10 +1,10 @@
 package userserver
 
 import (
-	"net/http"
-
-	"github.com/tinywasm/form"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/form"
 )
 
 type ssrForm interface {
@@ -46,7 +46,7 @@ func (m *loginModule) Create(data ...any) (any, error) {
 	return u, nil
 }
 
-func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
+func (m *loginModule) SetCookie(userID string, ctx router.Context) error {
 	var value string
 
 	if m.m.config.AuthMode == user.AuthModeJWT {
@@ -56,22 +56,18 @@ func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Re
 		}
 		value = token
 	} else {
-		sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
+		// Note: router.Context doesn't expose UserAgent directly.
+		sess, err := m.m.CreateSession(userID, extractClientIP(ctx, m.m.config.TrustProxy), "")
 		if err != nil {
 			return err
 		}
 		value = sess.ID
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     m.m.config.CookieName,
-		Value:    value,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   m.m.config.TokenTTL,
-		Path:     "/",
-	})
+	// router.Context.SetHeader is used to set the Set-Cookie header.
+	// A helper for building the cookie string might be better.
+	cookie := m.m.config.CookieName + "=" + value + "; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=" + fmt.Sprint(m.m.config.TokenTTL)
+	ctx.SetHeader("Set-Cookie", cookie)
 	return nil
 }
 
@@ -108,7 +104,7 @@ func (m *registerModule) Create(data ...any) (any, error) {
 	return u, nil
 }
 
-func (m *registerModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
+func (m *registerModule) SetCookie(userID string, ctx router.Context) error {
 	var value string
 
 	if m.m.config.AuthMode == user.AuthModeJWT {
@@ -118,22 +114,15 @@ func (m *registerModule) SetCookie(userID string, w http.ResponseWriter, r *http
 		}
 		value = token
 	} else {
-		sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
+		sess, err := m.m.CreateSession(userID, extractClientIP(ctx, m.m.config.TrustProxy), "")
 		if err != nil {
 			return err
 		}
 		value = sess.ID
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     m.m.config.CookieName,
-		Value:    value,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   m.m.config.TokenTTL,
-		Path:     "/",
-	})
+	cookie := m.m.config.CookieName + "=" + value + "; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=" + fmt.Sprint(m.m.config.TokenTTL)
+	ctx.SetHeader("Set-Cookie", cookie)
 	return nil
 }
 

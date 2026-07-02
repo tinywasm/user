@@ -2,9 +2,7 @@ package userserver
 
 import (
 	"errors"
-	"net"
-	"net/http"
-	"strings"
+	"github.com/tinywasm/router"
 )
 
 // GenerateAPIToken creates a signed JWT for API access (MCP clients, IDEs, LLMs).
@@ -22,10 +20,6 @@ func (m *Module) GenerateAPIToken(userID string, ttl int) (string, error) {
 }
 
 // clientIP extracts the real client IP from the request.
-func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		return strings.SplitN(ip, ",", 2)[0]
-	}
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
+func clientIP(ctx router.Context) string {
+	return extractClientIP(ctx, true)
 }

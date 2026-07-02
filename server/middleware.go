@@ -1,64 +1,55 @@
 package userserver
 
 import (
-	"context"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
 )
 
-type contextKey int
-
-const userKey contextKey = iota
+const userKey = "tinywasm/user/user"
 
 // RegisterMCP envuelve el handler MCP con middleware de sesión.
 // Alternativa limpia a registrar hooks en el MCPServer (que no existe en tinywasm/mcp).
-//
-// Ejemplo:
-//
-//	mcpHandler := mcp.NewStreamableHTTPServer(srv)
-//	mux.Handle("/mcp", m.RegisterMCP(mcpHandler))
-func (m *Module) RegisterMCP(next http.Handler) http.Handler {
-	return m.Middleware(next)
+func (m *Module) RegisterMCP() router.Middleware {
+	return m.Middleware()
 }
 
-// Middleware protects HTTP routes. Validates the session cookie and injects
-// the authenticated *User into the request context.
+// Middleware protects routes. Validates the session and injects
+// the authenticated *User into the router.Context.
 // Returns HTTP 401 if the session is missing or expired.
-//
-// Example:
-//
-//	mux.Handle("/admin", m.Middleware(adminHandler))
-func (m *Module) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, err := m.validateSession(r)
-		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+func (m *Module) Middleware() router.Middleware {
+	return func(next router.HandlerFunc) router.HandlerFunc {
+		return func(ctx router.Context) {
+			u, err := m.validateSession(ctx)
+			if err != nil {
+				ctx.WriteStatus(401)
+				ctx.Write([]byte("unauthorized"))
+				return
+			}
+			ctx.SetValue(userKey, u)
+			next(ctx)
 		}
-		ctx := context.WithValue(r.Context(), userKey, u)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}
 }
 
 // FromContext extracts the authenticated *User injected by Middleware or RegisterMCP.
 // Returns (nil, false) if the context carries no authenticated user.
-func (m *Module) FromContext(ctx context.Context) (*user.User, bool) {
+func (m *Module) FromContext(ctx router.Context) (*user.User, bool) {
 	u, ok := ctx.Value(userKey).(*user.User)
 	return u, ok
 }
 
 // AccessCheck is the bridge function for tinywasm/crudp and tinywasm/site.
-// Reads the *http.Request from data, validates the session, and checks RBAC permissions.
+// Reads the router.Context from data, validates the session, and checks RBAC permissions.
 // Satisfies the site.SetAccessCheck(fn) signature directly.
 //
 // Usage: site.SetAccessCheck(m.AccessCheck)
 func (m *Module) AccessCheck(resource string, action byte, data ...any) bool {
 	for _, d := range data {
-		if r, ok := d.(*http.Request); ok {
-			u, err := m.validateSession(r)
+		if ctx, ok := d.(router.Context); ok {
+			u, err := m.validateSession(ctx)
 			if err != nil {
 				return false
 			}
@@ -69,36 +60,25 @@ func (m *Module) AccessCheck(resource string, action byte, data ...any) bool {
 	return false
 }
 
-// mcpContextFunc returns a func compatible with mcp.SetHTTPContextFunc / SetSSEContextFunc.
-func (m *Module) mcpContextFunc() func(context.Context, *http.Request) context.Context {
-	return func(ctx context.Context, r *http.Request) context.Context {
-		u, err := m.validateSession(r)
-		if err != nil {
-			return ctx // unauthenticated — tools check with FromContext
-		}
-		return context.WithValue(ctx, userKey, u)
-	}
-}
-
 // InjectIdentity implements mcp.Authorizer.
 // Delegates to validateSession (respects configured AuthMode).
 // On failure: returns ctx unchanged — CanExecute will deny.
-func (m *Module) InjectIdentity(ctx context.Context, r *http.Request) context.Context {
-	u, err := m.validateSession(r)
+func (m *Module) InjectIdentity(ctx router.Context) {
+	u, err := m.validateSession(ctx)
 	if err != nil {
 		m.notify(user.SecurityEvent{
 			Type:      user.EventUnauthorizedAccess,
-			IP:        clientIP(r),
+			IP:        clientIP(ctx),
 			Timestamp: time.Now().Unix(),
 		})
-		return ctx
+		return
 	}
-	return context.WithValue(ctx, userKey, u)
+	ctx.SetValue(userKey, u)
 }
 
 // CanExecute implements mcp.Authorizer.
 // Reads identity injected by InjectIdentity and checks RBAC.
-func (m *Module) CanExecute(ctx context.Context, resource string, action byte) bool {
+func (m *Module) CanExecute(ctx router.Context, resource string, action byte) bool {
 	u, ok := ctx.Value(userKey).(*user.User)
 	if !ok || u == nil {
 		return false
@@ -133,11 +113,11 @@ func (m *Module) validateJWT(token string) (*user.User, error) {
 	return &u, nil
 }
 
-func (m *Module) validateSession(r *http.Request) (*user.User, error) {
+func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 	// AuthModeBearer: API/MCP clients — JWT in Authorization header, no cookie.
 	if m.config.AuthMode == user.AuthModeBearer {
 		const prefix = "Bearer "
-		auth := r.Header.Get("Authorization")
+		auth := ctx.GetHeader("Authorization")
 		if !strings.HasPrefix(auth, prefix) {
 			return nil, user.ErrSessionExpired
 		}
@@ -145,16 +125,32 @@ func (m *Module) validateSession(r *http.Request) (*user.User, error) {
 	}
 
 	// Cookie modes: browser clients.
-	cookie, err := r.Cookie(m.config.CookieName)
-	if err != nil {
+	cookie := ctx.GetHeader("Cookie") // Simple implementation, might need a helper to parse specific cookie
+	if cookie == "" {
+		return nil, user.ErrSessionExpired
+	}
+
+	// For simplicity in this refactor, we assume a helper or that GetHeader for "Cookie"
+	// is managed. Ideally router.Context would have a GetCookie(name) method.
+	// Since it doesn't, we might need to parse it manually if it's multiple cookies.
+	token := ""
+	for _, c := range strings.Split(cookie, ";") {
+		c = strings.TrimSpace(c)
+		if strings.HasPrefix(c, m.config.CookieName+"=") {
+			token = c[len(m.config.CookieName)+1:]
+			break
+		}
+	}
+
+	if token == "" {
 		return nil, user.ErrSessionExpired
 	}
 
 	if m.config.AuthMode == user.AuthModeJWT {
-		return m.validateJWT(cookie.Value)
+		return m.validateJWT(token)
 	}
 
-	sess, err := m.GetSession(cookie.Value)
+	sess, err := m.GetSession(token)
 	if err != nil {
 		return nil, err
 	}

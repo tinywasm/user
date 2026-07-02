@@ -4,22 +4,21 @@ package tests
 
 import (
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
 )
 
 func getLoginMod(m *userserver.Module) interface {
-	SetCookie(string, http.ResponseWriter, *http.Request) error
+	SetCookie(string, router.Context) error
 } {
 	for _, mod := range m.UIModules() {
 		if h, ok := mod.(interface{ HandlerName() string }); ok && h.HandlerName() == "login" {
 			if lm, ok := mod.(interface {
-				SetCookie(string, http.ResponseWriter, *http.Request) error
+				SetCookie(string, router.Context) error
 			}); ok {
 				return lm
 			}
@@ -33,58 +32,56 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Cookie Mode Flags", func(t *testing.T) {
 		m, _ := userserver.New(db, user.Config{TokenTTL: 3600})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/", nil)
+		ctx := newMockContext("GET", "/")
 
 		lm := getLoginMod(m)
-		err := lm.SetCookie("user1", rec, req)
+		err := lm.SetCookie("user1", ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cookies := rec.Result().Cookies()
-		if len(cookies) == 0 {
-			t.Fatal("no cookies set")
+		cookie := ctx.GetHeader("Set-Cookie")
+		if cookie == "" {
+			t.Fatal("no Set-Cookie header set")
 		}
-		c := cookies[0]
 
-		if c.Name != "session" {
-			t.Errorf("expected cookie name 'session', got %s", c.Name)
+		if !strings.Contains(cookie, "session=") {
+			t.Errorf("expected cookie name 'session'")
 		}
-		if !c.HttpOnly {
-			t.Errorf("expected HttpOnly=true")
+		if !strings.Contains(cookie, "HttpOnly") {
+			t.Errorf("expected HttpOnly")
 		}
-		if !c.Secure {
-			t.Errorf("expected Secure=true")
+		if !strings.Contains(cookie, "Secure") {
+			t.Errorf("expected Secure")
 		}
-		if c.SameSite != http.SameSiteStrictMode {
-			t.Errorf("expected SameSite=Strict, got %v", c.SameSite)
+		if !strings.Contains(cookie, "SameSite=Strict") {
+			t.Errorf("expected SameSite=Strict")
 		}
-		if c.Path != "/" {
-			t.Errorf("expected Path=/, got %s", c.Path)
+		if !strings.Contains(cookie, "Path=/") {
+			t.Errorf("expected Path=/")
 		}
-		if c.MaxAge != 3600 {
-			t.Errorf("expected MaxAge=3600, got %d", c.MaxAge)
+		if !strings.Contains(cookie, "Max-Age=3600") {
+			t.Errorf("expected Max-Age=3600")
 		}
 	})
 
 	t.Run("JWT Mode Cookie", func(t *testing.T) {
 		m, _ := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/", nil)
+		ctx := newMockContext("GET", "/")
 
 		lm := getLoginMod(m)
-		_ = lm.SetCookie("user1", rec, req)
+		_ = lm.SetCookie("user1", ctx)
 
-		c := rec.Result().Cookies()[0]
+		cookie := ctx.GetHeader("Set-Cookie")
 
 		// Assert flags
-		if !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteStrictMode {
+		if !strings.Contains(cookie, "HttpOnly") || !strings.Contains(cookie, "Secure") || !strings.Contains(cookie, "SameSite=Strict") {
 			t.Errorf("JWT cookie missing security flags")
 		}
 
 		// Assert value is JWT
-		parts := strings.Split(c.Value, ".")
+		val := cookie[strings.Index(cookie, "=")+1 : strings.Index(cookie, ";")]
+		parts := strings.Split(val, ".")
 		if len(parts) != 3 {
 			t.Errorf("expected JWT value (3 parts), got %d parts", len(parts))
 		}
@@ -92,15 +89,14 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Custom Cookie Name", func(t *testing.T) {
 		m, _ := userserver.New(db, user.Config{CookieName: "custom_auth"})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/", nil)
+		ctx := newMockContext("GET", "/")
 
 		lm := getLoginMod(m)
-		_ = lm.SetCookie("user1", rec, req)
+		_ = lm.SetCookie("user1", ctx)
 
-		c := rec.Result().Cookies()[0]
-		if c.Name != "custom_auth" {
-			t.Errorf("expected cookie name 'custom_auth', got %s", c.Name)
+		cookie := ctx.GetHeader("Set-Cookie")
+		if !strings.HasPrefix(cookie, "custom_auth=") {
+			t.Errorf("expected cookie name 'custom_auth'")
 		}
 	})
 }
@@ -161,20 +157,18 @@ func TestSessionRotation(t *testing.T) {
 		sessOld, _ := m.CreateSession(u.ID, "10.0.0.1", "ua1")
 		sessNew, _ := m.RotateSession(sessOld.ID, "10.0.0.1", "ua1")
 
-		reqOld := httptest.NewRequest("GET", "/", nil)
-		reqOld.AddCookie(&http.Cookie{Name: "session", Value: sessOld.ID})
-		recOld := httptest.NewRecorder()
-		m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(recOld, reqOld)
-		if recOld.Code != http.StatusUnauthorized {
-			t.Errorf("expected 401 for old session")
+		ctxOld := newMockContext("GET", "/")
+		ctxOld.SetHeader("Cookie", "session="+sessOld.ID)
+		m.Middleware()(func(c router.Context) {})(ctxOld)
+		if ctxOld.status != 401 {
+			t.Errorf("expected 401 for old session, got %d", ctxOld.status)
 		}
 
-		reqNew := httptest.NewRequest("GET", "/", nil)
-		reqNew.AddCookie(&http.Cookie{Name: "session", Value: sessNew.ID})
-		recNew := httptest.NewRecorder()
-		m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(recNew, reqNew)
-		if recNew.Code != http.StatusOK {
-			t.Errorf("expected 200 for new session")
+		ctxNew := newMockContext("GET", "/")
+		ctxNew.SetHeader("Cookie", "session="+sessNew.ID)
+		m.Middleware()(func(c router.Context) {})(ctxNew)
+		if ctxNew.status != 0 && ctxNew.status != 200 {
+			t.Errorf("expected 200/0 for new session, got %d", ctxNew.status)
 		}
 	})
 }

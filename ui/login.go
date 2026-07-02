@@ -1,6 +1,7 @@
 package userui
 
 import (
+	"github.com/tinywasm/dom"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/form"
 )
@@ -25,6 +26,6 @@ func (m *loginModule) ValidateData(action byte, data ...any) error {
 	return m.form.ValidateData(action, fielder)
 }
 
-func (m *loginModule) OnMount() {
-	m.form.OnMount()
+func (m *loginModule) Render() *dom.Element {
+	return m.form.Render()
 }

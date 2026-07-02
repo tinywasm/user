@@ -22,6 +22,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/tinywasm/css v0.1.2 // indirect
 	github.com/tinywasm/dom v0.11.2 // indirect
+	github.com/tinywasm/html v0.0.5 // indirect
+	github.com/tinywasm/router v0.1.0 // indirect
 	github.com/tinywasm/sqlt v0.0.5 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect

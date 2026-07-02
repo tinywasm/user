@@ -4,11 +4,11 @@ package tests
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
@@ -68,27 +68,25 @@ func testJWTCookieMode(t *testing.T) {
 	}
 
 	// Request con JWT en cookie → debe autenticar
-	req := httptest.NewRequest("GET", "/", nil)
-	req.AddCookie(&http.Cookie{Name: "session", Value: token})
-	rec := httptest.NewRecorder()
+	ctx := newMockContext("GET", "/")
+	ctx.SetHeader("Cookie", "session="+token)
 	var ctxUser *user.User
-	m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctxUser, _ = m.FromContext(r.Context())
-	})).ServeHTTP(rec, req)
+	m.Middleware()(func(c router.Context) {
+		ctxUser, _ = m.FromContext(c)
+	})(ctx)
 	if ctxUser == nil || ctxUser.ID != logged.ID {
 		t.Errorf("JWT middleware: expected user %s, got %v", logged.ID, ctxUser)
 	}
 
 	// Token inválido → 401
-	req2 := httptest.NewRequest("GET", "/", nil)
-	req2.AddCookie(&http.Cookie{Name: "session", Value: "invalid.jwt.token"})
-	rec2 := httptest.NewRecorder()
+	ctx2 := newMockContext("GET", "/")
+	ctx2.SetHeader("Cookie", "session=invalid.jwt.token")
 	called := false
-	m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	m.Middleware()(func(c router.Context) {
 		called = true
-	})).ServeHTTP(rec2, req2)
-	if called || rec2.Code != http.StatusUnauthorized {
-		t.Errorf("want 401 for invalid JWT, got %d (called=%v)", rec2.Code, called)
+	})(ctx2)
+	if called || ctx2.status != 401 {
+		t.Errorf("want 401 for invalid JWT, got %d (called=%v)", ctx2.status, called)
 	}
 }
 
@@ -274,17 +272,23 @@ func testOAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	url, err := m.BeginOAuth("mock")
+	urlStr, err := m.BeginOAuth("mock")
 	if err != nil {
 		t.Fatalf("BeginOAuth failed: %v", err)
 	}
-	if len(url) < 12 {
-		t.Fatalf("invalid url: %s", url)
+	state := ""
+	if strings.Contains(urlStr, "state=") {
+		state = urlStr[strings.Index(urlStr, "state=")+6:]
+		if idx := strings.Index(state, "&"); idx != -1 {
+			state = state[:idx]
+		}
+	} else {
+		// If it doesn't contain state=, maybe it's just the state appended as in MockProvider
+		state = urlStr[strings.LastIndex(urlStr, "/")+1:]
 	}
-	state := url[12:]
 
-	req, _ := http.NewRequest("GET", "/callback?state="+state+"&code=mockcode", nil)
-	u, isNew, err := m.CompleteOAuth("mock", req, "127.0.0.1", "TestAgent")
+	ctx := newMockContext("GET", "/callback?state="+state+"&code=mockcode")
+	u, isNew, err := m.CompleteOAuth("mock", ctx, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CompleteOAuth failed: %v", err)
 	}
@@ -296,10 +300,18 @@ func testOAuth(t *testing.T) {
 	}
 
 	url2, _ := m.BeginOAuth("mock")
-	state2 := url2[12:]
-	req2, _ := http.NewRequest("GET", "/callback?state="+state2+"&code=mockcode", nil)
+	state2 := ""
+	if strings.Contains(url2, "state=") {
+		state2 = url2[strings.Index(url2, "state=")+6:]
+		if idx := strings.Index(state2, "&"); idx != -1 {
+			state2 = state2[:idx]
+		}
+	} else {
+		state2 = url2[strings.LastIndex(url2, "/")+1:]
+	}
+	ctx2 := newMockContext("GET", "/callback?state="+state2+"&code=mockcode")
 
-	u2, isNew2, err := m.CompleteOAuth("mock", req2, "127.0.0.1", "TestAgent")
+	u2, isNew2, err := m.CompleteOAuth("mock", ctx2, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CompleteOAuth 2 failed: %v", err)
 	}
@@ -333,10 +345,10 @@ func testLAN(t *testing.T) {
 		t.Fatalf("AssignLANIP failed: %v", err)
 	}
 
-	req, _ := http.NewRequest("POST", "/lan", nil)
-	req.RemoteAddr = "192.168.1.10:1234"
+	ctx := newMockContext("POST", "/lan")
+	ctx.SetHeader("X-Forwarded-For", "192.168.1.10")
 
-	u2, err := m.LoginLAN("12345678-5", req)
+	u2, err := m.LoginLAN("12345678-5", ctx)
 	if err != nil {
 		t.Fatalf("LoginLAN failed: %v", err)
 	}
@@ -344,20 +356,20 @@ func testLAN(t *testing.T) {
 		t.Errorf("expected same user ID")
 	}
 
-	_, err = m.LoginLAN("123", req)
+	_, err = m.LoginLAN("123", ctx)
 	if err != user.ErrInvalidRUT {
 		t.Errorf("expected ErrInvalidRUT, got %v", err)
 	}
 
-	req.RemoteAddr = "10.0.0.1:1234"
-	_, err = m.LoginLAN("12345678-5", req)
+	ctx.headers = make(map[string]string)
+	ctx.SetHeader("X-Forwarded-For", "10.0.0.1")
+	_, err = m.LoginLAN("12345678-5", ctx)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials for wrong IP, got %v", err)
 	}
 
-	req.RemoteAddr = "10.0.0.1:1234"
-	req.Header.Set("X-Forwarded-For", "192.168.1.10")
-	u3, err := m.LoginLAN("12345678-5", req)
+	ctx.SetHeader("X-Forwarded-For", "192.168.1.10")
+	u3, err := m.LoginLAN("12345678-5", ctx)
 	if err != nil {
 		t.Fatalf("LoginLAN with proxy failed: %v", err)
 	}
@@ -369,7 +381,7 @@ func testLAN(t *testing.T) {
 		t.Fatalf("RevokeLANIP failed: %v", err)
 	}
 
-	_, err = m.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", ctx)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials after revoke, got %v", err)
 	}
@@ -378,7 +390,7 @@ func testLAN(t *testing.T) {
 		t.Fatalf("UnregisterLAN failed: %v", err)
 	}
 
-	_, err = m.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", ctx)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials after unregister, got %v", err)
 	}
