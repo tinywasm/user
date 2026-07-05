@@ -20,7 +20,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/tinywasm/css v0.1.2 // indirect
+	github.com/tinywasm/css v0.1.3 // indirect
 	github.com/tinywasm/dom v0.11.2 // indirect
 	github.com/tinywasm/sqlt v0.0.5 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect

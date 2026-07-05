@@ -26,17 +26,24 @@ antes de cualquier cambio.
    del `net/http` al concepto de `router.Middleware`/`router.Context`. Toca **solo
    `user/server/`**.
 
+3. **Autoridad de identidad/RBAC para `httpd` y `mcp`** → `docs/PLAN_MCP_AUTHZ.md`
+   Expone `Authenticate() router.Middleware` (deja `ctx.SetUser`) y
+   `Can(userID,resource,action string) bool` (= `router.Authorize`); borra el comentario
+   falso "implements mcp.Authorizer" y migra `HasPermission` de `byte`→`string`. Toca
+   **solo `user/server/`**. Extiende al plan (2).
+
 ---
 
 ## Orden de ejecución y por qué
 
-Los dos planes son **independientes** (archivos y `build tags` disjuntos: `ui/*` es
-`//go:build wasm`; `user/server/*` es servidor). Pueden ejecutarse en **cualquier
-orden o en paralelo**; ninguno bloquea al otro.
+Los planes (1) y (2) son **independientes** (archivos y `build tags` disjuntos:
+`ui/*` es `//go:build wasm`; `user/server/*` es servidor). El plan (3) **extiende** al
+(2) (misma zona `user/server/`, cara de permiso) y comparte su prerrequisito de
+`router`.
 
-Única dependencia externa: el plan (2) asume que el contrato `router` ofrece
-*middleware* con valores de ámbito de petición — prerrequisito en el PLAN de
-`github.com/tinywasm/router`.
+Dependencia externa de (2) y (3): el contrato `router` debe ofrecer *middleware* con
+identidad tipada de ámbito de petición (`Context.SetUser`/`User`) — prerrequisito en
+[`router/docs/PLAN.md`](../../router/docs/PLAN.md).
 
 ---
 
