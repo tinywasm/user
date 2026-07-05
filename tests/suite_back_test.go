@@ -4,11 +4,11 @@ package tests
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
+	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
@@ -68,27 +68,25 @@ func testJWTCookieMode(t *testing.T) {
 	}
 
 	// Request con JWT en cookie → debe autenticar
-	req := httptest.NewRequest("GET", "/", nil)
-	req.AddCookie(&http.Cookie{Name: "session", Value: token})
-	rec := httptest.NewRecorder()
-	var ctxUser *user.User
-	m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctxUser, _ = m.FromContext(r.Context())
-	})).ServeHTTP(rec, req)
-	if ctxUser == nil || ctxUser.ID != logged.ID {
-		t.Errorf("JWT middleware: expected user %s, got %v", logged.ID, ctxUser)
+	ctx := &mock.Context{}
+	ctx.SetCookie(router.Cookie{Name: "session", Value: token})
+	var authID string
+	m.Authenticate()(func(c router.Context) {
+		authID = c.UserID()
+	})(ctx)
+	if authID != logged.ID {
+		t.Errorf("JWT middleware: expected user %s, got %q", logged.ID, authID)
 	}
 
-	// Token inválido → 401
-	req2 := httptest.NewRequest("GET", "/", nil)
-	req2.AddCookie(&http.Cookie{Name: "session", Value: "invalid.jwt.token"})
-	rec2 := httptest.NewRecorder()
-	called := false
-	m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-	})).ServeHTTP(rec2, req2)
-	if called || rec2.Code != http.StatusUnauthorized {
-		t.Errorf("want 401 for invalid JWT, got %d (called=%v)", rec2.Code, called)
+	// Token inválido → anónimo
+	ctx2 := &mock.Context{}
+	ctx2.SetCookie(router.Cookie{Name: "session", Value: "invalid.jwt.token"})
+	authID = ""
+	m.Authenticate()(func(c router.Context) {
+		authID = c.UserID()
+	})(ctx2)
+	if authID != "" {
+		t.Errorf("want empty userID for invalid JWT, got %q", authID)
 	}
 }
 
@@ -283,8 +281,8 @@ func testOAuth(t *testing.T) {
 	}
 	state := url[12:]
 
-	req, _ := http.NewRequest("GET", "/callback?state="+state+"&code=mockcode", nil)
-	u, isNew, err := m.CompleteOAuth("mock", req, "127.0.0.1", "TestAgent")
+	ctx := &mock.Context{InPath: "/callback?state=" + state + "&code=mockcode"}
+	u, isNew, err := m.CompleteOAuth("mock", ctx, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CompleteOAuth failed: %v", err)
 	}
@@ -297,9 +295,9 @@ func testOAuth(t *testing.T) {
 
 	url2, _ := m.BeginOAuth("mock")
 	state2 := url2[12:]
-	req2, _ := http.NewRequest("GET", "/callback?state="+state2+"&code=mockcode", nil)
+	ctx2 := &mock.Context{InPath: "/callback?state=" + state2 + "&code=mockcode"}
 
-	u2, isNew2, err := m.CompleteOAuth("mock", req2, "127.0.0.1", "TestAgent")
+	u2, isNew2, err := m.CompleteOAuth("mock", ctx2, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CompleteOAuth 2 failed: %v", err)
 	}
@@ -333,10 +331,10 @@ func testLAN(t *testing.T) {
 		t.Fatalf("AssignLANIP failed: %v", err)
 	}
 
-	req, _ := http.NewRequest("POST", "/lan", nil)
-	req.RemoteAddr = "192.168.1.10:1234"
+	ctx := &mock.Context{}
+	ctx.SetValue("RemoteAddr", "192.168.1.10:1234")
 
-	u2, err := m.LoginLAN("12345678-5", req)
+	u2, err := m.LoginLAN("12345678-5", ctx)
 	if err != nil {
 		t.Fatalf("LoginLAN failed: %v", err)
 	}
@@ -344,20 +342,22 @@ func testLAN(t *testing.T) {
 		t.Errorf("expected same user ID")
 	}
 
-	_, err = m.LoginLAN("123", req)
+	_, err = m.LoginLAN("123", ctx)
 	if err != user.ErrInvalidRUT {
 		t.Errorf("expected ErrInvalidRUT, got %v", err)
 	}
 
-	req.RemoteAddr = "10.0.0.1:1234"
-	_, err = m.LoginLAN("12345678-5", req)
+	ctxW := &mock.Context{}
+	ctxW.SetValue("RemoteAddr", "10.0.0.1:1234")
+	_, err = m.LoginLAN("12345678-5", ctxW)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials for wrong IP, got %v", err)
 	}
 
-	req.RemoteAddr = "10.0.0.1:1234"
-	req.Header.Set("X-Forwarded-For", "192.168.1.10")
-	u3, err := m.LoginLAN("12345678-5", req)
+	ctxP := &mock.Context{}
+	ctxP.SetValue("RemoteAddr", "10.0.0.1:1234")
+	ctxP.SetHeader("X-Forwarded-For", "192.168.1.10")
+	u3, err := m.LoginLAN("12345678-5", ctxP)
 	if err != nil {
 		t.Fatalf("LoginLAN with proxy failed: %v", err)
 	}
@@ -369,7 +369,7 @@ func testLAN(t *testing.T) {
 		t.Fatalf("RevokeLANIP failed: %v", err)
 	}
 
-	_, err = m.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", ctxP)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials after revoke, got %v", err)
 	}
@@ -378,7 +378,7 @@ func testLAN(t *testing.T) {
 		t.Fatalf("UnregisterLAN failed: %v", err)
 	}
 
-	_, err = m.LoginLAN("12345678-5", req)
+	_, err = m.LoginLAN("12345678-5", ctxP)
 	if err != user.ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials after unregister, got %v", err)
 	}

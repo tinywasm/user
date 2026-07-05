@@ -11,11 +11,11 @@ import (
 
 type mockHandler struct {
 	name  string
-	roles map[byte][]byte
+	roles map[string][]string
 }
 
 func (h *mockHandler) HandlerName() string { return h.name }
-func (h *mockHandler) AllowedRoles(action byte) []byte {
+func (h *mockHandler) AllowedRoles(action string) []string {
 	return h.roles[action]
 }
 
@@ -35,9 +35,9 @@ func TestIntegration_FullFlow(t *testing.T) {
 
 	h := &mockHandler{
 		name: "invoice",
-		roles: map[byte][]byte{
-			'r': {'a', 'e'},
-			'w': {'a'},
+		roles: map[string][]string{
+			"r": {"a", "e"},
+			"w": {"a"},
 		},
 	}
 	if err := m.Register(h); err != nil {
@@ -55,7 +55,7 @@ func TestIntegration_FullFlow(t *testing.T) {
 		t.Fatalf("AssignRole failed: %v", err)
 	}
 
-	ok, err := m.HasPermission(u.ID, "invoice", 'r')
+	ok, err := m.HasPermission(u.ID, "invoice", "r")
 	if err != nil {
 		t.Fatalf("HasPermission failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestIntegration_FullFlow(t *testing.T) {
 		t.Error("Editor should be able to read invoice")
 	}
 
-	ok, err = m.HasPermission(u.ID, "invoice", 'w')
+	ok, err = m.HasPermission(u.ID, "invoice", "w")
 	if err != nil {
 		t.Fatalf("HasPermission failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestIntegration_FullFlow(t *testing.T) {
 		t.Fatalf("DeleteRole failed: %v", err)
 	}
 
-	ok, err = m.HasPermission(u.ID, "invoice", 'r')
+	ok, err = m.HasPermission(u.ID, "invoice", "r")
 	if err != nil {
 		t.Fatalf("HasPermission failed: %v", err)
 	}

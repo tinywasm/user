@@ -26,17 +26,17 @@ type Config struct {
 // AuthModeCookie: session ID in HttpOnly cookie → DB lookup per request. Immediate revocation.
 // AuthModeJWT:    signed JWT in HttpOnly cookie → crypto validation only. Stateless, SPA/PWA-ready.
 
-// Init — creates tables via ORM, warms session cache, applies config.
-func Init(db *orm.DB, cfg Config) error
+// New (in userserver) — creates tables via ORM, warms session cache, applies config.
+func New(db *orm.DB, cfg Config) (*Module, error)
 ```
 
 ### UI Modules
-Exposes the following standard UI modules:
-- `user.LoginModule`: `/login` (email+password form + OAuth buttons)
-- `user.RegisterModule`: `/register`
-- `user.ProfileModule`: `/profile` (edit name, phone, password)
-- `user.LANModule`: `/lan` (LAN IP management)
-- `user.OAuthCallback`: `/oauth/callback`
+Exposes the following standard UI modules (via `m.UIModules()` and `userui.UIModules()`):
+- `login`: (email+password form + OAuth buttons)
+- `register`
+- `profile`: (edit name, phone, password)
+- `lan`: (LAN IP management)
+- `oauth`: (callback handler)
 
 ### User CRUD
 ```go
@@ -72,7 +72,7 @@ func UnlinkIdentity(userID, provider string) error
 
 ### LAN Authentication
 ```go
-func LoginLAN(rut string, r *http.Request) (User, error)
+func LoginLAN(rut string, ctx router.Context) (User, error)
 func RegisterLAN(userID, rut string) error
 func UnregisterLAN(userID string) error  
 func AssignLANIP(userID, ip, label string) error
@@ -88,7 +88,7 @@ import "github.com/tinywasm/user"
 // ...
 
 // Initialize the user module directly with an ORM db instance
-err := user.Init(db, user.Config{
+m, err := userserver.New(db, user.Config{
     CookieName: "session_id", // default: "session"
     TokenTTL:   86400,        // default: 86400 (24h)
     TrustProxy: true,         // default: false

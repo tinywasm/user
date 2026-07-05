@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 
@@ -44,8 +46,19 @@ func (m *Module) BeginOAuth(providerName string) (string, error) {
 	return p.AuthCodeURL(state), nil
 }
 
-func (m *Module) CompleteOAuth(providerName string, r *http.Request, ip, ua string) (user.User, bool, error) {
-	state := r.URL.Query().Get("state")
+func (m *Module) CompleteOAuth(providerName string, ctx router.Context, ip, ua string) (user.User, bool, error) {
+	var state, code string
+	if q, ok := ctx.Value("query").(url.Values); ok {
+		state = q.Get("state")
+		code = q.Get("code")
+	} else {
+		// Fallback: parse from Path if it's a full URL or contains query
+		if u, err := url.Parse(ctx.Path()); err == nil {
+			state = u.Query().Get("state")
+			code = u.Query().Get("code")
+		}
+	}
+
 	if err := consumeState(m.db, state, providerName); err != nil {
 		return user.User{}, false, user.ErrInvalidOAuthState
 	}
@@ -55,12 +68,15 @@ func (m *Module) CompleteOAuth(providerName string, r *http.Request, ip, ua stri
 		return user.User{}, false, user.ErrProviderNotFound
 	}
 
-	token, err := p.ExchangeCode(r.Context(), r.URL.Query().Get("code"))
+	// Use background context as router.Context doesn't provide one
+	bgCtx := context.Background()
+
+	token, err := p.ExchangeCode(bgCtx, code)
 	if err != nil {
 		return user.User{}, false, err
 	}
 
-	info, err := p.GetUserInfo(r.Context(), token)
+	info, err := p.GetUserInfo(bgCtx, token)
 	if err != nil {
 		return user.User{}, false, err
 	}

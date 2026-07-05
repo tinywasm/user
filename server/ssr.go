@@ -1,9 +1,8 @@
 package userserver
 
 import (
-	"net/http"
-
 	"github.com/tinywasm/form"
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
 )
 
@@ -46,7 +45,7 @@ func (m *loginModule) Create(data ...any) (any, error) {
 	return u, nil
 }
 
-func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
+func (m *loginModule) SetCookie(userID string, ctx router.Context) error {
 	var value string
 
 	if m.m.config.AuthMode == user.AuthModeJWT {
@@ -56,19 +55,20 @@ func (m *loginModule) SetCookie(userID string, w http.ResponseWriter, r *http.Re
 		}
 		value = token
 	} else {
-		sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
+		ua := ctx.GetHeader("User-Agent")
+		sess, err := m.m.CreateSession(userID, extractClientIP(ctx, m.m.config.TrustProxy), ua)
 		if err != nil {
 			return err
 		}
 		value = sess.ID
 	}
 
-	http.SetCookie(w, &http.Cookie{
+	ctx.SetCookie(router.Cookie{
 		Name:     m.m.config.CookieName,
 		Value:    value,
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: router.SameSiteStrict,
 		MaxAge:   m.m.config.TokenTTL,
 		Path:     "/",
 	})
@@ -108,7 +108,7 @@ func (m *registerModule) Create(data ...any) (any, error) {
 	return u, nil
 }
 
-func (m *registerModule) SetCookie(userID string, w http.ResponseWriter, r *http.Request) error {
+func (m *registerModule) SetCookie(userID string, ctx router.Context) error {
 	var value string
 
 	if m.m.config.AuthMode == user.AuthModeJWT {
@@ -118,19 +118,20 @@ func (m *registerModule) SetCookie(userID string, w http.ResponseWriter, r *http
 		}
 		value = token
 	} else {
-		sess, err := m.m.CreateSession(userID, extractClientIP(r, m.m.config.TrustProxy), r.UserAgent())
+		ua := ctx.GetHeader("User-Agent")
+		sess, err := m.m.CreateSession(userID, extractClientIP(ctx, m.m.config.TrustProxy), ua)
 		if err != nil {
 			return err
 		}
 		value = sess.ID
 	}
 
-	http.SetCookie(w, &http.Cookie{
+	ctx.SetCookie(router.Cookie{
 		Name:     m.m.config.CookieName,
 		Value:    value,
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: router.SameSiteStrict,
 		MaxAge:   m.m.config.TokenTTL,
 		Path:     "/",
 	})

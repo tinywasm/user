@@ -1,7 +1,9 @@
 package userui
 
 import (
+	"github.com/tinywasm/dom"
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/html"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/user"
 )
@@ -35,7 +37,10 @@ func (m *profileModule) ValidateData(action byte, data ...any) error {
 	return nil
 }
 
-func (m *profileModule) OnMount() {
-	m.form.OnMount()
-	m.passwordForm.OnMount()
+func (m *profileModule) Render() *dom.Element {
+	return html.Div().Child(
+		m.form.Render(),
+		html.Hr(),
+		m.passwordForm.Render(),
+	)
 }

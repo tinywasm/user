@@ -3,10 +3,10 @@
 package tests
 
 import (
-	"context"
-	"net/http/httptest"
 	"testing"
 
+	"github.com/tinywasm/router"
+	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
 )
@@ -34,37 +34,37 @@ func TestMCPAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("TestValidateSession_Bearer_ValidJWT", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+	t.Run("TestAuthenticate_Bearer_ValidJWT", func(t *testing.T) {
+		ctx := &mock.Context{}
+		ctx.SetHeader("Authorization", "Bearer "+token)
 
-		ctx := m.InjectIdentity(context.Background(), req)
-		u2, ok := m.FromContext(ctx)
-		if !ok || u2.ID != u.ID {
-			t.Errorf("expected user %s, got %v", u.ID, u2)
-		}
+		m.Authenticate()(func(c router.Context) {
+			if c.UserID() != u.ID {
+				t.Errorf("expected user %s, got %s", u.ID, c.UserID())
+			}
+		})(ctx)
 	})
 
-	t.Run("TestValidateSession_Bearer_InvalidJWT", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Authorization", "Bearer invalid.token")
-		ctx := m.InjectIdentity(context.Background(), req)
-		_, ok := m.FromContext(ctx)
-		if ok {
-			t.Error("expected unauthorized for invalid JWT")
-		}
+	t.Run("TestAuthenticate_Bearer_InvalidJWT", func(t *testing.T) {
+		ctx := &mock.Context{}
+		ctx.SetHeader("Authorization", "Bearer invalid.token")
+		m.Authenticate()(func(c router.Context) {
+			if c.UserID() != "" {
+				t.Error("expected anonymous for invalid JWT")
+			}
+		})(ctx)
 	})
 
-	t.Run("TestValidateSession_Bearer_MissingHeader", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		ctx := m.InjectIdentity(context.Background(), req)
-		_, ok := m.FromContext(ctx)
-		if ok {
-			t.Error("expected unauthorized for missing header")
-		}
+	t.Run("TestAuthenticate_Bearer_MissingHeader", func(t *testing.T) {
+		ctx := &mock.Context{}
+		m.Authenticate()(func(c router.Context) {
+			if c.UserID() != "" {
+				t.Error("expected anonymous for missing header")
+			}
+		})(ctx)
 	})
 
-	t.Run("TestCanExecute", func(t *testing.T) {
+	t.Run("TestCan", func(t *testing.T) {
 		err := m.CreateRole("r1", "admin", "Admin", "")
 		if err != nil {
 			t.Fatal(err)
@@ -82,18 +82,14 @@ func TestMCPAuthorizer(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		ctx := m.InjectIdentity(context.Background(), req)
-
-		if !m.CanExecute(ctx, "data", 'R') {
-			t.Error("expected CanExecute to return true")
+		if !m.Can(u.ID, "data", "R") {
+			t.Error("expected Can to return true")
 		}
-		if m.CanExecute(ctx, "data", 'W') {
-			t.Error("expected CanExecute to return false for wrong action")
+		if m.Can(u.ID, "data", "W") {
+			t.Error("expected Can to return false for wrong action")
 		}
-		if m.CanExecute(ctx, "other", 'R') {
-			t.Error("expected CanExecute to return false for wrong resource")
+		if m.Can(u.ID, "other", "R") {
+			t.Error("expected Can to return false for wrong resource")
 		}
 	})
 

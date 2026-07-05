@@ -72,7 +72,6 @@ const (
 
 	// AuthModeBearer reads a signed JWT from the "Authorization: Bearer <token>" header.
 	// Stateless: for API clients (MCP servers, IDEs, LLMs) that cannot use cookies.
-	// Structurally implements mcp.Authorizer via InjectIdentity + CanExecute methods.
 	// Requires JWTSecret.
 	AuthModeBearer
 )
@@ -98,4 +97,43 @@ type Config struct {
 	// Return a non-nil error to reject the password.
 	// If nil, only the built-in len >= 8 check applies.
 	OnPasswordValidate func(password string) error
+}
+
+// ProfileDTO is a safe subset of User data for public/API consumption.
+type ProfileDTO struct {
+	ID     string
+	Name   string
+	Email  string
+	Avatar string
+	Roles  []string
+	Locale string
+}
+
+func (p ProfileDTO) EncodeFields(w fmt.FieldWriter) {
+	w.String("id", p.ID)
+	w.String("name", p.Name)
+	w.String("email", p.Email)
+	w.String("avatar", p.Avatar)
+	w.String("locale", p.Locale)
+	aw := w.Array("roles", len(p.Roles))
+	for _, r := range p.Roles {
+		aw.String(r)
+	}
+	aw.Close()
+}
+
+func (p ProfileDTO) IsNil() bool { return false }
+
+func (p *ProfileDTO) DecodeFields(r fmt.FieldReader) {
+	p.ID, _ = r.String("id")
+	p.Name, _ = r.String("name")
+	p.Email, _ = r.String("email")
+	p.Avatar, _ = r.String("avatar")
+	p.Locale, _ = r.String("locale")
+	if ar, ok := r.Array("roles"); ok {
+		p.Roles = make([]string, ar.Len())
+		for i := 0; i < ar.Len(); i++ {
+			p.Roles[i] = ar.String(i)
+		}
+	}
 }

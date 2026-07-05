@@ -26,6 +26,12 @@ type Module struct {
 // New initializes the user/rbac schema, warms the cache, and returns a Module handle.
 // This is the ONLY entry point for this package on the backend.
 func New(db *orm.DB, cfg user.Config) (*Module, error) {
+	if cfg.AuthMode == user.AuthModeJWT || cfg.AuthMode == user.AuthModeBearer {
+		if len(cfg.JWTSecret) == 0 {
+			return nil, fmt.Err("userserver: JWTSecret required for selected AuthMode")
+		}
+	}
+
 	if cfg.CookieName == "" {
 		cfg.CookieName = "session"
 	}

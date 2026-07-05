@@ -30,7 +30,7 @@ The package is split into three parts:
 - **Auto-link by email:** OAuth login with an email that matches an existing local account
   links the OAuth identity automatically.
 - **No framework dependencies:** Standard library + `golang.org/x/crypto` + `golang.org/x/oauth2`.
-- **Isomorphic modules:** Auth UI modules implement `site.Module` via duck typing. Backend modules (in `userserver`) handle SSR and `Create/Update/Delete`. Frontend modules (in `userui`) handle `OnMount`.
+- **Isomorphic modules:** Auth UI modules implement `site.Module` via duck typing. Backend modules (in `userserver`) handle SSR and `Create/Update/Delete`. Frontend modules (in `userui`) self-manage via signals; delegation of `OnMount` is removed.
 - **Config struct:** All configuration (`CookieName`, `TokenTTL`, `TrustProxy`,
   `OAuthProviders`, `AuthMode`, `JWTSecret`) is grouped logically and passed during initialization.
 - **Form-backed validation:** Each module holds a `*form.Form`. `ValidateData` (crudp.DataValidator) delegates to the form — same validation rules on frontend and backend, zero duplication.
@@ -40,8 +40,8 @@ The package is split into three parts:
 ## Package Structure
 
 - `user/`: Agnostic models (`User`, `Session`, `Identity`, etc.) and error constants.
-- `user/server/`: `Module` struct, `New()`, authentication logic, RBAC, and SSR modules.
-- `user/ui/`: `UIModules()` for frontend registration and `OnMount()` wiring.
+- `user/server/`: `Module` struct, `New()`, authentication logic (as `router.Middleware`), RBAC, and SSR modules.
+- `user/ui/`: `UIModules()` for frontend registration; forms self-manage via signals.
 
 ---
 
@@ -87,7 +87,7 @@ graph TD
     APP -->|"userserver.New(...)\nm.UIModules()"| SERVER
     APP -->|"userui.UIModules()"| UI
     SERVER -->|"db.CreateTable"| DB
-    UI -->|"form.OnMount"| FORM
+    UI -->|"Signals"| FORM
     SERVER -->|"form.String (SSR)"| FORM
 ```
 
