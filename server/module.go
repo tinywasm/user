@@ -1,5 +1,7 @@
 package userserver
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/form"
@@ -158,7 +160,7 @@ func (m *Module) UIModules() []any {
 	}
 }
 
-func mustForm(parentID string, s fmt.Fielder) *form.Form {
+func mustForm(parentID string, s model.Fielder) *form.Form {
 	f, err := form.New(parentID, s)
 	if err != nil {
 		panic("userserver: mustForm: " + err.Error())

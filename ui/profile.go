@@ -1,8 +1,9 @@
 package userui
 
+import "github.com/tinywasm/model"
+
 import (
 	"github.com/tinywasm/dom"
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/html"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/user"
@@ -23,7 +24,7 @@ func (m *profileModule) ValidateData(action byte, data ...any) error {
 		return nil
 	}
 
-	fielder, ok := data[0].(fmt.Fielder)
+	fielder, ok := data[0].(model.Fielder)
 	if !ok {
 		return nil
 	}

@@ -1,13 +1,13 @@
 package userserver
 
 import (
-	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
 )
 
 func initSchema(db *orm.DB, mode user.AuthMode) error {
-	models := []fmt.Model{
+	models := []model.Model{
 		&user.User{}, &user.Role{}, &user.Permission{},
 		&user.Identity{}, &user.LANIP{},
 		&user.OAuthState{}, &user.UserRole{}, &user.RolePermission{},

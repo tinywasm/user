@@ -1,7 +1,8 @@
 package userui
 
+import "github.com/tinywasm/model"
+
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/form/input"
 	"github.com/tinywasm/user"
@@ -31,7 +32,7 @@ func init() {
 // Isomorphic: available in both WASM and non-WASM builds.
 func UIModules() []any { return uiModules }
 
-func mustForm(parentID string, s fmt.Fielder) *form.Form {
+func mustForm(parentID string, s model.Fielder) *form.Form {
 	f, err := form.New(parentID, s)
 	if err != nil {
 		panic("user: mustForm: " + err.Error())

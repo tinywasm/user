@@ -5,14 +5,15 @@ go 1.25.2
 require (
 	github.com/tinywasm/context v0.0.18
 	github.com/tinywasm/dom v0.11.2
-	github.com/tinywasm/fmt v0.24.6
-	github.com/tinywasm/form v0.2.11
+	github.com/tinywasm/fmt v0.25.0
+	github.com/tinywasm/form v0.2.12
 	github.com/tinywasm/html v0.0.5
-	github.com/tinywasm/json v0.5.6
-	github.com/tinywasm/mcp v0.1.14
-	github.com/tinywasm/orm v0.9.18
-	github.com/tinywasm/router v0.1.2
-	github.com/tinywasm/sqlite v0.2.3
+	github.com/tinywasm/json v0.5.8
+	github.com/tinywasm/mcp v0.1.16
+	github.com/tinywasm/model v0.0.2
+	github.com/tinywasm/orm v0.9.19
+	github.com/tinywasm/router v0.1.3
+	github.com/tinywasm/sqlite v0.2.4
 	github.com/tinywasm/unixid v0.2.23
 	golang.org/x/crypto v0.48.0
 	golang.org/x/oauth2 v0.35.0
@@ -28,7 +29,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/tinywasm/css v0.1.3 // indirect
 	github.com/tinywasm/fetch v0.1.24 // indirect
-	github.com/tinywasm/sqlt v0.0.5 // indirect
+	github.com/tinywasm/sqlt v0.0.6 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect

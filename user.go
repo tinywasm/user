@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 	"golang.org/x/oauth2"
 )
 
@@ -109,7 +110,7 @@ type ProfileDTO struct {
 	Locale string
 }
 
-func (p ProfileDTO) EncodeFields(w fmt.FieldWriter) {
+func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
 	w.String("id", p.ID)
 	w.String("name", p.Name)
 	w.String("email", p.Email)
@@ -124,7 +125,7 @@ func (p ProfileDTO) EncodeFields(w fmt.FieldWriter) {
 
 func (p ProfileDTO) IsNil() bool { return false }
 
-func (p *ProfileDTO) DecodeFields(r fmt.FieldReader) {
+func (p *ProfileDTO) DecodeFields(r model.FieldReader) {
 	p.ID, _ = r.String("id")
 	p.Name, _ = r.String("name")
 	p.Email, _ = r.String("email")
