@@ -180,7 +180,7 @@ func (m *Module) AssignPermission(roleID, permissionID string) error {
 
 type RBACObject interface {
 	HandlerName() string
-	AllowedRoles(action byte) []byte
+	AllowedRoles(action string) []string
 }
 
 func (m *Module) GetRoleByCode(code string) (*user.Role, error) {
@@ -200,7 +200,7 @@ func (m *Module) Register(handlers ...RBACObject) error {
 }
 
 func registerRBAC(m *Module, handlers ...RBACObject) error {
-	actions := []byte{'c', 'r', 'u', 'd'}
+	actions := []string{"c", "r", "u", "d"}
 	for _, h := range handlers {
 		resource := h.HandlerName()
 		for _, action := range actions {
@@ -209,13 +209,13 @@ func registerRBAC(m *Module, handlers ...RBACObject) error {
 				continue
 			}
 
-			permID := resource + ":" + string(action)
-			if err := m.CreatePermission(permID, permID, resource, string(action)); err != nil {
+			permID := resource + ":" + action
+			if err := m.CreatePermission(permID, permID, resource, action); err != nil {
 				return err
 			}
 
 			for _, code := range roles {
-				r, err := m.GetRoleByCode(string(code))
+				r, err := m.GetRoleByCode(code)
 				if err != nil {
 					continue // Role not found, skip assignment
 				}
@@ -228,7 +228,10 @@ func registerRBAC(m *Module, handlers ...RBACObject) error {
 	return nil
 }
 
-func (m *Module) HasPermission(userID, resource string, action byte) (bool, error) {
+func (m *Module) HasPermission(userID, resource string, action string) (bool, error) {
+	if userID == "" {
+		return false, nil
+	}
 	u, err := m.GetUser(userID)
 	if err != nil {
 		if err == user.ErrNotFound || err == sql.ErrNoRows {
@@ -238,7 +241,7 @@ func (m *Module) HasPermission(userID, resource string, action byte) (bool, erro
 	}
 
 	for _, p := range u.Permissions {
-		if p.Resource == resource && p.Action == string(action) {
+		if p.Resource == resource && p.Action == action {
 			return true, nil
 		}
 	}

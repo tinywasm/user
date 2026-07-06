@@ -2,9 +2,6 @@ package userserver
 
 import (
 	"errors"
-	"net"
-	"net/http"
-	"strings"
 )
 
 // GenerateAPIToken creates a signed JWT for API access (MCP clients, IDEs, LLMs).
@@ -21,11 +18,3 @@ func (m *Module) GenerateAPIToken(userID string, ttl int) (string, error) {
 	return GenerateJWT(m.config.JWTSecret, userID, ttl)
 }
 
-// clientIP extracts the real client IP from the request.
-func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		return strings.SplitN(ip, ",", 2)[0]
-	}
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
-}

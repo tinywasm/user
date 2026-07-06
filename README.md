@@ -31,7 +31,7 @@ import "github.com/tinywasm/user"
 // ...
 
 // Initialize the user module directly with an ORM db instance
-err := user.Init(db, user.Config{
+m, err := userserver.New(db, user.Config{
     CookieName: "session_id", // default: "session"
     TokenTTL:   86400,        // default: 86400 (24h)
     TrustProxy: true,         // default: false

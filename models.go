@@ -49,6 +49,7 @@ type PasswordData struct {
 	Confirm string
 }
 
+
 // orm:typed_fields
 type Identity struct {
 	ID         string `db:"pk"`

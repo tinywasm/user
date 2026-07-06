@@ -12,8 +12,8 @@ type userCRUD struct {
 }
 
 func (h *userCRUD) HandlerName() string                   { return "users" }
-func (h *userCRUD) AllowedRoles(action byte) []byte       { return []byte{'a'} }
-func (h *userCRUD) ValidateData(action byte, _ any) error { return nil }
+func (h *userCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
+func (h *userCRUD) ValidateData(action string, _ any) error { return nil }
 
 func (h *userCRUD) Create(payload any) (any, error) {
 	u := payload.(user.User)
@@ -31,8 +31,8 @@ func (h *userCRUD) Delete(id string) error { return deleteUser(h.db, h.cache, id
 type roleCRUD struct{ m *Module }
 
 func (h *roleCRUD) HandlerName() string                   { return "roles" }
-func (h *roleCRUD) AllowedRoles(action byte) []byte       { return []byte{'a'} }
-func (h *roleCRUD) ValidateData(action byte, _ any) error { return nil }
+func (h *roleCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
+func (h *roleCRUD) ValidateData(action string, _ any) error { return nil }
 
 func (h *roleCRUD) Create(payload any) (any, error) {
 	r := payload.(user.Role)
@@ -63,8 +63,8 @@ func (h *roleCRUD) Delete(id string) error { return h.m.DeleteRole(id) }
 type permissionCRUD struct{ m *Module }
 
 func (h *permissionCRUD) HandlerName() string                   { return "permissions" }
-func (h *permissionCRUD) AllowedRoles(action byte) []byte       { return []byte{'a'} }
-func (h *permissionCRUD) ValidateData(action byte, _ any) error { return nil }
+func (h *permissionCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
+func (h *permissionCRUD) ValidateData(action string, _ any) error { return nil }
 
 func (h *permissionCRUD) Create(payload any) (any, error) {
 	p := payload.(user.Permission)
@@ -95,8 +95,8 @@ func (h *permissionCRUD) Delete(id string) error { return h.m.DeletePermission(i
 type lanipCRUD struct{ m *Module }
 
 func (h *lanipCRUD) HandlerName() string                   { return "lan_ips" }
-func (h *lanipCRUD) AllowedRoles(action byte) []byte       { return []byte{'a'} }
-func (h *lanipCRUD) ValidateData(action byte, _ any) error { return nil }
+func (h *lanipCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
+func (h *lanipCRUD) ValidateData(action string, _ any) error { return nil }
 
 func (h *lanipCRUD) Create(payload any) (any, error) {
 	ip := payload.(user.LANIP)
