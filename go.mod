@@ -9,7 +9,7 @@ require (
 	github.com/tinywasm/form v0.2.12
 	github.com/tinywasm/html v0.0.5
 	github.com/tinywasm/json v0.5.8
-	github.com/tinywasm/mcp v0.1.17
+	github.com/tinywasm/mcp v0.1.18
 	github.com/tinywasm/model v0.0.5
 	github.com/tinywasm/orm v0.9.24
 	github.com/tinywasm/router v0.1.3
