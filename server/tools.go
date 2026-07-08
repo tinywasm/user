@@ -34,6 +34,7 @@ func (m *Module) Tools() []mcp.Tool {
 				for _, r := range u.Roles {
 					profile.Roles = append(profile.Roles, r.Code)
 				}
+				profile.Permissions = permissionsOf(u)
 
 				var out string
 				if err := json.Encode(profile, &out); err != nil {
@@ -44,4 +45,12 @@ func (m *Module) Tools() []mcp.Tool {
 			},
 		},
 	}
+}
+
+func permissionsOf(u user.User) []string {
+	var perms []string
+	for _, p := range u.Permissions {
+		perms = append(perms, p.Resource+":"+p.Action)
+	}
+	return perms
 }

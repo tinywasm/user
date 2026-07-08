@@ -28,6 +28,12 @@ type Config struct {
 
 // New (in userserver) — creates tables via ORM, warms session cache, applies config.
 func New(db *orm.DB, cfg Config) (*Module, error)
+
+// MountAPI registers the authentication routes (/login, /logout, /oauth) on the host router.
+func (m *Module) MountAPI(r router.Router)
+
+// Bootstrap seeds the first administrator if the users table is empty.
+func (m *Module) Bootstrap(email, password string) error
 ```
 
 ### UI Modules
@@ -54,6 +60,12 @@ func ReactivateUser(id string) error
 func SetPassword(userID, password string) error     
 func VerifyPassword(userID, password string) error   
 func Login(email, password string) (User, error)
+
+// Authenticate returns a middleware for identity resolution.
+func (m *Module) Authenticate() router.Middleware
+
+// Can is the RBAC authority for resource/action checks.
+func (m *Module) Can(userID, resource, action string) bool
 ```
 
 ### Sessions

@@ -48,8 +48,17 @@ if err != nil {
 }
 ```
 
+## Production Wiring
+
+`tinywasm/user` is designed for autonomous operation in production environments. After initialization:
+
+1. **Mount API**: Call `m.MountAPI(router)` to publish standard authentication routes (`/login`, `/logout`, `/oauth/:provider`).
+2. **Bootstrap**: Call `m.Bootstrap(email, password)` on startup to ensure a first administrator exists if the database is empty.
+3. **Protect Routes**: Inject `m.Authenticate()` (middleware) and `m.Can` (authorization) into your host router.
+4. **Client-side gating**: Use the `me` MCP tool to retrieve user profile and permissions for cosmetic UI gating.
+
 For detailed API usage and module integration guidance, refer to [docs/SKILL.md](docs/SKILL.md).
 
 ## Status
 
-> Implementation pending. Documentation complete.
+> Implementation complete. Ready for production wiring.

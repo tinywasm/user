@@ -241,7 +241,9 @@ func (m *Module) HasPermission(userID, resource string, action string) (bool, er
 	}
 
 	for _, p := range u.Permissions {
-		if p.Resource == resource && p.Action == action {
+		resourceMatch := p.Resource == resource || p.Resource == user.ResourceAll
+		actionMatch := p.Action == action || p.Action == user.ActionAll
+		if resourceMatch && actionMatch {
 			return true, nil
 		}
 	}

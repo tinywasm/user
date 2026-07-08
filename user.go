@@ -98,16 +98,31 @@ type Config struct {
 	// Return a non-nil error to reject the password.
 	// If nil, only the built-in len >= 8 check applies.
 	OnPasswordValidate func(password string) error
+
+	// AfterLoginPath is the path to redirect to after successful login.
+	// Default: PathAfterLogin ("/")
+	AfterLoginPath string
 }
+
+const (
+	PathLogin      = "/login"
+	PathLogout     = "/logout"
+	PathAfterLogin = "/"
+
+	RoleCodeAdmin = "admin"
+	ResourceAll   = "*"
+	ActionAll     = "*"
+)
 
 // ProfileDTO is a safe subset of User data for public/API consumption.
 type ProfileDTO struct {
-	ID     string
-	Name   string
-	Email  string
-	Avatar string
-	Roles  []string
-	Locale string
+	ID          string
+	Name        string
+	Email       string
+	Avatar      string
+	Roles       []string
+	Permissions []string // "resource:actions" pairs, e.g. "service_catalog:rc"
+	Locale      string
 }
 
 func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
@@ -121,6 +136,11 @@ func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
 		aw.String(r)
 	}
 	aw.Close()
+	pw := w.Array("permissions", len(p.Permissions))
+	for _, perm := range p.Permissions {
+		pw.String(perm)
+	}
+	pw.Close()
 }
 
 func (p ProfileDTO) IsNil() bool { return false }
@@ -135,6 +155,12 @@ func (p *ProfileDTO) DecodeFields(r model.FieldReader) {
 		p.Roles = make([]string, ar.Len())
 		for i := 0; i < ar.Len(); i++ {
 			p.Roles[i] = ar.String(i)
+		}
+	}
+	if ap, ok := r.Array("permissions"); ok {
+		p.Permissions = make([]string, ap.Len())
+		for i := 0; i < ap.Len(); i++ {
+			p.Permissions[i] = ap.String(i)
 		}
 	}
 }
