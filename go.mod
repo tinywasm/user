@@ -12,7 +12,7 @@ require (
 	github.com/tinywasm/mcp v0.1.18
 	github.com/tinywasm/model v0.0.6
 	github.com/tinywasm/orm v0.9.26
-	github.com/tinywasm/router v0.1.3
+	github.com/tinywasm/router v0.1.4
 	github.com/tinywasm/sqlite v0.2.4
 	github.com/tinywasm/unixid v0.2.23
 	golang.org/x/crypto v0.48.0
