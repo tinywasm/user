@@ -84,7 +84,7 @@ graph TD
     FORM["tinywasm/form\n(validation)"]
     DB["Database\n(via orm.DB)"]
 
-    APP -->|"userserver.New(...)\nm.UIModules()"| SERVER
+    APP -->|"userserver.New(...)\nm.Bootstrap(...)\nm.MountAPI(...)"| SERVER
     APP -->|"userui.UIModules()"| UI
     SERVER -->|"db.CreateTable"| DB
     UI -->|"Signals"| FORM

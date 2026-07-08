@@ -1,149 +1,198 @@
-# PLAN — Production wiring surface: `MountAPI` (login/logout), `me` with permissions, `Bootstrap`
+# PLAN — Fix production wiring: typed model Definitions, no views in this library, browser-real login POST
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
 
 ## Context (zero-context summary)
 
-`tinywasm/user` is the ecosystem's single authority for **who** (identity) and
-**may** (RBAC). The backend `userserver.Module` (created via `New(db,
-user.Config)`) already provides: `Authenticate() router.Middleware`,
-`Can(userID, resource, action string) bool`, sessions/JWT/bearer, OAuth, RBAC
-primitives (`CreateRole`/`CreatePermission`/`AssignRole`/`AssignPermission`/
-`GetRoleByCode`), CRUD handlers (`Add()`), SSR-capable auth UI flow handlers
-(`UIModules()`: login/register/profile/lan/oauth with `RenderHTML`, `Create`,
-`SetCookie`), and MCP tools (`Tools()` with `me`).
+The previous delivery (`docs/CHECK_PLAN.md`, commit `f7aef51`) implemented
+`MountAPI` (login/logout/oauth routes), `me` with `Permissions`, and
+`Bootstrap`. `Bootstrap` and `me` are verified green. The login flow has real
+functional bugs, and two architectural violations must be corrected:
 
-Three gaps block a consumer (`veltylabs/mjosefa-cms`) from going to production:
+1. **`GET /login` renders a form with no fields.** `tinywasm/form` binds
+   inputs exclusively via `model.Field.Widget`; the form DTOs (`LoginData`,
+   `RegisterData`, `ProfileData`, `PasswordData`) are hand-written structs
+   with no widget metadata, so every generated schema field has
+   `Widget: nil` and `form.New` skips them all. The `form.RegisterInput(...)`
+   workaround in `server/init.go` is dead machinery (form does no
+   name-matching).
+2. **This library must NOT own any view.** How a login page looks is the
+   **consumer's** job (each app brands and lays out its own pages). The
+   delivery wired `GET /login` to render HTML (`loginModule.RenderHTML` +
+   `wrapSSR` + `renderLoginError` HTML). That rendering responsibility leaves
+   this library.
+3. **`POST /login` only decodes JSON** (`server/mount.go`), but a plain HTML
+   form submits `application/x-www-form-urlencoded`. A real browser could
+   never log in. The test passes because it posts JSON and only asserts
+   status codes.
 
-1. **The auth flows are not mounted anywhere.** `loginModule` can render its
-   form and validate credentials, but nothing publishes `GET/POST /login` or
-   `POST /logout` on a `router.Router`. Every consumer would have to hand-wire
-   routes against private types — impossible (the types are unexported) and
-   wrong (this module owns its flows).
-2. **`me` returns no permissions.** The client shell (`platformd.Platform.CanView`)
-   gates the nav cosmetically using the profile's permissions; today
-   `user.ProfileDTO` carries only `ID/Name/Email/Roles`, so the client cannot
-   know which resources the user may see.
-3. **No first-run story.** A fresh database has zero users: nobody can ever log
-   in. Consumers need an idempotent, safe bootstrap.
+**How models are authored in this ecosystem (mandatory pattern —
+`tinywasm/model` README + `tinywasm/orm/docs/ARQUITECTURE.md`):** the source
+of truth is a **typed `model.Definition` literal** (`var XxxModel =
+model.Definition{...}`, the var name MUST end in `Model`). The generator
+`ormc` (`tinywasm/orm/ormc`, invoked via `go generate` → `//go:generate ormc`)
+parses that literal — including typed `Widget: input.Email()` expressions —
+and **generates the concrete struct** plus `Schema()`, `Pointers()`,
+`Validate()`, `EncodeFields()`, `DecodeFields()`. Only these generated codecs
+make `tinywasm/json` work. **Struct tags are NOT the pattern. Stdlib
+`encoding/json` is forbidden everywhere.**
 
-**Ecosystem conventions that apply:** no stdlib in shared code (`tinywasm/fmt`),
-no `any`/`map` in public APIs, typed constants for every repeated string (route
-paths!), errors always propagate, `gotest` only.
+**Ecosystem rules that apply:** no stdlib in shared code (`tinywasm/fmt`), no
+`any`/`map` in public APIs, typed constants for repeated strings, errors
+propagate, `gotest` only
+(`go install github.com/tinywasm/devflow/cmd/gotest@latest`).
 
-## Stage 1 — `Module` implements `router.APIModule`
+## Stage 1 — form DTOs become typed `model.Definition`s (ormc generates the rest)
 
-New file `server/mount.go`:
+Replace the four hand-written DTO structs in `models.go` with Definition
+literals (new file `definitions_forms.go`, or alongside existing definitions
+if the repo already groups them — do NOT leave the hand-written structs, ormc
+generates them and names would collide):
 
 ```go
-// MountAPI publishes the authentication flows on the host router. The module
-// owns its routes; consumers just Mount it like any other APIModule.
-func (m *Module) MountAPI(r router.Router) {
-	// GET  PathLogin  → full SSR login page (loginModule.RenderHTML wrapped in
-	//                   a minimal HTML document; no wasm required to log in)
-	// POST PathLogin  → parse LoginData, loginModule.Create (Login), on success
-	//                   SetCookie + redirect PathAfterLogin; on failure re-render
-	//                   the login page with the error (and emit SecurityEvent)
-	// POST PathLogout → destroy session + clear cookie + redirect PathLogin
+import (
+	"github.com/tinywasm/form/input"
+	"github.com/tinywasm/model"
+)
+
+var LoginDataModel = model.Definition{
+	Name: "login_data",
+	Fields: model.Fields{
+		{Name: "email",    Type: model.FieldText, NotNull: true, Widget: input.Email()},
+		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+	},
+}
+
+var RegisterDataModel = model.Definition{
+	Name: "register_data",
+	Fields: model.Fields{
+		{Name: "name",     Type: model.FieldText, NotNull: true, Widget: input.Text()},
+		{Name: "email",    Type: model.FieldText, NotNull: true, Widget: input.Email()},
+		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "phone",    Type: model.FieldText, Widget: input.Phone()},
+	},
+}
+
+var ProfileDataModel = model.Definition{
+	Name: "profile_data",
+	Fields: model.Fields{
+		{Name: "name",  Type: model.FieldText, NotNull: true, Widget: input.Text()},
+		{Name: "phone", Type: model.FieldText, Widget: input.Phone()},
+	},
+}
+
+var PasswordDataModel = model.Definition{
+	Name: "password_data",
+	Fields: model.Fields{
+		{Name: "current", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "new",     Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "confirm", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+	},
 }
 ```
 
-Rules:
+- These are form/codec models, **no `Field.DB`** (they are not tables). If
+  `ormc` cannot generate a table-less Definition, **STOP and report** — that
+  fix belongs in `tinywasm/orm`, never worked around here.
+- Regenerate with `go generate ./...` (runs `ormc`, latest published version).
+  Verify the generated schemas carry the widgets and the codec methods, and
+  that existing call sites (`user.LoginData{}` etc.) still compile against the
+  generated structs (field names `Email`, `Password`, … must round-trip).
+- **Delete `server/init.go`** (`form.RegisterInput` block): widgets now come
+  from the Definition. If some other code path genuinely needs the registry,
+  keep only that registration with a comment naming the path.
+- Replace `server/export.go` (`ExportGetUserByEmail`, a test-only export) with
+  a legitimate public method `Module.GetUserByEmail(email string)
+  (user.User, error)`; update the test to use it.
+- Do NOT migrate `User`/`Session`/`Identity` (DB models) in this plan — out of
+  scope, they work today.
 
-- Route paths are exported typed constants: `PathLogin = "/login"`,
-  `PathLogout = "/logout"`, `PathAfterLogin = "/"` (overridable via
-  `user.Config` field `AfterLoginPath string`, default `"/"`).
-- The SSR page reuses the existing `loginModule.RenderHTML()` (form + OAuth
-  links) — no duplicated markup. The HTML document wrapper lives in a
-  `//go:build !wasm` file per the SSR-split convention.
-- Failed logins go through the existing `OnSecurityEvent` notification path.
-- These routes are **public by design** (they are the door); document that the
-  host must not require a resource on them.
-- OAuth callback routes: mount the existing `oauthModule` handlers under their
-  current path convention only if providers are registered; zero routes when
-  `cfg.OAuthProviders` is empty (pay-per-use).
+## Stage 2 — MountAPI serves flows, never views
 
-## Stage 2 — `me` returns permissions
+The consumer builds and serves its own login page (with `tinywasm/form` over
+`user.LoginData` and its own branding) and posts to this module's endpoints.
+Rework `server/mount.go`:
 
-Extend `user.ProfileDTO` (in the root package `models.go`) with:
+- **Remove all HTML rendering** from this library's mount path: no
+  `GET /login` page, no `wrapSSR`, no `renderLoginError` HTML. Delete
+  `server/mount_ssr.go` (and `mount_wasm.go` if it only supported that
+  rendering); remove the now-unused `loginUI()` plumbing from `mount.go` if
+  nothing else needs it.
+- `MountAPI` mounts **only**:
+  - `POST user.PathLogin` — decode credentials by `Content-Type`:
+    `application/x-www-form-urlencoded` (plain HTML form) parsed privately
+    over `tinywasm/fmt` (stdlib `net/url` forbidden), or `application/json`
+    via `tinywasm/json`; anything else → `400`. On success: `SetCookie` +
+    `302` to `AfterLoginPath`. On failure: **`401`** + a short `text/plain`
+    error body + the existing `SecurityEvent` — the consumer's page decides
+    how to display it (e.g. re-rendering with the error via
+    `?err=` on its own page; this library does not decide that).
+  - `POST user.PathLogout` — unchanged behavior (destroy session, clear
+    cookie), redirect to `user.PathLogin`.
+  - OAuth begin/callback routes — unchanged flow, but failure paths return
+    `401`/`400` text, never HTML.
+- Path constants (`PathLogin`, `PathLogout`, `PathAfterLogin`,
+  `Config.AfterLoginPath`) stay as delivered.
 
-```go
-Permissions []string // "resource:actions" pairs, e.g. "service_catalog:rc"
-```
+## Stage 3 — tests that would have caught the bugs
 
-The `me` tool (`server/tools.go`) fills it from the user's roles' permissions
-(data already reachable via `hydrateUser`/RBAC tables; add a private
-`permissionsOf(u)` helper if needed). Purpose: the client shell filters its
-nav cosmetically (`CanView`); the server keeps re-validating every call with
-`Can` — state this in the field's doc comment.
+Rework `tests/production_wiring_test.go`:
 
-## Stage 3 — `Bootstrap` (first-run admin seed)
+- **Widget regression:** `form.New` over `&user.LoginData{}` yields exactly 2
+  inputs (email + password) — fails fast if a future regeneration loses the
+  widgets. Same one-liner check for the other three DTOs.
+- **Consumer-view simulation:** render `form.New(&user.LoginData{}).SetSSR(true)`
+  in the test (playing the consumer's role) and assert the produced HTML posts
+  the field names the handler expects — the contract between consumer-built
+  views and this module's endpoints.
+- **`POST /login`** success + failure via **urlencoded** bodies (browser
+  semantics): cookie + `302` on success; `401` + SecurityEvent on bad
+  password. Keep one JSON case for the API path. `POST /logout` clears the
+  cookie.
+- Remove any test asserting this library renders HTML pages.
+- All green under `gotest ./...` (native + wasm suites).
 
-New method in `server/`:
+## Stage 4 — documentation (deferred by the previous delivery; not optional)
 
-```go
-// Bootstrap seeds the very first administrator. It is a no-op unless the users
-// table is EMPTY. When empty it: creates the user (email), sets the password,
-// creates (or reuses) the role with code RoleCodeAdmin, grants it the wildcard
-// permission ResourceAll/ActionAll, and assigns it. Idempotent and safe to call
-// on every startup.
-func (m *Module) Bootstrap(email, password string) error
-```
-
-- `RoleCodeAdmin = "admin"`, plus wildcard resource/action constants — whatever
-  wildcard convention `Can`/`HasPermission` already honors; if none exists,
-  implement wildcard support in `HasPermission` (`resource == "*"` matches all)
-  as part of this stage, with tests.
-- Empty email/password with an empty table → explicit error (the consumer
-  surfaces "set ADMIN_EMAIL/ADMIN_PASSWORD"); with a non-empty table → nil.
-- Uses only existing primitives (`createUser`, `SetPassword`, `CreateRole`,
-  `CreatePermission`, `AssignPermission`, `AssignRole`).
-
-## Tests (`gotest ./...`, never `go test`; suite conventions already exist in `tests/`)
-
-- Mount: `httptest` against a router hosting `MountAPI` — GET login renders the
-  form; POST with good credentials sets the session cookie and redirects; POST
-  with bad credentials re-renders with error + emits SecurityEvent; logout
-  clears the session.
-- `me`: profile includes the exact permission pairs of the user's roles.
-- `Bootstrap`: empty table seeds admin who passes
-  `Can(admin, "<any>", "<any>")`; second call is a no-op; non-empty table is a
-  no-op; empty credentials + empty table errors.
-
-## Documentation (mandatory)
-
-- `README.md`: "Production wiring" section — `New` → `MountAPI` → inject
-  `Authenticate`/`Can` into the host, `Bootstrap` from env at startup, `me` for
-  client-side cosmetic gating.
-- `docs/ARCHITECTURE.md`: add mount surface + bootstrap flow to the diagrams.
-- `docs/SKILL.md`: update conventions (consumers never touch private flow
-  handlers; they Mount the module).
+- `README.md`: "Production wiring" — `New` → `MountAPI` (flow endpoints only)
+  → inject `Authenticate`/`Can`; `Bootstrap` from env; `me` permissions for
+  cosmetic gating; **"views belong to the consumer"** with a short example:
+  the app builds its login page with `form.New(&user.LoginData{})` and posts
+  to `user.PathLogin`.
+- `docs/ARCHITECTURE.md`: routes table (`POST /login`, `POST /logout`,
+  oauth), bootstrap flow, and the model-authoring rule (typed
+  `model.Definition` + ormc; widgets in the Definition).
+- `docs/SKILL.md`: consumers never touch private flow handlers; DTOs are
+  Definitions; no HTML in this library.
 
 ## Harness checklist (mandatory)
 
-- Route paths, role codes and wildcard markers are exported typed constants —
-  zero string literals in logic.
-- No `any`/`map` in new public API; no stdlib in shared/wasm-visible code.
-- Errors propagate; every auth failure emits the existing `SecurityEvent`.
-- Additive: no existing public signature changes (`ProfileDTO` gains a field —
-  additive for `tinywasm/json` decoding).
+- Typed `model.Definition` literals only — no struct tags, no reflection, no
+  stdlib `encoding/json`/`net/url`.
+- Route paths / role codes / wildcard markers remain exported typed constants;
+  no new string literals in logic.
+- No `any`/`map` in public API; errors propagate; every auth failure emits its
+  `SecurityEvent`.
+- No unrelated refactors; `Bootstrap`/`me`/RBAC stay as delivered (green).
 
 ## Acceptance criteria
 
-1. `gotest ./...` green.
-2. A host app reaches production login with exactly:
-   `auth, _ := userserver.New(db, cfg)` + `Mount(auth)` +
-   `Authn: auth.Authenticate(), Authorize: auth.Can` +
-   `auth.Bootstrap(email, pass)` — no other user-package calls.
-3. `me` powers `platformd.CanView` (permission pairs verified in test).
-4. Fresh DB + env credentials → login works end-to-end in the mount test.
+1. `gotest ./...` green; the widget-regression and urlencoded tests fail if
+   either original bug is reintroduced.
+2. `grep -rn "RenderHTML\|wrapSSR" server/mount*.go` → empty: the mount
+   surface serves flows, not views.
+3. The four DTOs exist only as generated code from their `model.Definition`;
+   `form.New` over each yields all its fields with widgets.
+4. Browser-real flow proven by test: consumer-style form HTML → urlencoded
+   POST with bootstrap credentials → `302` + session cookie → logout clears
+   it; wrong password → `401` + SecurityEvent.
+5. README/ARCHITECTURE/SKILL updated as specified.
 
 ## Stages
 
 | Stage | File(s) | Action |
 |---|---|---|
-| 1 | `server/mount.go` (+ SSR wrapper file `!wasm`) | `MountAPI`: GET/POST login, POST logout, OAuth passthrough; path constants |
-| 2 | `models.go`, `server/tools.go` | `ProfileDTO.Permissions` + fill in `me` |
-| 3 | `server/bootstrap.go` | `Bootstrap` + wildcard permission support if missing |
-| 4 | `tests/` | mount round-trip, me permissions, bootstrap idempotency |
-| 5 | `README.md`, `docs/ARCHITECTURE.md`, `docs/SKILL.md` | production wiring docs |
+| 1 | `definitions_forms.go` (new), `models.go` (remove hand-written DTOs), `models_orm.go` (regenerated), `server/init.go` (delete), `server/export.go` → `Module.GetUserByEmail` | typed Definitions + ormc regen; remove dead registry and test-only export |
+| 2 | `server/mount.go`, `server/mount_ssr.go` (delete) | flows only: urlencoded+JSON POST, 401/400 text errors, no HTML |
+| 3 | `tests/production_wiring_test.go` | widget regression, consumer-view contract, urlencoded round-trip |
+| 4 | `README.md`, `docs/ARCHITECTURE.md`, `docs/SKILL.md` | production wiring + "views belong to the consumer" |
