@@ -4,15 +4,13 @@
 User management library for the tinywasm ecosystem. Handles user entities,
 password authentication, OAuth providers (Google, Microsoft), LAN (local network)
 authentication by RUT + IP, and session management.
-Applications import `tinywasm/user` directly to configure session behaviour, and use its
-**isomorphic UI modules** for authentication workflows.
 
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — What & Why: schema, contracts, design principles
-- [docs/SKILL.md](docs/SKILL.md) — API contract, configuration, UI modules, and usage snippets
+- [docs/SKILL.md](docs/SKILL.md) — API contract, configuration, and usage snippets
 
-> **Note**: RBAC is now integrated into the User module (see ARCHITECTURE.md).
+> **Note**: RBAC is integrated into the User module (see ARCHITECTURE.md).
 
 ## Diagrams
 
@@ -21,12 +19,12 @@ Applications import `tinywasm/user` directly to configure session behaviour, and
 - [docs/diagrams/USER_CRUD_FLOW.md](docs/diagrams/USER_CRUD_FLOW.md) — User creation pipeline
 - [docs/diagrams/OAUTH_FLOW.md](docs/diagrams/OAUTH_FLOW.md) — OAuth begin/callback flow (all branches)
 - [docs/diagrams/LAN_AUTH_FLOW.md](docs/diagrams/LAN_AUTH_FLOW.md) — LAN login: RUT validation + IP allowlist check
-- [docs/diagrams/LAN_IP_FLOW.md](docs/diagrams/LAN_IP_FLOW.md) — LAN IP management: RegisterLAN, AssignLANIP, RevokeLANIP, GetLANIPs, UnregisterLAN
+- [docs/diagrams/LAN_IP_FLOW.md](docs/diagrams/LAN_IP_FLOW.md) — LAN IP management
 
 ## Initialization
 
 ```go
-import "github.com/tinywasm/user"
+import "github.com/tinywasm/user/server"
 
 // ...
 
@@ -35,29 +33,19 @@ m, err := userserver.New(db, user.Config{
     CookieName: "session_id", // default: "session"
     TokenTTL:   86400,        // default: 86400 (24h)
     TrustProxy: true,         // default: false
-    OAuthProviders: []user.OAuthProvider{
-        &user.GoogleProvider{
-            ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-            ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-            RedirectURL:  "https://example.com/oauth/callback",
-        },
-    },
+    JWTSecret:  []byte("your-secret"), // Required for JWT/Bearer modes
 })
-if err != nil {
-    // handle error
-}
 ```
 
 ## Production Wiring
 
-`tinywasm/user` is designed for autonomous operation in production environments. After initialization:
+`tinywasm/user` handles authentication flows, while views belong to the consumer.
 
-1. **Mount API**: Call `m.MountAPI(router)` to publish standard authentication routes (`/login`, `/logout`, `/oauth/:provider`).
-2. **Bootstrap**: Call `m.Bootstrap(email, password)` on startup to ensure a first administrator exists if the database is empty.
-3. **Protect Routes**: Inject `m.Authenticate()` (middleware) and `m.Can` (authorization) into your host router.
-4. **Client-side gating**: Use the `me` MCP tool to retrieve user profile and permissions for cosmetic UI gating.
-
-For detailed API usage and module integration guidance, refer to [docs/SKILL.md](docs/SKILL.md).
+1. **Mount API**: Call `m.MountAPI(router)` to publish standard authentication routes (`POST /login`, `POST /logout`, `/oauth/:provider`).
+2. **Bootstrap**: Call `m.Bootstrap(email, password)` on startup to ensure a first administrator exists.
+3. **Consumer Views**: The application builds its own login page using `form.New(&user.LoginData{})` and posts to `user.PathLogin`.
+4. **Protect Routes**: Inject `m.Authenticate()` (middleware) and `m.Can` (authorization) into your host router.
+5. **Client-side gating**: Use the `me` MCP tool to retrieve user profile and permissions for cosmetic UI gating.
 
 ## Status
 
