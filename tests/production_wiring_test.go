@@ -22,9 +22,30 @@ func TestProductionWiring(t *testing.T) {
 	userserver.PasswordHashCost = bcrypt.MinCost
 
 	t.Run("Widgets", testWidgets)
+	t.Run("ConsumerViewSSR", testConsumerViewSSR)
 	t.Run("Bootstrap", testBootstrap)
 	t.Run("MountAPI", testMountAPI)
 	t.Run("MeToolPermissions", testMeToolPermissions)
+}
+
+// testConsumerViewSSR plays the role of a consumer app building its own
+// login page over user.LoginData and posting to user.PathLogin: the
+// rendered HTML must expose the field names the handler expects.
+func testConsumerViewSSR(t *testing.T) {
+	f, err := form.New("login", &user.LoginData{})
+	if err != nil {
+		t.Fatalf("form.New failed: %v", err)
+	}
+	f.SetSSR(true)
+
+	html := f.String()
+
+	if !strings.Contains(html, "name='email'") {
+		t.Errorf("consumer-view HTML missing email field: %s", html)
+	}
+	if !strings.Contains(html, "name='password'") {
+		t.Errorf("consumer-view HTML missing password field: %s", html)
+	}
 }
 
 func testWidgets(t *testing.T) {

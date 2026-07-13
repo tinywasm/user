@@ -1,198 +1,139 @@
-# PLAN — Fix production wiring: typed model Definitions, no views in this library, browser-real login POST
+---
+message: "feat: edge-ready auth — Kind API migration, JSON-only wire, stdlib purge, OWASP hardening"
+---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
 
+# PLAN — Master: make `tinywasm/user` edge-ready
+
 ## Context (zero-context summary)
 
-The previous delivery (`docs/CHECK_PLAN.md`, commit `f7aef51`) implemented
-`MountAPI` (login/logout/oauth routes), `me` with `Permissions`, and
-`Bootstrap`. `Bootstrap` and `me` are verified green. The login flow has real
-functional bugs, and two architectural violations must be corrected:
+`github.com/tinywasm/user` is an authentication/RBAC library for the tinywasm
+ecosystem. It is **database- and transport-agnostic** (`tinywasm/orm` and
+`tinywasm/router` are its only integration surfaces) and it must run **on the
+edge** — Cloudflare Workers / `goflare`, i.e. Go compiled to `js/wasm`.
 
-1. **`GET /login` renders a form with no fields.** `tinywasm/form` binds
-   inputs exclusively via `model.Field.Widget`; the form DTOs (`LoginData`,
-   `RegisterData`, `ProfileData`, `PasswordData`) are hand-written structs
-   with no widget metadata, so every generated schema field has
-   `Widget: nil` and `form.New` skips them all. The `form.RegisterInput(...)`
-   workaround in `server/init.go` is dead machinery (form does no
-   name-matching).
-2. **This library must NOT own any view.** How a login page looks is the
-   **consumer's** job (each app brands and lays out its own pages). The
-   delivery wired `GET /login` to render HTML (`loginModule.RenderHTML` +
-   `wrapSSR` + `renderLoginError` HTML). That rendering responsibility leaves
-   this library.
-3. **`POST /login` only decodes JSON** (`server/mount.go`), but a plain HTML
-   form submits `application/x-www-form-urlencoded`. A real browser could
-   never log in. The test passes because it posts JSON and only asserts
-   status codes.
+Two facts drive this plan, and both are currently violated:
 
-**How models are authored in this ecosystem (mandatory pattern —
-`tinywasm/model` README + `tinywasm/orm/docs/ARQUITECTURE.md`):** the source
-of truth is a **typed `model.Definition` literal** (`var XxxModel =
-model.Definition{...}`, the var name MUST end in `Model`). The generator
-`ormc` (`tinywasm/orm/ormc`, invoked via `go generate` → `//go:generate ormc`)
-parses that literal — including typed `Widget: input.Email()` expressions —
-and **generates the concrete struct** plus `Schema()`, `Pointers()`,
-`Validate()`, `EncodeFields()`, `DecodeFields()`. Only these generated codecs
-make `tinywasm/json` work. **Struct tags are NOT the pattern. Stdlib
-`encoding/json` is forbidden everywhere.**
+1. **Everything in this repo compiles to WASM.** `server/` carries **no build
+   tags at all** (verify: `grep -rn "go:build" server/` → empty), so every
+   import in `server/` lands in the edge binary. Today that includes
+   `encoding/json`, `net/http`, `net/url`, `database/sql`, `crypto/hmac`,
+   `strings`, `time`, `sync` and `golang.org/x/crypto/bcrypt`. Binary size is
+   a first-class constraint on the edge: **stdlib in this repo is a defect,
+   not a detail.**
+2. **The model layer changed contract (Kind unification).** `Field.Widget` was
+   removed; the kind now lives in the single `Type:` slot as a constructor
+   expression (`model.Text()`, `input.Email()`). `models.go` still uses the old
+   `Type: model.FieldText` + `Widget: input.Email()` pair, so the current
+   generator refuses to produce valid code for it.
 
-**Ecosystem rules that apply:** no stdlib in shared code (`tinywasm/fmt`), no
-`any`/`map` in public APIs, typed constants for repeated strings, errors
-propagate, `gotest` only
-(`go install github.com/tinywasm/devflow/cmd/gotest@latest`).
+**Wire-format rule (the reason a whole feature gets deleted):** in this
+ecosystem a form is **never** submitted as a native `x-www-form-urlencoded`
+browser POST. `form.Render()`
+(<https://github.com/tinywasm/form/blob/main/render.go>) binds
+`el.On("submit", …)` which calls `e.PreventDefault()` and then `Form.Submit()`
+→ `SyncValues` → `Validate` → `OnSubmit(data model.Fielder, done func(error))`.
+The consumer ships that `Fielder` over the wire, and the ecosystem's codec is
+`tinywasm/json` on the ormc-generated `EncodeFields`/`DecodeFields`.
+**Therefore: forms travel as JSON, always, everywhere.** Any urlencoded parsing
+in this library is dead weight in the edge binary and must be removed, not
+fixed.
 
-## Stage 1 — form DTOs become typed `model.Definition`s (ormc generates the rest)
+**Validation is not this library's job either.** The kinds validate:
+`input.Email()` / `input.Password()` implement `Validate(value string) error`,
+and `model.Field.Validate` is the input-boundary floor. `user` decodes a DTO
+and calls `Login` — it never re-implements a check that a kind already owns.
 
-Replace the four hand-written DTO structs in `models.go` with Definition
-literals (new file `definitions_forms.go`, or alongside existing definitions
-if the repo already groups them — do NOT leave the hand-written structs, ormc
-generates them and names would collide):
+## Ecosystem rules that apply
+
+- **No Go stdlib anywhere in this repo** (it all reaches WASM). Use
+  `tinywasm/fmt` (strings/errors/strconv), `tinywasm/time`, `tinywasm/json`,
+  `tinywasm/fetch`, `tinywasm/orm`, `tinywasm/crypto`. The single tolerated
+  exception is `golang.org/x/crypto/bcrypt` in `server/auth.go` — see the
+  explicit carve-out in Stage 3.
+- No `any`/`map` in public APIs; typed constants for repeated strings; errors
+  propagate.
+- Tests run with `gotest`
+  (`go install github.com/tinywasm/devflow/cmd/gotest@latest`).
+- **Never call `gopush` or `codejob`** — local developer tooling, outside the
+  agent.
+- If a stage exposes a defect in an upstream library (`tinywasm/model`,
+  `tinywasm/form`, `tinywasm/orm`, `tinywasm/router`, `tinywasm/ormc`):
+  **STOP and report it in the final summary.** The fix belongs in that
+  library's own `docs/PLAN.md` — never work around it here.
+
+## External gate (blocks Stage 3 only)
+
+`server/jwt.go` signs with `crypto/hmac` + `crypto/sha256` + `encoding/base64`.
+`github.com/tinywasm/crypto` exists but exposes only AES/ECDSA
+(`Encrypt`, `Decrypt`, `Sign`, `Verify`) — it has **no HMAC and no base64url**.
+Stage 3 consumes this contract, which must land in `tinywasm/crypto` v0.0.20 first:
 
 ```go
-import (
-	"github.com/tinywasm/form/input"
-	"github.com/tinywasm/model"
-)
+// github.com/tinywasm/crypto  — NOT published yet: this is the gate
+func HMACSHA256(key, message []byte) []byte
+func HMACEqual(mac1, mac2 []byte) bool        // constant-time
 
-var LoginDataModel = model.Definition{
-	Name: "login_data",
-	Fields: model.Fields{
-		{Name: "email",    Type: model.FieldText, NotNull: true, Widget: input.Email()},
-		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
-	},
-}
-
-var RegisterDataModel = model.Definition{
-	Name: "register_data",
-	Fields: model.Fields{
-		{Name: "name",     Type: model.FieldText, NotNull: true, Widget: input.Text()},
-		{Name: "email",    Type: model.FieldText, NotNull: true, Widget: input.Email()},
-		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
-		{Name: "phone",    Type: model.FieldText, Widget: input.Phone()},
-	},
-}
-
-var ProfileDataModel = model.Definition{
-	Name: "profile_data",
-	Fields: model.Fields{
-		{Name: "name",  Type: model.FieldText, NotNull: true, Widget: input.Text()},
-		{Name: "phone", Type: model.FieldText, Widget: input.Phone()},
-	},
-}
-
-var PasswordDataModel = model.Definition{
-	Name: "password_data",
-	Fields: model.Fields{
-		{Name: "current", Type: model.FieldText, NotNull: true, Widget: input.Password()},
-		{Name: "new",     Type: model.FieldText, NotNull: true, Widget: input.Password()},
-		{Name: "confirm", Type: model.FieldText, NotNull: true, Widget: input.Password()},
-	},
-}
+// github.com/tinywasm/base64  — ALREADY published (v0.0.2), zero dependencies
+func URLEncode(src []byte) string             // RFC 4648 §5, unpadded
+func URLDecode(s string) ([]byte, error)
 ```
 
-- These are form/codec models, **no `Field.DB`** (they are not tables). If
-  `ormc` cannot generate a table-less Definition, **STOP and report** — that
-  fix belongs in `tinywasm/orm`, never worked around here.
-- Regenerate with `go generate ./...` (runs `ormc`, latest published version).
-  Verify the generated schemas carry the widgets and the codec methods, and
-  that existing call sites (`user.LoginData{}` etc.) still compile against the
-  generated structs (field names `Email`, `Password`, … must round-trip).
-- **Delete `server/init.go`** (`form.RegisterInput` block): widgets now come
-  from the Definition. If some other code path genuinely needs the registry,
-  keep only that registration with a comment naming the path.
-- Replace `server/export.go` (`ExportGetUserByEmail`, a test-only export) with
-  a legitimate public method `Module.GetUserByEmail(email string)
-  (user.User, error)`; update the test to use it.
-- Do NOT migrate `User`/`Session`/`Identity` (DB models) in this plan — out of
-  scope, they work today.
+Base64 is ready to use. The HMAC half is specified in `tinywasm/crypto`'s own
+`docs/PLAN.md` and must be dispatched and published **first**. If it is not
+available when Stage 3 runs: **STOP and report.** Do not vendor a local HMAC
+into this repo, and do not keep `crypto/*` imports "for now".
 
-## Stage 2 — MountAPI serves flows, never views
+## Dependency graph
 
-The consumer builds and serves its own login page (with `tinywasm/form` over
-`user.LoginData` and its own branding) and posts to this module's endpoints.
-Rework `server/mount.go`:
+```mermaid
+flowchart LR
+    S1[Stage 1<br/>Kind migration<br/>GATE] --> S2[Stage 2<br/>JSON-only wire]
+    S1 --> S3[Stage 3<br/>stdlib purge]
+    CR[(tinywasm/crypto<br/>HMAC + base64url)] --> S3
+    S2 --> S4[Stage 4<br/>tests module]
+    S3 --> S4
+    S4 --> S5[Stage 5<br/>OWASP hardening]
+    S5 --> S6[Stage 6<br/>docs]
+```
 
-- **Remove all HTML rendering** from this library's mount path: no
-  `GET /login` page, no `wrapSSR`, no `renderLoginError` HTML. Delete
-  `server/mount_ssr.go` (and `mount_wasm.go` if it only supported that
-  rendering); remove the now-unused `loginUI()` plumbing from `mount.go` if
-  nothing else needs it.
-- `MountAPI` mounts **only**:
-  - `POST user.PathLogin` — decode credentials by `Content-Type`:
-    `application/x-www-form-urlencoded` (plain HTML form) parsed privately
-    over `tinywasm/fmt` (stdlib `net/url` forbidden), or `application/json`
-    via `tinywasm/json`; anything else → `400`. On success: `SetCookie` +
-    `302` to `AfterLoginPath`. On failure: **`401`** + a short `text/plain`
-    error body + the existing `SecurityEvent` — the consumer's page decides
-    how to display it (e.g. re-rendering with the error via
-    `?err=` on its own page; this library does not decide that).
-  - `POST user.PathLogout` — unchanged behavior (destroy session, clear
-    cookie), redirect to `user.PathLogin`.
-  - OAuth begin/callback routes — unchanged flow, but failure paths return
-    `401`/`400` text, never HTML.
-- Path constants (`PathLogin`, `PathLogout`, `PathAfterLogin`,
-  `Config.AfterLoginPath`) stay as delivered.
-
-## Stage 3 — tests that would have caught the bugs
-
-Rework `tests/production_wiring_test.go`:
-
-- **Widget regression:** `form.New` over `&user.LoginData{}` yields exactly 2
-  inputs (email + password) — fails fast if a future regeneration loses the
-  widgets. Same one-liner check for the other three DTOs.
-- **Consumer-view simulation:** render `form.New(&user.LoginData{}).SetSSR(true)`
-  in the test (playing the consumer's role) and assert the produced HTML posts
-  the field names the handler expects — the contract between consumer-built
-  views and this module's endpoints.
-- **`POST /login`** success + failure via **urlencoded** bodies (browser
-  semantics): cookie + `302` on success; `401` + SecurityEvent on bad
-  password. Keep one JSON case for the API path. `POST /logout` clears the
-  cookie.
-- Remove any test asserting this library renders HTML pages.
-- All green under `gotest ./...` (native + wasm suites).
-
-## Stage 4 — documentation (deferred by the previous delivery; not optional)
-
-- `README.md`: "Production wiring" — `New` → `MountAPI` (flow endpoints only)
-  → inject `Authenticate`/`Can`; `Bootstrap` from env; `me` permissions for
-  cosmetic gating; **"views belong to the consumer"** with a short example:
-  the app builds its login page with `form.New(&user.LoginData{})` and posts
-  to `user.PathLogin`.
-- `docs/ARCHITECTURE.md`: routes table (`POST /login`, `POST /logout`,
-  oauth), bootstrap flow, and the model-authoring rule (typed
-  `model.Definition` + ormc; widgets in the Definition).
-- `docs/SKILL.md`: consumers never touch private flow handlers; DTOs are
-  Definitions; no HTML in this library.
-
-## Harness checklist (mandatory)
-
-- Typed `model.Definition` literals only — no struct tags, no reflection, no
-  stdlib `encoding/json`/`net/url`.
-- Route paths / role codes / wildcard markers remain exported typed constants;
-  no new string literals in logic.
-- No `any`/`map` in public API; errors propagate; every auth failure emits its
-  `SecurityEvent`.
-- No unrelated refactors; `Bootstrap`/`me`/RBAC stay as delivered (green).
-
-## Acceptance criteria
-
-1. `gotest ./...` green; the widget-regression and urlencoded tests fail if
-   either original bug is reintroduced.
-2. `grep -rn "RenderHTML\|wrapSSR" server/mount*.go` → empty: the mount
-   surface serves flows, not views.
-3. The four DTOs exist only as generated code from their `model.Definition`;
-   `form.New` over each yields all its fields with widgets.
-4. Browser-real flow proven by test: consumer-style form HTML → urlencoded
-   POST with bootstrap credentials → `302` + session cookie → logout clears
-   it; wrong password → `401` + SecurityEvent.
-5. README/ARCHITECTURE/SKILL updated as specified.
+Stage 1 is a **gate**: it changes generated struct field names, so nothing else
+compiles until it lands. Stages 2 and 3 may proceed in either order once
+Stage 1 is green.
 
 ## Stages
 
-| Stage | File(s) | Action |
+| Stage | File | Scope |
 |---|---|---|
-| 1 | `definitions_forms.go` (new), `models.go` (remove hand-written DTOs), `models_orm.go` (regenerated), `server/init.go` (delete), `server/export.go` → `Module.GetUserByEmail` | typed Definitions + ormc regen; remove dead registry and test-only export |
-| 2 | `server/mount.go`, `server/mount_ssr.go` (delete) | flows only: urlencoded+JSON POST, 401/400 text errors, no HTML |
-| 3 | `tests/production_wiring_test.go` | widget regression, consumer-view contract, urlencoded round-trip |
-| 4 | `README.md`, `docs/ARCHITECTURE.md`, `docs/SKILL.md` | production wiring + "views belong to the consumer" |
+| 1 | [PLAN_STAGE_1_KIND_MIGRATION.md](PLAN_STAGE_1_KIND_MIGRATION.md) | `models.go` → Kind API; regenerate with `ormc`; `ID` → `Id` call sites; dep bump |
+| 2 | [PLAN_STAGE_2_JSON_WIRE.md](PLAN_STAGE_2_JSON_WIRE.md) | delete urlencoded parsing; `POST /login` is JSON-only; validation stays in the kinds |
+| 3 | [PLAN_STAGE_3_EDGE_STDLIB.md](PLAN_STAGE_3_EDGE_STDLIB.md) | purge stdlib from `server/`: `encoding/json`, `strings`, `time`, `database/sql`, `net/http`+`net/url` (OAuth → `tinywasm/fetch`), `crypto/*` → `tinywasm/crypto` |
+| 4 | [PLAN_STAGE_4_TESTS_MODULE.md](PLAN_STAGE_4_TESTS_MODULE.md) | `tests/go.mod`: the SQLite driver leaves the root module |
+| 5 | [PLAN_STAGE_5_OWASP.md](PLAN_STAGE_5_OWASP.md) | uniform 401 (anti-enumeration), `Config.RateLimit` hook, OWASP regression suite |
+| 6 | [PLAN_STAGE_6_DOCS.md](PLAN_STAGE_6_DOCS.md) | README / ARCHITECTURE / SKILL |
+
+## Acceptance criteria (whole plan)
+
+1. `grep -rn "\"encoding/json\"\|\"net/http\"\|\"net/url\"\|\"database/sql\"\|\"strings\"\|\"time\"\|\"crypto/" server/` → **empty**. The only
+   stdlib-adjacent import left in the repo is `golang.org/x/crypto/bcrypt` in
+   `server/auth.go`.
+2. `grep -rni "urlencoded" .` → **empty** (no source, no test).
+3. `GOOS=js GOARCH=wasm go build ./...` succeeds.
+4. `gotest ./...` green at the root AND inside `tests/` (native + wasm suites).
+5. No `Field.Widget` anywhere; `form.New` over each of the four DTOs yields all
+   its fields (the kinds carry the UI binding now).
+6. Root `go.mod` carries no SQLite driver.
+7. The three enumeration probes return byte-identical 401 responses.
+
+## Harness checklist (mandatory, every stage)
+
+- No hardcoded strings in logic: reuse exported errors/constants
+  (`user.ErrInvalidCredentials`, `user.PathLogin`, …). New event types are
+  typed enum values appended at the **end** of the iota block (existing values
+  are persisted/compared — their order must never shift).
+- No `any`/`map` in the public API.
+- Errors propagate; every auth failure emits its `SecurityEvent`.
+- No unrelated refactors: RBAC, sessions, LAN login and the OAuth **flow**
+  (its transport changes in Stage 3, its logic does not) stay as delivered.
+- Do not re-add a dependency a stage removed.

@@ -13,6 +13,96 @@ import (
 	"github.com/tinywasm/user/server"
 )
 
+func TestCookieSecurity(t *testing.T) {
+	login := func(m *userserver.Module, cookieName, email, pass string) router.Cookie {
+		r := &mock.Router{}
+		m.MountAPI(r)
+
+		ctx := &mock.Context{
+			InMethod: "POST",
+			InPath:   user.PathLogin,
+			InBody:   []byte("email=" + email + "&password=" + pass),
+		}
+		ctx.SetHeader("Content-Type", "application/x-www-form-urlencoded")
+
+		r.Invoke("POST", user.PathLogin, ctx)
+		if ctx.Status != 302 {
+			t.Fatalf("login failed: status %d, body %s", ctx.Status, string(ctx.ResponseBody()))
+		}
+
+		c, ok := ctx.Cookie(cookieName)
+		if !ok {
+			t.Fatal("no cookie set")
+		}
+		return c
+	}
+
+	t.Run("Cookie Mode Flags", func(t *testing.T) {
+		db := newTestDB(t)
+		m, _ := userserver.New(db, user.Config{TokenTTL: 3600, CookieName: "session"})
+		email, pass := "cookie1@example.com", "password123"
+		if err := m.Bootstrap(email, pass); err != nil {
+			t.Fatal(err)
+		}
+
+		c := login(m, "session", email, pass)
+
+		if c.Name != "session" {
+			t.Errorf("expected cookie name 'session', got %s", c.Name)
+		}
+		if !c.HttpOnly {
+			t.Errorf("expected HttpOnly=true")
+		}
+		if !c.Secure {
+			t.Errorf("expected Secure=true")
+		}
+		if c.SameSite != router.SameSiteStrict {
+			t.Errorf("expected SameSite=Strict, got %v", c.SameSite)
+		}
+		if c.Path != "/" {
+			t.Errorf("expected Path=/, got %s", c.Path)
+		}
+		if c.MaxAge != 3600 {
+			t.Errorf("expected MaxAge=3600, got %d", c.MaxAge)
+		}
+	})
+
+	t.Run("JWT Mode Cookie", func(t *testing.T) {
+		db := newTestDB(t)
+		m, _ := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session"})
+		email, pass := "cookie2@example.com", "password123"
+		if err := m.Bootstrap(email, pass); err != nil {
+			t.Fatal(err)
+		}
+
+		c := login(m, "session", email, pass)
+
+		if !c.HttpOnly || !c.Secure || c.SameSite != router.SameSiteStrict {
+			t.Errorf("JWT cookie missing security flags")
+		}
+
+		parts := strings.Split(c.Value, ".")
+		if len(parts) != 3 {
+			t.Errorf("expected JWT value (3 parts), got %d parts", len(parts))
+		}
+	})
+
+	t.Run("Custom Cookie Name", func(t *testing.T) {
+		db := newTestDB(t)
+		m, _ := userserver.New(db, user.Config{CookieName: "custom_auth"})
+		email, pass := "cookie3@example.com", "password123"
+		if err := m.Bootstrap(email, pass); err != nil {
+			t.Fatal(err)
+		}
+
+		c := login(m, "custom_auth", email, pass)
+
+		if c.Name != "custom_auth" {
+			t.Errorf("expected cookie name 'custom_auth', got %s", c.Name)
+		}
+	})
+}
+
 func TestSessionRotation(t *testing.T) {
 	db := newTestDB(t)
 	m, _ := userserver.New(db, user.Config{TokenTTL: 3600})

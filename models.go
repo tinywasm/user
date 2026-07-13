@@ -103,7 +103,7 @@ var OAuthStateModel = model.Definition{
 var LoginDataModel = model.Definition{
 	Name: "login_data",
 	Fields: model.Fields{
-		{Name: "email",    Type: model.FieldText, NotNull: true, Widget: input.Email()},
+		{Name: "email", Type: model.FieldText, NotNull: true, Widget: input.Email()},
 		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
 	},
 }
@@ -111,17 +111,17 @@ var LoginDataModel = model.Definition{
 var RegisterDataModel = model.Definition{
 	Name: "register_data",
 	Fields: model.Fields{
-		{Name: "name",     Type: model.FieldText, NotNull: true, Widget: input.Text()},
-		{Name: "email",    Type: model.FieldText, NotNull: true, Widget: input.Email()},
+		{Name: "name", Type: model.FieldText, NotNull: true, Widget: input.Text()},
+		{Name: "email", Type: model.FieldText, NotNull: true, Widget: input.Email()},
 		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
-		{Name: "phone",    Type: model.FieldText, Widget: input.Phone()},
+		{Name: "phone", Type: model.FieldText, Widget: input.Phone()},
 	},
 }
 
 var ProfileDataModel = model.Definition{
 	Name: "profile_data",
 	Fields: model.Fields{
-		{Name: "name",  Type: model.FieldText, NotNull: true, Widget: input.Text()},
+		{Name: "name", Type: model.FieldText, NotNull: true, Widget: input.Text()},
 		{Name: "phone", Type: model.FieldText, Widget: input.Phone()},
 	},
 }
@@ -130,7 +130,7 @@ var PasswordDataModel = model.Definition{
 	Name: "password_data",
 	Fields: model.Fields{
 		{Name: "current", Type: model.FieldText, NotNull: true, Widget: input.Password()},
-		{Name: "new",     Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "new", Type: model.FieldText, NotNull: true, Widget: input.Password()},
 		{Name: "confirm", Type: model.FieldText, NotNull: true, Widget: input.Password()},
 	},
 }
