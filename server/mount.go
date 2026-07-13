@@ -1,6 +1,9 @@
 package userserver
 
 import (
+	"strings"
+
+	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
@@ -15,15 +18,34 @@ func (m *Module) MountAPI(r router.Router) {
 		afterLogin = user.PathAfterLogin
 	}
 
-	r.Get(user.PathLogin, func(ctx router.Context) {
-		ctx.SetHeader("Content-Type", "text/html; charset=utf-8")
-		ctx.Write([]byte(m.wrapSSR(m.loginUI().RenderHTML())))
-	})
-
 	r.Post(user.PathLogin, func(ctx router.Context) {
 		data := &user.LoginData{}
-		if err := json.Decode(string(ctx.Body()), data); err != nil {
-			m.renderLoginError(ctx, err)
+		ct := ctx.GetHeader("Content-Type")
+
+		if strings.Contains(ct, "application/x-www-form-urlencoded") {
+			body := string(ctx.Body())
+			parts := fmt.Split(body, "&")
+			for _, part := range parts {
+				kv := fmt.Split(part, "=")
+				if len(kv) == 2 {
+					key := kv[0]
+					val := kv[1]
+					if key == "email" {
+						data.Email = val
+					} else if key == "password" {
+						data.Password = val
+					}
+				}
+			}
+		} else if strings.Contains(ct, "application/json") {
+			if err := json.Decode(string(ctx.Body()), data); err != nil {
+				ctx.WriteStatus(400)
+				ctx.Write([]byte(err.Error()))
+				return
+			}
+		} else {
+			ctx.WriteStatus(400)
+			ctx.Write([]byte("unsupported content type"))
 			return
 		}
 
@@ -34,16 +56,43 @@ func (m *Module) MountAPI(r router.Router) {
 				IP:     extractClientIP(ctx, m.config.TrustProxy),
 				UserID: data.Email,
 			})
-			m.renderLoginError(ctx, err)
+			ctx.WriteStatus(401)
+			ctx.Write([]byte(err.Error()))
 			return
 		}
 
-		if err := m.loginUI().SetCookie(u.ID, ctx); err != nil {
-			m.renderLoginError(ctx, err)
-			return
+		var value string
+		if m.config.AuthMode == user.AuthModeJWT {
+			token, err := GenerateJWT(m.config.JWTSecret, u.ID, m.config.TokenTTL)
+			if err != nil {
+				ctx.WriteStatus(500)
+				ctx.Write([]byte(err.Error()))
+				return
+			}
+			value = token
+		} else {
+			ua := ctx.GetHeader("User-Agent")
+			sess, err := m.CreateSession(u.ID, extractClientIP(ctx, m.config.TrustProxy), ua)
+			if err != nil {
+				ctx.WriteStatus(500)
+				ctx.Write([]byte(err.Error()))
+				return
+			}
+			value = sess.ID
 		}
 
-		m.redirect(ctx, afterLogin)
+		ctx.SetCookie(router.Cookie{
+			Name:     m.config.CookieName,
+			Value:    value,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: router.SameSiteStrict,
+			MaxAge:   m.config.TokenTTL,
+			Path:     "/",
+		})
+
+		ctx.SetHeader("Location", afterLogin)
+		ctx.WriteStatus(302)
 	})
 
 	r.Post(user.PathLogout, func(ctx router.Context) {
@@ -65,10 +114,10 @@ func (m *Module) MountAPI(r router.Router) {
 			MaxAge:   -1,
 			HttpOnly: true,
 		})
-		m.redirect(ctx, user.PathLogin)
+		ctx.SetHeader("Location", user.PathLogin)
+		ctx.WriteStatus(302)
 	})
 
-	// OAuth routes
 	for _, p := range m.registeredProviders() {
 		providerName := p.Name()
 		r.Get("/oauth/"+providerName, func(ctx router.Context) {
@@ -78,7 +127,8 @@ func (m *Module) MountAPI(r router.Router) {
 				ctx.Write([]byte(err.Error()))
 				return
 			}
-			m.redirect(ctx, url)
+			ctx.SetHeader("Location", url)
+			ctx.WriteStatus(302)
 		})
 
 		r.Get("/oauth/callback/"+providerName, func(ctx router.Context) {
@@ -86,36 +136,42 @@ func (m *Module) MountAPI(r router.Router) {
 			ua := ctx.GetHeader("User-Agent")
 			u, _, err := m.CompleteOAuth(providerName, ctx, ip, ua)
 			if err != nil {
-				m.renderLoginError(ctx, err)
+				ctx.WriteStatus(401)
+				ctx.Write([]byte(err.Error()))
 				return
 			}
 
-			if err := m.loginUI().SetCookie(u.ID, ctx); err != nil {
-				m.renderLoginError(ctx, err)
-				return
+			var value string
+			if m.config.AuthMode == user.AuthModeJWT {
+				token, err := GenerateJWT(m.config.JWTSecret, u.ID, m.config.TokenTTL)
+				if err != nil {
+					ctx.WriteStatus(500)
+					ctx.Write([]byte(err.Error()))
+					return
+				}
+				value = token
+			} else {
+				sess, err := m.CreateSession(u.ID, ip, ua)
+				if err != nil {
+					ctx.WriteStatus(500)
+					ctx.Write([]byte(err.Error()))
+					return
+				}
+				value = sess.ID
 			}
 
-			m.redirect(ctx, afterLogin)
+			ctx.SetCookie(router.Cookie{
+				Name:     m.config.CookieName,
+				Value:    value,
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: router.SameSiteStrict,
+				MaxAge:   m.config.TokenTTL,
+				Path:     "/",
+			})
+
+			ctx.SetHeader("Location", afterLogin)
+			ctx.WriteStatus(302)
 		})
 	}
-}
-
-func (m *Module) loginUI() *loginModule {
-	for _, mod := range m.UIModules() {
-		if l, ok := mod.(*loginModule); ok {
-			return l
-		}
-	}
-	panic("userserver: loginModule not found in UIModules")
-}
-
-func (m *Module) renderLoginError(ctx router.Context, err error) {
-	ctx.SetHeader("Content-Type", "text/html; charset=utf-8")
-	html := `<div style="color:red">` + err.Error() + `</div>` + m.loginUI().RenderHTML()
-	ctx.Write([]byte(m.wrapSSR(html)))
-}
-
-func (m *Module) redirect(ctx router.Context, path string) {
-	ctx.SetHeader("Location", path)
-	ctx.WriteStatus(302)
 }

@@ -7,11 +7,7 @@ import (
 )
 
 func TestUserFrontend(t *testing.T) {
-	RunSharedTests(t)
-	t.Run("TestModulesOnMount", testModulesOnMount)
-}
-
-func testModulesOnMount(t *testing.T) {
-	// Implementation would require a DOM environment.
-	// This placeholder satisfies the requirement for the test file structure.
+	// Frontend-specific tests would go here.
+	// Since UI modules were removed from this library's responsibility,
+	// frontend tests that depend on them are removed or adapted in the consumer.
 }

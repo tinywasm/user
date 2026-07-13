@@ -1,10 +1,7 @@
 package userserver
 
-import "github.com/tinywasm/model"
-
 import (
 	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/form"
 	"sync"
 	"time"
 
@@ -144,26 +141,3 @@ func (m *Module) Add() []any {
 	}
 }
 
-// UIModules returns all standard authentication UI flow handlers bound to this module.
-// Note: This returns the backend-side modules with SSR capability.
-func (m *Module) UIModules() []any {
-	return []any{
-		&loginModule{m: m, form: mustForm("login", &user.LoginData{})},
-		&registerModule{m: m, form: mustForm("register", &user.RegisterData{})},
-		&profileModule{
-			m:            m,
-			form:         mustForm("profile", &user.ProfileData{}),
-			passwordForm: mustForm("password", &user.PasswordData{}),
-		},
-		&lanModule{m: m},
-		&oauthModule{m: m},
-	}
-}
-
-func mustForm(parentID string, s model.Fielder) *form.Form {
-	f, err := form.New(parentID, s)
-	if err != nil {
-		panic("userserver: mustForm: " + err.Error())
-	}
-	return f
-}

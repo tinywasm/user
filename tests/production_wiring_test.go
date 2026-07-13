@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	twctx "github.com/tinywasm/context"
+	"github.com/tinywasm/form"
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/mcp"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
@@ -19,9 +21,61 @@ import (
 func TestProductionWiring(t *testing.T) {
 	userserver.PasswordHashCost = bcrypt.MinCost
 
+	t.Run("Widgets", testWidgets)
+	t.Run("ConsumerViewSSR", testConsumerViewSSR)
 	t.Run("Bootstrap", testBootstrap)
 	t.Run("MountAPI", testMountAPI)
 	t.Run("MeToolPermissions", testMeToolPermissions)
+}
+
+// testConsumerViewSSR plays the role of a consumer app building its own
+// login page over user.LoginData and posting to user.PathLogin: the
+// rendered HTML must expose the field names the handler expects.
+func testConsumerViewSSR(t *testing.T) {
+	f, err := form.New("login", &user.LoginData{})
+	if err != nil {
+		t.Fatalf("form.New failed: %v", err)
+	}
+	f.SetSSR(true)
+
+	html := f.String()
+
+	if !strings.Contains(html, "name='email'") {
+		t.Errorf("consumer-view HTML missing email field: %s", html)
+	}
+	if !strings.Contains(html, "name='password'") {
+		t.Errorf("consumer-view HTML missing password field: %s", html)
+	}
+}
+
+func testWidgets(t *testing.T) {
+	cases := []struct {
+		name     string
+		data     model.Fielder
+		expected int
+	}{
+		{"LoginData", &user.LoginData{}, 2},
+		{"RegisterData", &user.RegisterData{}, 4},
+		{"ProfileData", &user.ProfileData{}, 2},
+		{"PasswordData", &user.PasswordData{}, 3},
+	}
+
+	for _, tc := range cases {
+		_, err := form.New("test", tc.data)
+		if err != nil {
+			t.Fatalf("%s: form.New failed: %v", tc.name, err)
+		}
+		schema := tc.data.Schema()
+		count := 0
+		for _, field := range schema {
+			if field.Widget != nil {
+				count++
+			}
+		}
+		if count != tc.expected {
+			t.Errorf("%s: expected %d widgets, got %d", tc.name, tc.expected, count)
+		}
+	}
 }
 
 func testBootstrap(t *testing.T) {
@@ -34,29 +88,24 @@ func testBootstrap(t *testing.T) {
 	email := "admin@test.com"
 	pass := "password123"
 
-	// 1. Bootstrap fresh DB
 	if err := m.Bootstrap(email, pass); err != nil {
 		t.Fatalf("Bootstrap failed: %v", err)
 	}
 
-	// 2. Verify admin exists and can log in
 	u, err := m.Login(email, pass)
 	if err != nil {
 		t.Fatalf("Admin login failed: %v", err)
 	}
 
-	// 3. Verify wildcard permissions
 	ok := m.Can(u.ID, "any_resource", "any_action")
 	if !ok {
 		t.Errorf("Admin should have wildcard permissions")
 	}
 
-	// 4. Idempotency check: second call should be no-op
 	if err := m.Bootstrap(email, pass); err != nil {
 		t.Fatalf("Bootstrap second call failed: %v", err)
 	}
 
-	// 5. Empty credentials check
 	db2 := newTestDB(t)
 	m2, _ := userserver.New(db2, user.Config{})
 	if err := m2.Bootstrap("", ""); err == nil {
@@ -73,7 +122,6 @@ func testMountAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Seed a user
 	email := "user@test.com"
 	pass := "password123"
 	if err := m.Bootstrap(email, pass); err != nil {
@@ -83,23 +131,17 @@ func testMountAPI(t *testing.T) {
 	r := &mock.Router{}
 	m.MountAPI(r)
 
-	// 1. GET /login
-	ctxGet := &mock.Context{InMethod: "GET", InPath: user.PathLogin}
-	r.Invoke("GET", user.PathLogin, ctxGet)
-	if ctxGet.Status != 0 && ctxGet.Status != 200 {
-		t.Errorf("GET /login status: %d", ctxGet.Status)
+	// 1. POST /login (success) - urlencoded
+	ctxPost := &mock.Context{
+		InMethod: "POST",
+		InPath:   user.PathLogin,
+		InBody:   []byte("email=" + email + "&password=" + pass),
 	}
-
-	// 2. POST /login (success)
-	ctxPost := &mock.Context{InMethod: "POST", InPath: user.PathLogin}
-	loginData := &user.LoginData{Email: email, Password: pass}
-	var postBody string
-	json.Encode(loginData, &postBody)
-	ctxPost.InBody = []byte(postBody)
+	ctxPost.SetHeader("Content-Type", "application/x-www-form-urlencoded")
 
 	r.Invoke("POST", user.PathLogin, ctxPost)
 	if ctxPost.Status != 302 {
-		t.Errorf("POST /login (success) status: %d", ctxPost.Status)
+		t.Errorf("POST /login (success) status: %d, body: %s", ctxPost.Status, string(ctxPost.ResponseBody()))
 	}
 	if ctxPost.GetHeader("Location") != user.PathAfterLogin {
 		t.Errorf("POST /login (success) redirect: %s", ctxPost.GetHeader("Location"))
@@ -109,20 +151,36 @@ func testMountAPI(t *testing.T) {
 		t.Errorf("POST /login (success) cookie missing or empty")
 	}
 
-	// 3. POST /login (failure)
-	ctxFail := &mock.Context{InMethod: "POST", InPath: user.PathLogin}
-	loginDataFail := &user.LoginData{Email: email, Password: "wrong"}
-	var postBodyFail string
-	json.Encode(loginDataFail, &postBodyFail)
-	ctxFail.InBody = []byte(postBodyFail)
+	// 2. POST /login (failure) - urlencoded
+	ctxFail := &mock.Context{
+		InMethod: "POST",
+		InPath:   user.PathLogin,
+		InBody:   []byte("email=" + email + "&password=wrong"),
+	}
+	ctxFail.SetHeader("Content-Type", "application/x-www-form-urlencoded")
 
 	r.Invoke("POST", user.PathLogin, ctxFail)
-	// Should stay on login page or re-render (not redirect)
-	if ctxFail.Status == 302 {
-		t.Errorf("POST /login (failure) should not redirect")
+	if ctxFail.Status != 401 {
+		t.Errorf("POST /login (failure) status expected 401, got: %d", ctxFail.Status)
 	}
 	if !strings.Contains(string(ctxFail.ResponseBody()), "access denied") {
 		t.Errorf("POST /login (failure) missing error message: %s", string(ctxFail.ResponseBody()))
+	}
+
+	// 3. POST /login (success) - JSON
+	ctxJson := &mock.Context{
+		InMethod: "POST",
+		InPath:   user.PathLogin,
+	}
+	ctxJson.SetHeader("Content-Type", "application/json")
+	loginData := &user.LoginData{Email: email, Password: pass}
+	var postBody string
+	json.Encode(loginData, &postBody)
+	ctxJson.InBody = []byte(postBody)
+
+	r.Invoke("POST", user.PathLogin, ctxJson)
+	if ctxJson.Status != 302 {
+		t.Errorf("POST /login (JSON) status: %d", ctxJson.Status)
 	}
 
 	// 4. POST /logout
@@ -150,12 +208,11 @@ func testMeToolPermissions(t *testing.T) {
 	email := "tools@test.com"
 	pass := "password123"
 
-	// Create user via Bootstrap
 	if err := m.Bootstrap(email, pass); err != nil {
 		t.Fatal(err)
 	}
 
-	uObj, err := m.ExportGetUserByEmail(email)
+	uObj, err := m.GetUserByEmail(email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +242,6 @@ func testMeToolPermissions(t *testing.T) {
 		t.Fatalf("failed to decode profile: %v", err)
 	}
 
-	// From Bootstrap we expect wildcard perm
 	if len(profile.Permissions) != 1 || profile.Permissions[0] != "*:*" {
 		t.Errorf("expected permission '*:*', got %v", profile.Permissions)
 	}

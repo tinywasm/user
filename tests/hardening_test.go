@@ -13,38 +13,39 @@ import (
 	"github.com/tinywasm/user/server"
 )
 
-func getLoginMod(m *userserver.Module) interface {
-	SetCookie(string, router.Context) error
-} {
-	for _, mod := range m.UIModules() {
-		if h, ok := mod.(interface{ HandlerName() string }); ok && h.HandlerName() == "login" {
-			if lm, ok := mod.(interface {
-				SetCookie(string, router.Context) error
-			}); ok {
-				return lm
-			}
-		}
-	}
-	return nil
-}
-
 func TestCookieSecurity(t *testing.T) {
-	db := newTestDB(t)
+	login := func(m *userserver.Module, cookieName, email, pass string) router.Cookie {
+		r := &mock.Router{}
+		m.MountAPI(r)
 
-	t.Run("Cookie Mode Flags", func(t *testing.T) {
-		m, _ := userserver.New(db, user.Config{TokenTTL: 3600})
-		ctx := &mock.Context{}
+		ctx := &mock.Context{
+			InMethod: "POST",
+			InPath:   user.PathLogin,
+			InBody:   []byte("email=" + email + "&password=" + pass),
+		}
+		ctx.SetHeader("Content-Type", "application/x-www-form-urlencoded")
 
-		lm := getLoginMod(m)
-		err := lm.SetCookie("user1", ctx)
-		if err != nil {
-			t.Fatal(err)
+		r.Invoke("POST", user.PathLogin, ctx)
+		if ctx.Status != 302 {
+			t.Fatalf("login failed: status %d, body %s", ctx.Status, string(ctx.ResponseBody()))
 		}
 
-		c, ok := ctx.Cookie("session")
+		c, ok := ctx.Cookie(cookieName)
 		if !ok {
 			t.Fatal("no cookie set")
 		}
+		return c
+	}
+
+	t.Run("Cookie Mode Flags", func(t *testing.T) {
+		db := newTestDB(t)
+		m, _ := userserver.New(db, user.Config{TokenTTL: 3600, CookieName: "session"})
+		email, pass := "cookie1@example.com", "password123"
+		if err := m.Bootstrap(email, pass); err != nil {
+			t.Fatal(err)
+		}
+
+		c := login(m, "session", email, pass)
 
 		if c.Name != "session" {
 			t.Errorf("expected cookie name 'session', got %s", c.Name)
@@ -67,20 +68,19 @@ func TestCookieSecurity(t *testing.T) {
 	})
 
 	t.Run("JWT Mode Cookie", func(t *testing.T) {
-		m, _ := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200})
-		ctx := &mock.Context{}
+		db := newTestDB(t)
+		m, _ := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session"})
+		email, pass := "cookie2@example.com", "password123"
+		if err := m.Bootstrap(email, pass); err != nil {
+			t.Fatal(err)
+		}
 
-		lm := getLoginMod(m)
-		_ = lm.SetCookie("user1", ctx)
+		c := login(m, "session", email, pass)
 
-		c, _ := ctx.Cookie("session")
-
-		// Assert flags
 		if !c.HttpOnly || !c.Secure || c.SameSite != router.SameSiteStrict {
 			t.Errorf("JWT cookie missing security flags")
 		}
 
-		// Assert value is JWT
 		parts := strings.Split(c.Value, ".")
 		if len(parts) != 3 {
 			t.Errorf("expected JWT value (3 parts), got %d parts", len(parts))
@@ -88,13 +88,15 @@ func TestCookieSecurity(t *testing.T) {
 	})
 
 	t.Run("Custom Cookie Name", func(t *testing.T) {
+		db := newTestDB(t)
 		m, _ := userserver.New(db, user.Config{CookieName: "custom_auth"})
-		ctx := &mock.Context{}
+		email, pass := "cookie3@example.com", "password123"
+		if err := m.Bootstrap(email, pass); err != nil {
+			t.Fatal(err)
+		}
 
-		lm := getLoginMod(m)
-		_ = lm.SetCookie("user1", ctx)
+		c := login(m, "custom_auth", email, pass)
 
-		c, _ := ctx.Cookie("custom_auth")
 		if c.Name != "custom_auth" {
 			t.Errorf("expected cookie name 'custom_auth', got %s", c.Name)
 		}

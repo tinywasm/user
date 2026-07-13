@@ -1,106 +1,136 @@
 package user
 
-// orm:typed_fields
-type User struct {
-	ID          string `db:"pk"`
-	Email       string `db:"unique"`
-	Name        string
-	Phone       string
-	Status      string // "active", "suspended"
-	CreatedAt   int64
-	Roles       []Role       `db:"-"`
-	Permissions []Permission `db:"-"`
+import (
+	"github.com/tinywasm/form/input"
+	"github.com/tinywasm/model"
+)
+
+var UserModel = model.Definition{
+	Name: "user",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "email", Type: model.FieldText, DB: &model.FieldDB{Unique: true}},
+		{Name: "name", Type: model.FieldText},
+		{Name: "phone", Type: model.FieldText},
+		{Name: "status", Type: model.FieldText},
+		{Name: "created_at", Type: model.FieldInt},
+		{Name: "roles", Type: model.FieldStructSlice, Ref: &RoleModel, Exclude: true},
+		{Name: "permissions", Type: model.FieldStructSlice, Ref: &PermissionModel, Exclude: true},
+	},
 }
 
-// orm:typed_fields
-type Session struct {
-	ID        string `db:"pk"`
-	UserID    string `db:"ref=users"`
-	ExpiresAt int64
-	IP        string
-	UserAgent string
-	CreatedAt int64
+var SessionModel = model.Definition{
+	Name: "session",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "user_id", Type: model.FieldText, DB: &model.FieldDB{RefColumn: "id"}, Ref: &UserModel},
+		{Name: "expires_at", Type: model.FieldInt},
+		{Name: "ip", Type: model.FieldText},
+		{Name: "user_agent", Type: model.FieldText},
+		{Name: "created_at", Type: model.FieldInt},
+	},
 }
 
-// LoginData is validated by LoginModule on both frontend and backend.
-type LoginData struct {
-	Email    string
-	Password string
+var IdentityModel = model.Definition{
+	Name: "identity",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "user_id", Type: model.FieldText, DB: &model.FieldDB{RefColumn: "id"}, Ref: &UserModel},
+		{Name: "provider", Type: model.FieldText},
+		{Name: "provider_id", Type: model.FieldText},
+		{Name: "email", Type: model.FieldText},
+		{Name: "created_at", Type: model.FieldInt},
+	},
 }
 
-// RegisterData is validated by RegisterModule.
-type RegisterData struct {
-	Name     string
-	Email    string
-	Password string
-	Phone    string
+var RoleModel = model.Definition{
+	Name: "role",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "code", Type: model.FieldText},
+		{Name: "name", Type: model.FieldText},
+		{Name: "description", Type: model.FieldText},
+	},
 }
 
-// ProfileData is validated by ProfileModule (name/phone update).
-type ProfileData struct {
-	Name  string
-	Phone string
+var UserRoleModel = model.Definition{
+	Name: "user_role",
+	Fields: model.Fields{
+		{Name: "user_id", Type: model.FieldText, DB: &model.FieldDB{PK: true, RefColumn: "id"}, Ref: &UserModel},
+		{Name: "role_id", Type: model.FieldText, DB: &model.FieldDB{PK: true, RefColumn: "id"}, Ref: &RoleModel},
+	},
 }
 
-// PasswordData is validated by ProfileModule (password change sub-form).
-type PasswordData struct {
-	Current string
-	New     string
-	Confirm string
+var PermissionModel = model.Definition{
+	Name: "permission",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText},
+		{Name: "resource", Type: model.FieldText},
+		{Name: "action", Type: model.FieldText},
+	},
 }
 
-
-// orm:typed_fields
-type Identity struct {
-	ID         string `db:"pk"`
-	UserID     string `db:"ref=users"`
-	Provider   string
-	ProviderID string
-	Email      string
-	CreatedAt  int64
+var RolePermissionModel = model.Definition{
+	Name: "role_permission",
+	Fields: model.Fields{
+		{Name: "role_id", Type: model.FieldText, DB: &model.FieldDB{PK: true, RefColumn: "id"}, Ref: &RoleModel},
+		{Name: "permission_id", Type: model.FieldText, DB: &model.FieldDB{PK: true, RefColumn: "id"}, Ref: &PermissionModel},
+	},
 }
 
-// orm:typed_fields
-type Role struct {
-	ID          string `db:"pk"`
-	Code        string
-	Name        string
-	Description string
+var LANIPModel = model.Definition{
+	Name: "lanip",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "user_id", Type: model.FieldText, DB: &model.FieldDB{RefColumn: "id"}, Ref: &UserModel},
+		{Name: "ip", Type: model.FieldText},
+		{Name: "label", Type: model.FieldText},
+		{Name: "created_at", Type: model.FieldInt},
+	},
 }
 
-// orm:typed_fields
-type UserRole struct {
-	UserID string `db:"pk,ref=users"`
-	RoleID string `db:"pk,ref=roles"`
+var OAuthStateModel = model.Definition{
+	Name: "oauth_state",
+	Fields: model.Fields{
+		{Name: "state", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "provider", Type: model.FieldText},
+		{Name: "expires_at", Type: model.FieldInt},
+		{Name: "created_at", Type: model.FieldInt},
+	},
 }
 
-// orm:typed_fields
-type Permission struct {
-	ID       string `db:"pk"`
-	Name     string
-	Resource string
-	Action   string
+var LoginDataModel = model.Definition{
+	Name: "login_data",
+	Fields: model.Fields{
+		{Name: "email", Type: model.FieldText, NotNull: true, Widget: input.Email()},
+		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+	},
 }
 
-// orm:typed_fields
-type RolePermission struct {
-	RoleID       string `db:"pk,ref=roles"`
-	PermissionID string `db:"pk,ref=permissions"`
+var RegisterDataModel = model.Definition{
+	Name: "register_data",
+	Fields: model.Fields{
+		{Name: "name", Type: model.FieldText, NotNull: true, Widget: input.Text()},
+		{Name: "email", Type: model.FieldText, NotNull: true, Widget: input.Email()},
+		{Name: "password", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "phone", Type: model.FieldText, Widget: input.Phone()},
+	},
 }
 
-// orm:typed_fields
-type LANIP struct {
-	ID        string `db:"pk"`
-	UserID    string `db:"ref=users"`
-	IP        string
-	Label     string
-	CreatedAt int64
+var ProfileDataModel = model.Definition{
+	Name: "profile_data",
+	Fields: model.Fields{
+		{Name: "name", Type: model.FieldText, NotNull: true, Widget: input.Text()},
+		{Name: "phone", Type: model.FieldText, Widget: input.Phone()},
+	},
 }
 
-// orm:typed_fields
-type OAuthState struct {
-	State     string `db:"pk"`
-	Provider  string
-	ExpiresAt int64
-	CreatedAt int64
+var PasswordDataModel = model.Definition{
+	Name: "password_data",
+	Fields: model.Fields{
+		{Name: "current", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "new", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+		{Name: "confirm", Type: model.FieldText, NotNull: true, Widget: input.Password()},
+	},
 }
