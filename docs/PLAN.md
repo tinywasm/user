@@ -3,6 +3,21 @@ message: "feat: edge-ready auth — Kind API migration, JSON-only wire, stdlib p
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
+>
+> **Este repo NO COMPILA hoy, y no por culpa de ninguna etapa de este plan.** Dos roturas
+> aguas arriba lo tienen en rojo; arréglalas ANTES de empezar (son bumps, no diseño):
+>
+> 1. `form` está pineado en **v0.2.12**, que usa `model.Widget` — un símbolo que el refactor
+>    Kind **eliminó**. Sube a **v0.2.13**.
+> 2. `router` (v0.1.9) y `mcp` (v0.1.21) tiparon la frontera RBAC: `Tool.Resource` ya no es
+>    `string`, `Tool.Action` ya no es `byte`, `Tool.Public` ya no existe (ahora es
+>    `model.Access`) y `Config.Authorize` es `model.Authorizer`. La **Etapa 7** los adopta.
+>
+> **La Etapa 7 ([`PLAN_POLICY.md`](PLAN_POLICY.md)) es parte de este plan, no un plan aparte.**
+> Depende de la Etapa 1 y NO puede ejecutarse antes: la Etapa 1 regenera `models_orm.go`
+> (renombra `ID` → `Id`) y la Etapa 7 trabaja sobre esas mismas llamadas —`server/rbac.go`,
+> `server/bootstrap.go`—, además de necesitar un cambio en `models.go`, que es el archivo de
+> la Etapa 1.
 
 # PLAN — Master: make `tinywasm/user` edge-ready
 
@@ -96,11 +111,16 @@ flowchart LR
     S3 --> S4
     S4 --> S5[Stage 5<br/>OWASP hardening]
     S5 --> S6[Stage 6<br/>docs]
+    S1 --> S7[Stage 7<br/>policy to the consumer<br/>BREAK v0.1.0]
+    S7 --> S6
 ```
 
 Stage 1 is a **gate**: it changes generated struct field names, so nothing else
 compiles until it lands. Stages 2 and 3 may proceed in either order once
-Stage 1 is green.
+Stage 1 is green. **Stage 7 also hangs off Stage 1** — it edits `models.go` (the
+`permissions.action` column now stores CRUD letters) and the very call sites Stage 1
+renames. Do not run it first, and do not mix it with another stage in one PR: it is the
+only stage that **breaks the public API**.
 
 ## Stages
 
@@ -112,6 +132,7 @@ Stage 1 is green.
 | 4 | [PLAN_STAGE_4_TESTS_MODULE.md](PLAN_STAGE_4_TESTS_MODULE.md) | `tests/go.mod`: the SQLite driver leaves the root module |
 | 5 | [PLAN_STAGE_5_OWASP.md](PLAN_STAGE_5_OWASP.md) | uniform 401 (anti-enumeration), `Config.RateLimit` hook, OWASP regression suite |
 | 6 | [PLAN_STAGE_6_DOCS.md](PLAN_STAGE_6_DOCS.md) | README / ARCHITECTURE / SKILL |
+| **7** | [PLAN_POLICY.md](PLAN_POLICY.md) | **BREAK (v0.1.0)** — la política de seguridad la declara el consumidor: `Bootstrap(Seed)`, sin rol ni comodín implícitos; `me` sin recurso inventado; adopta el RBAC tipado de `model`. **Gate: Etapa 1** (toca `models.go` y las llamadas que la Etapa 1 renombra). Fase E de `tinywasm/docs/AUTH_POLICY_MASTER_PLAN.md`. |
 
 ## Acceptance criteria (whole plan)
 
