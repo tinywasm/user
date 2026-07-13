@@ -10,6 +10,17 @@ import (
 	"github.com/tinywasm/user"
 )
 
+// Module is an APIModule: it mounts its own routes and carries its own identity.
+// The assertion is the contract — without it the missing half of the interface only
+// surfaced at the consumer, who then wrote a local wrapper to paper over it. A
+// library that says "Mount me like any other APIModule" must fail to compile when it
+// isn't one.
+var _ router.APIModule = (*Module)(nil)
+
+// ModelName is the module's identity (model.ModuleNaming), used as the RBAC resource
+// and as the key by which a host registers it.
+func (m *Module) ModelName() string { return "user" }
+
 // MountAPI publishes the authentication flows on the host router. The module
 // owns its routes; consumers just Mount it like any other APIModule.
 func (m *Module) MountAPI(r router.Router) {
