@@ -222,6 +222,6 @@ func testMeToolPermissions(t *testing.T) {
 	}
 
 	if len(profile.Permissions) != 1 || profile.Permissions[0] != "*:crud" {
-		t.Errorf("expected permission '*:*', got %v", profile.Permissions)
+		t.Errorf("expected permission '*:crud', got %v", profile.Permissions)
 	}
 }

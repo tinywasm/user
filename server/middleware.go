@@ -32,7 +32,18 @@ func (m *Module) Can(userID string, resource model.Resource, action model.Action
 	if userID == "" {
 		return false
 	}
-	ok, _ := m.HasPermission(userID, resource, action)
+	ok, err := m.HasPermission(userID, resource, action)
+	if err != nil {
+		// La firma de model.Authorizer solo devuelve bool: el error no cabe. Si no sale por
+		// aquí, no sale por ningún sitio. Denegamos, pero ruidosamente.
+		m.notify(user.SecurityEvent{
+			Type:      user.EventPermissionCorrupt,
+			UserID:    userID,
+			Resource:  string(resource),
+			Timestamp: time.Now() / 1e9,
+		})
+		return false
+	}
 	if !ok {
 		m.notify(user.SecurityEvent{
 			Type:      user.EventAccessDenied,

@@ -241,9 +241,11 @@ func (m *Module) HasPermission(userID string, resource model.Resource, action mo
 	}
 
 	for _, p := range u.Permissions {
+		// Una acción ilegible NO se salta: saltarla borra el permiso real en silencio y deja
+		// la fila corrupta invisible para siempre. Denegar sí; callar no.
 		pAction, err := model.ParseAction(p.Action)
 		if err != nil {
-			continue // Should we fail loudly? Stage 7 says "No te la tragues".
+			return false, err
 		}
 		grant := model.Grant{
 			Resource: model.Resource(p.Resource),

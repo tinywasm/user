@@ -34,6 +34,7 @@ const (
 	EventNonActiveAccess                             // Login/LoginLAN: status != "active"
 	EventUnauthorizedAccess                          // validateSession: cookie present but session invalid
 	EventAccessDenied                                // AccessCheck: RBAC denied with valid session
+	EventPermissionCorrupt                           // HasPermission: permissions.action is not a CRUD string
 )
 
 type SecurityEvent struct {
