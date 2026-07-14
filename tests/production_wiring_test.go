@@ -14,12 +14,12 @@ import (
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func TestProductionWiring(t *testing.T) {
-	userserver.PasswordHashCost = bcrypt.MinCost
+	authority.PasswordHashCost = bcrypt.MinCost
 
 	t.Run("Widgets", testWidgets)
 	t.Run("ConsumerViewSSR", testConsumerViewSSR)
@@ -75,7 +75,7 @@ func testWidgets(t *testing.T) {
 
 func testBootstrap(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func testBootstrap(t *testing.T) {
 	email := "admin@test.com"
 	pass := "password123"
 
-	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+	if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatalf("Bootstrap failed: %v", err)
 	}
 
@@ -97,20 +97,20 @@ func testBootstrap(t *testing.T) {
 		t.Errorf("Admin should have wildcard permissions")
 	}
 
-	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+	if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatalf("Bootstrap second call failed: %v", err)
 	}
 
 	db2 := newTestDB(t)
-	m2, _ := userserver.New(db2, user.Config{})
-	if err := m2.Bootstrap(userserver.Seed{}); err == nil {
+	m2, _ := authority.New(db2, user.Config{})
+	if err := m2.Bootstrap(authority.Seed{}); err == nil {
 		t.Errorf("Bootstrap with empty credentials on empty DB should fail")
 	}
 }
 
 func testMountAPI(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{
+	m, err := authority.New(db, user.Config{
 		CookieName: "test_session",
 	})
 	if err != nil {
@@ -119,7 +119,7 @@ func testMountAPI(t *testing.T) {
 
 	email := "user@test.com"
 	pass := "password123"
-	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+	if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -190,12 +190,12 @@ func testMountAPI(t *testing.T) {
 
 func testMeToolPermissions(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := userserver.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{})
 
 	email := "tools@test.com"
 	pass := "password123"
 
-	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+	if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatal(err)
 	}
 

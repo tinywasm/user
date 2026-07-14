@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/model"
 )
 
@@ -22,7 +22,7 @@ func (h *mockHandler) AllowedRoles(action model.Action) []model.RoleCode {
 
 func TestIntegration_FullFlow(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

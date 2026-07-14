@@ -9,14 +9,14 @@ import (
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/model"
 )
 
 func TestMCPAuthorizer(t *testing.T) {
 	db := newTestDB(t)
 	secret := []byte("test-secret-32-bytes-minimum-len")
-	m, err := userserver.New(db, user.Config{
+	m, err := authority.New(db, user.Config{
 		AuthMode:  user.AuthModeBearer,
 		JWTSecret: secret,
 	})
@@ -43,6 +43,17 @@ func TestMCPAuthorizer(t *testing.T) {
 		m.Authenticate()(func(c router.Context) {
 			if c.UserID() != u.Id {
 				t.Errorf("expected user %s, got %s", u.Id, c.UserID())
+			}
+		})(ctx)
+	})
+
+	t.Run("TestAuthenticate_Bearer_Lowercase", func(t *testing.T) {
+		ctx := &mock.Context{}
+		ctx.SetHeader("Authorization", "bearer "+token)
+
+		m.Authenticate()(func(c router.Context) {
+			if c.UserID() != u.Id {
+				t.Errorf("expected user %s with lowercase bearer, got %s", u.Id, c.UserID())
 			}
 		})(ctx)
 	})
@@ -111,7 +122,7 @@ func TestMCPAuthorizer(t *testing.T) {
 	})
 
 	t.Run("TestGenerateAPIToken_NoSecret", func(t *testing.T) {
-		m2, _ := userserver.New(db, user.Config{})
+		m2, _ := authority.New(db, user.Config{})
 		_, err := m2.GenerateAPIToken(u.Id, 0)
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing")

@@ -9,7 +9,7 @@ import (
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 )
 
 // Un token caducado es el evento más rutinario que existe: una sesión que se acaba.
@@ -25,7 +25,7 @@ func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 	var events []user.SecurityEvent
 
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{
+	m, err := authority.New(db, user.Config{
 		AuthMode:        user.AuthModeBearer,
 		JWTSecret:       secret,
 		OnSecurityEvent: func(e user.SecurityEvent) { events = append(events, e) },
@@ -72,7 +72,7 @@ func TestForgedTokenIsReportedAsTampering(t *testing.T) {
 	var events []user.SecurityEvent
 
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{
+	m, err := authority.New(db, user.Config{
 		AuthMode:        user.AuthModeBearer,
 		JWTSecret:       secret,
 		OnSecurityEvent: func(e user.SecurityEvent) { events = append(events, e) },

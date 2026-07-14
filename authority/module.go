@@ -1,4 +1,4 @@
-package userserver
+package authority
 
 import (
 	"github.com/tinywasm/fmt"
@@ -27,7 +27,7 @@ type Module struct {
 func New(db *orm.DB, cfg user.Config) (*Module, error) {
 	if cfg.AuthMode == user.AuthModeJWT || cfg.AuthMode == user.AuthModeBearer {
 		if len(cfg.JWTSecret) == 0 {
-			return nil, fmt.Err("userserver: JWTSecret required for selected AuthMode")
+			return nil, fmt.Err("authority: JWTSecret required for selected AuthMode")
 		}
 	}
 

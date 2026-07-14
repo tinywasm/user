@@ -11,7 +11,7 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -27,7 +27,7 @@ func newTestDB(t *testing.T) *orm.DB {
 }
 
 func RunUserTests(t *testing.T) {
-	userserver.PasswordHashCost = bcrypt.MinCost
+	authority.PasswordHashCost = bcrypt.MinCost
 	t.Run("TestInit", testInit)
 	t.Run("TestCRUD", testCRUD)
 	t.Run("TestAuth", testAuth)
@@ -40,7 +40,7 @@ func RunUserTests(t *testing.T) {
 func testJWTCookieMode(t *testing.T) {
 	db := newTestDB(t)
 	secret := []byte("test-secret-32-bytes-minimum-len")
-	m, err := userserver.New(db, user.Config{
+	m, err := authority.New(db, user.Config{
 		AuthMode:  user.AuthModeJWT,
 		JWTSecret: secret,
 	})
@@ -95,14 +95,14 @@ func testInit(t *testing.T) {
 		CookieName: "test_session",
 		TokenTTL:   3600,
 	}
-	m, err := userserver.New(db, cfg)
+	m, err := authority.New(db, cfg)
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
 	_ = m // to be used later
 }
 
-func getHandler(m *userserver.Module, name string) interface {
+func getHandler(m *authority.Module, name string) interface {
 	Create(any) (any, error)
 	Read(string) (any, error)
 	Update(any) (any, error)
@@ -123,7 +123,7 @@ func getHandler(m *userserver.Module, name string) interface {
 
 func testCRUD(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func testCRUD(t *testing.T) {
 
 func testAuth(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func testAuth(t *testing.T) {
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{TokenTTL: 3600})
+	m, err := authority.New(db, user.Config{TokenTTL: 3600})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Re-init to flush memory cache
-	m, _ = userserver.New(db, user.Config{TokenTTL: 3600})
+	m, _ = authority.New(db, user.Config{TokenTTL: 3600})
 
 	_, err = m.GetSession(sess.Id)
 	if err != user.ErrSessionExpired {
@@ -266,7 +266,7 @@ func testOAuth(t *testing.T) {
 	cfg := user.Config{
 		OAuthProviders: []user.OAuthProvider{mockP},
 	}
-	m, err := userserver.New(db, cfg)
+	m, err := authority.New(db, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,7 +310,7 @@ func testOAuth(t *testing.T) {
 
 func testLAN(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{TrustProxy: true})
+	m, err := authority.New(db, user.Config{TrustProxy: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,8 +383,8 @@ func testLAN(t *testing.T) {
 	}
 }
 
-func setupModule(t *testing.T) *userserver.Module {
+func setupModule(t *testing.T) *authority.Module {
 	db := newTestDB(t)
-	m, _ := userserver.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{})
 	return m
 }

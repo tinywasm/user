@@ -9,7 +9,7 @@ require (
 	github.com/tinywasm/fmt v0.25.3
 	github.com/tinywasm/form v0.2.13
 	github.com/tinywasm/json v0.5.11
-	github.com/tinywasm/jwt v0.0.3
+	github.com/tinywasm/jwt v0.1.1
 	github.com/tinywasm/mcp v0.1.21
 	github.com/tinywasm/model v0.0.12
 	github.com/tinywasm/orm v0.9.27
@@ -20,6 +20,6 @@ require (
 )
 
 require (
-	github.com/tinywasm/base64 v0.0.2 // indirect
+	github.com/tinywasm/base64 v0.0.3 // indirect
 	github.com/tinywasm/crypto v0.0.20 // indirect
 )

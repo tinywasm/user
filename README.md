@@ -24,12 +24,12 @@ authentication by RUT + IP, and session management.
 ## Initialization
 
 ```go
-import "github.com/tinywasm/user/server"
+import "github.com/tinywasm/user/authority"
 
 // ...
 
 // Initialize the user module directly with an ORM db instance
-m, err := userserver.New(db, user.Config{
+m, err := authority.New(db, user.Config{
     CookieName: "session_id", // default: "session"
     TokenTTL:   86400,        // default: 86400 (24h)
     TrustProxy: true,         // default: false

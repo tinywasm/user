@@ -1,4 +1,4 @@
-package userserver
+package authority
 
 import (
 	"github.com/tinywasm/context"

@@ -9,13 +9,13 @@ import (
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/mcp"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/model"
 )
 
 func TestRBAC_ClosedByDefault(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestRBAC_ClosedByDefault(t *testing.T) {
 
 func TestTools_Me(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := userserver.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{})
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "me@test.com", Name: "Me User"})
@@ -129,21 +129,21 @@ func TestNew_Validation(t *testing.T) {
 	db := newTestDB(t)
 
 	t.Run("AuthModeBearer requires JWTSecret", func(t *testing.T) {
-		_, err := userserver.New(db, user.Config{AuthMode: user.AuthModeBearer})
+		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeBearer})
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing for AuthModeBearer")
 		}
 	})
 
 	t.Run("AuthModeJWT requires JWTSecret", func(t *testing.T) {
-		_, err := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT})
+		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeJWT})
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing for AuthModeJWT")
 		}
 	})
 
 	t.Run("AuthModeCookie does not require JWTSecret", func(t *testing.T) {
-		_, err := userserver.New(db, user.Config{AuthMode: user.AuthModeCookie})
+		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeCookie})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

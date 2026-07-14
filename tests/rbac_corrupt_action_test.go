@@ -8,14 +8,14 @@ import (
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 )
 
 // seedCorruptPermission da al usuario un rol cuyo único permiso tiene una acción ilegible.
 // Una fila así solo puede llegar desde la BD: la escritura está cerrada por el tipo
 // (CreatePermission recibe model.Action). Llega de una edición a mano, una migración, o una
 // versión vieja de la librería.
-func seedCorruptPermission(t *testing.T, db *orm.DB, m *userserver.Module) string {
+func seedCorruptPermission(t *testing.T, db *orm.DB, m *authority.Module) string {
 	t.Helper()
 
 	userCRUD := getHandler(m, "users")
@@ -51,7 +51,7 @@ func seedCorruptPermission(t *testing.T, db *orm.DB, m *userserver.Module) strin
 // denegar EN SILENCIO no.
 func TestHasPermission_CorruptActionFailsLoudly(t *testing.T) {
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestHasPermission_CorruptActionFailsLoudly(t *testing.T) {
 func TestCan_CorruptActionDeniesAndNotifies(t *testing.T) {
 	var events []user.SecurityEvent
 	db := newTestDB(t)
-	m, err := userserver.New(db, user.Config{
+	m, err := authority.New(db, user.Config{
 		OnSecurityEvent: func(e user.SecurityEvent) { events = append(events, e) },
 	})
 	if err != nil {

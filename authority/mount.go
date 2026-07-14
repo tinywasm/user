@@ -1,4 +1,4 @@
-package userserver
+package authority
 
 import (
 
@@ -29,19 +29,24 @@ func (m *Module) MountAPI(r router.Router) {
 
 	r.Post(user.PathLogin, func(ctx router.Context) {
 		ip := extractClientIP(ctx, m.config.TrustProxy)
-		if m.config.RateLimit != nil {
-			if err := m.config.RateLimit(ip); err != nil {
-				ctx.WriteStatus(429)
-				ctx.Write([]byte(err.Error()))
-				return
-			}
-		}
-
 		data := &user.LoginData{}
 		if err := json.Decode(string(ctx.Body()), data); err != nil {
 			ctx.WriteStatus(400)
 			ctx.Write([]byte(err.Error()))
 			return
+		}
+
+		if m.config.RateLimit != nil {
+			if err := m.config.RateLimit(ip); err != nil {
+				m.notify(user.SecurityEvent{
+					Type:   user.EventRateLimited,
+					IP:     ip,
+					UserID: data.Email,
+				})
+				ctx.WriteStatus(429)
+				ctx.Write([]byte(err.Error()))
+				return
+			}
 		}
 
 		u, err := m.Login(data.Email, data.Password)
