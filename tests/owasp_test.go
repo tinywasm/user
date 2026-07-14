@@ -8,22 +8,22 @@ import (
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/model"
 )
 
 func TestOWASP(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := userserver.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{})
 
 	email := "active@test.com"
 	pass := "password123"
-	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+	if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatal(err)
 	}
 
 	suspended := "suspended@test.com"
-	if err := m.Bootstrap(userserver.Seed{Email: suspended, Password: pass, Name: "Suspended", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+	if err := m.Bootstrap(authority.Seed{Email: suspended, Password: pass, Name: "Suspended", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatal(err)
 	}
 	uSusp, _ := m.GetUserByEmail(suspended)
@@ -68,18 +68,23 @@ func TestOWASP(t *testing.T) {
 
 	t.Run("Rate Limit Hook", func(t *testing.T) {
 		db := newTestDB(t)
-		m, _ := userserver.New(db, user.Config{
+		var events []user.SecurityEvent
+		m, _ := authority.New(db, user.Config{
 			RateLimit: func(ip string) error {
 				if ip == "1.2.3.4" {
 					return user.ErrInvalidCredentials // Simulating rejection
 				}
 				return nil
 			},
+			OnSecurityEvent: func(e user.SecurityEvent) {
+				events = append(events, e)
+			},
 		})
 		r := &mock.Router{}
 		m.MountAPI(r)
 
 		t.Run("Blocked IP", func(t *testing.T) {
+			events = nil
 			ctx := &mock.Context{
 				InMethod: "POST",
 				InPath:   user.PathLogin,
@@ -91,6 +96,22 @@ func TestOWASP(t *testing.T) {
 			r.Invoke("POST", user.PathLogin, ctx)
 			if ctx.Status != 429 {
 				t.Errorf("expected 429, got %d", ctx.Status)
+			}
+
+			found := false
+			for _, e := range events {
+				if e.Type == user.EventRateLimited {
+					found = true
+					if e.UserID != email {
+						t.Errorf("expected UserID %s, got %s", email, e.UserID)
+					}
+					if e.IP != "1.2.3.4" {
+						t.Errorf("expected IP 1.2.3.4, got %s", e.IP)
+					}
+				}
+			}
+			if !found {
+				t.Error("EventRateLimited not found in security events")
 			}
 		})
 

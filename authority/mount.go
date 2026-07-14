@@ -1,4 +1,4 @@
-package userserver
+package authority
 
 import (
 
@@ -29,19 +29,24 @@ func (m *Module) MountAPI(r router.Router) {
 
 	r.Post(user.PathLogin, func(ctx router.Context) {
 		ip := extractClientIP(ctx, m.config.TrustProxy)
-		if m.config.RateLimit != nil {
-			if err := m.config.RateLimit(ip); err != nil {
-				ctx.WriteStatus(429)
-				ctx.Write([]byte(err.Error()))
-				return
-			}
-		}
-
 		data := &user.LoginData{}
 		if err := json.Decode(string(ctx.Body()), data); err != nil {
 			ctx.WriteStatus(400)
 			ctx.Write([]byte(err.Error()))
 			return
+		}
+
+		if m.config.RateLimit != nil {
+			if err := m.config.RateLimit(ip); err != nil {
+				m.notify(user.SecurityEvent{
+					Type:   user.EventRateLimited,
+					IP:     ip,
+					UserID: data.Email,
+				})
+				ctx.WriteStatus(429)
+				ctx.Write([]byte(err.Error()))
+				return
+			}
 		}
 
 		u, err := m.Login(data.Email, data.Password)
@@ -88,7 +93,7 @@ func (m *Module) MountAPI(r router.Router) {
 
 		ctx.SetHeader("Location", afterLogin)
 		ctx.WriteStatus(302)
-	})
+	}).Public()
 
 	r.Post(user.PathLogout, func(ctx router.Context) {
 		cookie, ok := ctx.Cookie(m.config.CookieName)
@@ -111,7 +116,7 @@ func (m *Module) MountAPI(r router.Router) {
 		})
 		ctx.SetHeader("Location", user.PathLogin)
 		ctx.WriteStatus(302)
-	})
+	}).Public()
 
 	for _, p := range m.registeredProviders() {
 		providerName := p.Name()
@@ -124,7 +129,7 @@ func (m *Module) MountAPI(r router.Router) {
 			}
 			ctx.SetHeader("Location", url)
 			ctx.WriteStatus(302)
-		})
+		}).Public()
 
 		r.Get("/oauth/callback/"+providerName, func(ctx router.Context) {
 			ip := extractClientIP(ctx, m.config.TrustProxy)
@@ -167,6 +172,6 @@ func (m *Module) MountAPI(r router.Router) {
 
 			ctx.SetHeader("Location", afterLogin)
 			ctx.WriteStatus(302)
-		})
+		}).Public()
 	}
 }

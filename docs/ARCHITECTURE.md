@@ -7,13 +7,13 @@ authentication by RUT + IP, HTTP sessions, and RBAC.
 
 The package is split into:
 1. `github.com/tinywasm/user`: Agnostic types and models (shared by all).
-2. `github.com/tinywasm/user/server` (`userserver`): Backend logic and Module handle.
+2. `github.com/tinywasm/user/authority` (`authority`): Authority logic (native or edge) and Module handle.
 
 ---
 
 ## Core Principles
 
-- **Separation of Concerns:** Backend logic (`userserver`) is decoupled from UI. Views belong to the consumer. Forms are submitted as JSON only.
+- **Separation of Concerns:** Authority logic (native or edge) (`authority`) is decoupled from UI. Views belong to the consumer. Forms are submitted as JSON only.
 - **Typed Definitions:** All models (DB and form DTOs) are authored as `model.Definition` literals using the Kind API. `ormc` generates concrete structs and codecs.
 - **Edge-Ready:** No Go standard library imports in `server/`. Everything compiles to WASM for edge deployment.
 - **Identity-based authentication:** `Login` routes through `user_identities` — only users
@@ -28,7 +28,7 @@ The package is split into:
 ## Package Structure
 
 - `user/`: Agnostic models (`User`, `Session`, `Identity`, etc.) and error constants.
-- `user/server/`: `Module` struct, `New()`, authentication logic, and RBAC.
+- `user/authority/`: `Module` struct, `New()`, authentication logic, and RBAC.
 
 ---
 
@@ -36,7 +36,7 @@ The package is split into:
 
 ### Automated ORM DDL
 
-The `initSchema` method in `userserver` utilizes `db.CreateTable(m)` to initialize or alter the database.
+The `initSchema` method in `authority` utilizes `db.CreateTable(m)` to initialize or alter the database.
 
 ### Model Authoring
 
@@ -57,11 +57,11 @@ Please refer to:
 graph TD
     APP["Application\n(web/server.go)"]
     SITE["tinywasm/site\n(routing + RBAC)"]
-    SERVER["tinywasm/user/server\n(auth backend)"]
+    SERVER["tinywasm/user/authority\n(auth authority)"]
     FORM["tinywasm/form\n(consumer views)"]
     DB["Database\n(via orm.DB)"]
 
-    APP -->|"userserver.New(...)\nm.Bootstrap(...)\nm.MountAPI(...)"| SERVER
+    APP -->|"authority.New(...)\nm.Bootstrap(...)\nm.MountAPI(...)"| SERVER
     APP -->|"form.New(&user.LoginData{})"| FORM
     SERVER -->|"db.CreateTable"| DB
 ```

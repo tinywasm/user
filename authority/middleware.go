@@ -1,7 +1,6 @@
-package userserver
+package authority
 
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/jwt"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/time"
@@ -60,12 +59,11 @@ func (m *Module) Can(userID string, resource model.Resource, action model.Action
 func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 	// AuthModeBearer: API/MCP clients — JWT in Authorization header, no cookie.
 	if m.config.AuthMode == user.AuthModeBearer {
-		const prefix = "Bearer "
-		auth := ctx.GetHeader("Authorization")
-		if !fmt.HasPrefix(auth, prefix) {
+		token, ok := jwt.FromBearer(ctx.GetHeader("Authorization"))
+		if !ok {
 			return nil, user.ErrSessionExpired
 		}
-		return m.validateJWT(auth[len(prefix):])
+		return m.validateJWT(token)
 	}
 
 	// Cookie modes: browser clients.

@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/tinywasm/user"
-	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/user/authority"
 )
 
 func TestTimingSafeAuth(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := userserver.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{})
 
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "timing@example.com", Name: "Timing User"})

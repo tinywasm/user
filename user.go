@@ -32,6 +32,7 @@ const (
 	EventUnauthorizedAccess                          // validateSession: cookie present but session invalid
 	EventAccessDenied                                // AccessCheck: RBAC denied with valid session
 	EventPermissionCorrupt                           // HasPermission: permissions.action is not a CRUD string
+	EventRateLimited                                 // POST /login: Config.RateLimit rejected the attempt before bcrypt
 )
 
 type SecurityEvent struct {

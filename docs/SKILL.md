@@ -26,7 +26,7 @@ type Config struct {
 
 ### Server API
 ```go
-// New (in userserver)
+// New (in authority)
 func New(db *orm.DB, cfg Config) (*Module, error)
 
 // MountAPI registers:
