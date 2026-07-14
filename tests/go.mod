@@ -8,11 +8,11 @@ require (
 	github.com/tinywasm/json v0.5.11
 	github.com/tinywasm/jwt v0.1.1
 	github.com/tinywasm/mcp v0.1.22
-	github.com/tinywasm/model v0.0.13
-	github.com/tinywasm/orm v0.9.27
+	github.com/tinywasm/model v0.0.14
+	github.com/tinywasm/orm v0.9.28
 	github.com/tinywasm/router v0.1.11
-	github.com/tinywasm/sqlite v0.2.5
-	github.com/tinywasm/user v0.0.34
+	github.com/tinywasm/sqlite v0.2.6
+	github.com/tinywasm/user v0.0.35
 	golang.org/x/crypto v0.54.0
 	modernc.org/sqlite v1.53.0
 )
