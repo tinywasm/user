@@ -82,11 +82,18 @@ de este repo — nada de `TestXxx` sueltos nuevos si la suite registra en un run
 
 ## Criterios de aceptación
 
+La única herramienta de pruebas es `gotest` — nunca `go test` a pelo. Si no está en el
+sandbox: `go install github.com/tinywasm/devflow/cmd/gotest@latest`.
+
 1. `grep -n "HasPrefix" server/middleware.go` → vacío.
 2. `grep -rn '"Bearer "' server/` → solo los usos **salientes** de `oauth.go` (y
    comentarios); ninguno en `middleware.go`.
-3. Suite de `tests/` en verde; el caso `bearer x` (minúsculas) autentica.
-4. `gotest` en verde.
+3. `gotest` en verde desde la raíz (incluye la suite de `tests/`); el caso `bearer x`
+   (minúsculas) autentica.
+4. Este plan cambia imports (`jwt` sube de versión): la compatibilidad TinyGo debe
+   re-verificarse con `gotest -tinygo`. **Si `tinygo` no existe en tu sandbox, NO
+   intentes instalarlo**: declara la verificación TinyGo como PENDIENTE en el resumen
+   final — nunca la marques cumplida con `gotest` a secas.
 5. Nunca llames `gopush` ni `codejob`.
 
 ## Ciclo de vida de este archivo

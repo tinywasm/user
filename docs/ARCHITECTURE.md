@@ -75,6 +75,5 @@ tinywasm/user
 ├── github.com/tinywasm/fmt    (errors, logging, string conversion)
 ├── github.com/tinywasm/model  (model definitions and validation)
 ├── github.com/tinywasm/unixid (ID generation)
-├── golang.org/x/crypto        (bcrypt, password hashing)
-└── golang.org/x/oauth2        (OAuth 2.0 token exchange)
+└── golang.org/x/crypto        (bcrypt, password hashing)
 ```

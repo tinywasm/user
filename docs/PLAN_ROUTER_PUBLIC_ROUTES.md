@@ -26,13 +26,19 @@ necesita autenticarse.**
 Pasó desapercibido porque el mock de `router` ≤ v0.1.9 era una grabadora: `Invoke`
 llamaba al handler directamente, saltándose la puerta. El mock de **v0.1.10** aplica el
 mismo contrato que las implementaciones desplegadas (pasa `router/conformance`), y con
-él la suite lo destapa:
+él caen **tres** suites, todas por esta única causa:
 
 ```
---- FAIL: TestProductionWiring/MountAPI
-    production_wiring_test.go:142: POST /login (JSON) status: 403
-    production_wiring_test.go:172: POST /logout status: 403
+--- FAIL: TestCookieSecurity      hardening_test.go:35: login failed: status 403
+--- FAIL: TestOWASP               owasp_test.go:60/93/110: expected 401/429, got 403
+--- FAIL: TestProductionWiring    production_wiring_test.go:142: POST /login status: 403
+                                  production_wiring_test.go:172: POST /logout status: 403
 ```
+
+Ojo con `owasp_test.go`: los 403 enmascaran las aserciones reales (401 de credenciales
+malas, 429 de rate limit). Con las rutas anotadas esas aserciones vuelven a ejercitar el
+handler; **no cambies los valores esperados del test para que cuadren con el 403** — el
+403 es el bug.
 
 ## Cambios
 
@@ -79,13 +85,17 @@ sobre `r.Routes()`: cada ruta montada por este módulo debe satisfacer
 
 ## Criterios de aceptación
 
-1. `go test ./...` dentro de `tests/` en verde, con `router v0.1.10` en ambos `go.mod`.
+La única herramienta de pruebas es `gotest` — nunca `go test` a pelo. Si no está en el
+sandbox: `go install github.com/tinywasm/devflow/cmd/gotest@latest`.
+
+1. `gotest` en verde desde la raíz del repo (corre vet + race + tests + wasm, incluida
+   la suite de `tests/`), con `router v0.1.10` en ambos `go.mod`.
 2. `grep -rn "\.Public()" server/mount.go` → exactamente 4 resultados (login, logout,
    oauth begin, oauth callback).
 3. El test de rutas públicas sobre `Routes()` existe y está en verde.
-4. `gotest` en verde. (La compuerta TinyGo del módulo es asunto de
-   [PLAN_TINYGO_OAUTH.md](PLAN_TINYGO_OAUTH.md); este plan no debe empeorarla ni
-   arreglarla.)
+4. Este plan no toca imports ni formato wire: la verificación TinyGo del módulo no es
+   asunto suyo. Si de todos modos corres `gotest -tinygo` y `tinygo` no existe en tu
+   sandbox, **no intentes instalarlo**: repórtalo como no ejecutado y sigue.
 
 ## Ciclo de vida de este archivo
 

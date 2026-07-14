@@ -1,8 +1,6 @@
 package userserver
 
 import (
-	"context"
-
 	"github.com/tinywasm/fetch"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
@@ -12,10 +10,14 @@ import (
 	"github.com/tinywasm/time"
 	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
+)
 
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/microsoft"
+const (
+	googleAuthURL  = "https://accounts.google.com/o/oauth2/auth"
+	googleTokenURL = "https://oauth2.googleapis.com/token"
+
+	msAuthURL  = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+	msTokenURL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 )
 
 func (m *Module) BeginOAuth(providerName string) (string, error) {
@@ -74,15 +76,12 @@ func (m *Module) CompleteOAuth(providerName string, ctx router.Context, ip, ua s
 		return user.User{}, false, user.ErrProviderNotFound
 	}
 
-	// Use background context as router.Context doesn't provide one
-	bgCtx := context.Background()
-
-	token, err := p.ExchangeCode(bgCtx, code)
+	token, err := p.ExchangeCode(code)
 	if err != nil {
 		return user.User{}, false, err
 	}
 
-	info, err := p.GetUserInfo(bgCtx, token)
+	info, err := p.GetUserInfo(token)
 	if err != nil {
 		return user.User{}, false, err
 	}
@@ -147,33 +146,29 @@ type GoogleProvider struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
-	config       *oauth2.Config
 }
 
 func (p *GoogleProvider) Name() string {
 	return "google"
 }
 
-func (p *GoogleProvider) ensureConfig() {
-	if p.config == nil {
-		p.config = &oauth2.Config{
-			ClientID:     p.ClientID,
-			ClientSecret: p.ClientSecret,
-			RedirectURL:  p.RedirectURL,
-			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
-			Endpoint:     google.Endpoint,
-		}
+func (p *GoogleProvider) config() user.OAuthConfig {
+	return user.OAuthConfig{
+		ClientID:     p.ClientID,
+		ClientSecret: p.ClientSecret,
+		RedirectURL:  p.RedirectURL,
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		AuthURL:      googleAuthURL,
+		TokenURL:     googleTokenURL,
 	}
 }
 
 func (p *GoogleProvider) AuthCodeURL(state string) string {
-	p.ensureConfig()
-	return p.config.AuthCodeURL(state)
+	return authCodeURL(p.config(), state)
 }
 
-func (p *GoogleProvider) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {
-	p.ensureConfig()
-	return p.config.Exchange(ctx, code)
+func (p *GoogleProvider) ExchangeCode(code string) (user.OAuthToken, error) {
+	return exchangeCode(p.config(), code)
 }
 
 type googleData struct {
@@ -190,7 +185,7 @@ func (d *googleData) DecodeFields(r model.FieldReader) {
 	d.Name, _ = r.String("name")
 }
 
-func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (user.OAuthUserInfo, error) {
+func (p *GoogleProvider) GetUserInfo(token user.OAuthToken) (user.OAuthUserInfo, error) {
 	var res user.OAuthUserInfo
 	var errOut error
 	done := make(chan bool)
@@ -227,33 +222,29 @@ type MicrosoftProvider struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
-	config       *oauth2.Config
 }
 
 func (p *MicrosoftProvider) Name() string {
 	return "microsoft"
 }
 
-func (p *MicrosoftProvider) ensureConfig() {
-	if p.config == nil {
-		p.config = &oauth2.Config{
-			ClientID:     p.ClientID,
-			ClientSecret: p.ClientSecret,
-			RedirectURL:  p.RedirectURL,
-			Scopes:       []string{"User.Read"},
-			Endpoint:     microsoft.AzureADEndpoint("common"),
-		}
+func (p *MicrosoftProvider) config() user.OAuthConfig {
+	return user.OAuthConfig{
+		ClientID:     p.ClientID,
+		ClientSecret: p.ClientSecret,
+		RedirectURL:  p.RedirectURL,
+		Scopes:       []string{"User.Read"},
+		AuthURL:      msAuthURL,
+		TokenURL:     msTokenURL,
 	}
 }
 
 func (p *MicrosoftProvider) AuthCodeURL(state string) string {
-	p.ensureConfig()
-	return p.config.AuthCodeURL(state)
+	return authCodeURL(p.config(), state)
 }
 
-func (p *MicrosoftProvider) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {
-	p.ensureConfig()
-	return p.config.Exchange(ctx, code)
+func (p *MicrosoftProvider) ExchangeCode(code string) (user.OAuthToken, error) {
+	return exchangeCode(p.config(), code)
 }
 
 type msData struct {
@@ -272,7 +263,7 @@ func (d *msData) DecodeFields(r model.FieldReader) {
 	d.Name, _ = r.String("displayName")
 }
 
-func (p *MicrosoftProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (user.OAuthUserInfo, error) {
+func (p *MicrosoftProvider) GetUserInfo(token user.OAuthToken) (user.OAuthUserInfo, error) {
 	var res user.OAuthUserInfo
 	var errOut error
 	done := make(chan bool)
@@ -307,4 +298,77 @@ func (p *MicrosoftProvider) GetUserInfo(ctx context.Context, token *oauth2.Token
 
 	<-done
 	return res, errOut
+}
+
+func authCodeURL(cfg user.OAuthConfig, state string) string {
+	res := cfg.AuthURL + "?response_type=code"
+	res += "&client_id=" + queryEscape(cfg.ClientID)
+	res += "&redirect_uri=" + queryEscape(cfg.RedirectURL)
+	res += "&state=" + queryEscape(state)
+	if len(cfg.Scopes) > 0 {
+		res += "&scope="
+		for i, s := range cfg.Scopes {
+			if i > 0 {
+				res += "+"
+			}
+			res += queryEscape(s)
+		}
+	}
+	return res
+}
+
+func exchangeCode(cfg user.OAuthConfig, code string) (user.OAuthToken, error) {
+	body := "grant_type=authorization_code"
+	body += "&code=" + queryEscape(code)
+	body += "&client_id=" + queryEscape(cfg.ClientID)
+	body += "&client_secret=" + queryEscape(cfg.ClientSecret)
+	body += "&redirect_uri=" + queryEscape(cfg.RedirectURL)
+
+	var res user.OAuthToken
+	var errOut error
+	done := make(chan bool)
+
+	fetch.Post(cfg.TokenURL).
+		Header("Content-Type", "application/x-www-form-urlencoded").
+		Body([]byte(body)).
+		Send(func(resp *fetch.Response, err error) {
+			defer func() { done <- true }()
+			if err != nil {
+				errOut = err
+				return
+			}
+			if resp.Status != 200 {
+				errOut = user.ErrInvalidCredentials
+				return
+			}
+			if err := json.Decode(resp.Text(), &res); err != nil {
+				errOut = err
+				return
+			}
+		})
+
+	<-done
+	return res, errOut
+}
+
+func queryEscape(s string) string {
+	res := ""
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~' {
+			res += string(c)
+		} else if c == ' ' {
+			res += "+"
+		} else {
+			res += "%" + hexDigit(c>>4) + hexDigit(c&0x0F)
+		}
+	}
+	return res
+}
+
+func hexDigit(c byte) string {
+	if c < 10 {
+		return string('0' + c)
+	}
+	return string('A' + (c - 10))
 }
