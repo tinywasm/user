@@ -126,6 +126,14 @@ func testMountAPI(t *testing.T) {
 	r := &mock.Router{}
 	m.MountAPI(r)
 
+	// Verify that all routes registered by MountAPI are public.
+	// This module only provides pre-identity flows (login, logout, oauth).
+	for _, info := range r.Routes() {
+		if !info.IsPublic() {
+			t.Errorf("Route %s %s must be .Public()", info.Method, info.Path)
+		}
+	}
+
 	// 1. POST /login (success) - JSON
 	ctxJson := &mock.Context{
 		InMethod: "POST",

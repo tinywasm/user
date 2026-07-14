@@ -88,7 +88,7 @@ func (m *Module) MountAPI(r router.Router) {
 
 		ctx.SetHeader("Location", afterLogin)
 		ctx.WriteStatus(302)
-	})
+	}).Public()
 
 	r.Post(user.PathLogout, func(ctx router.Context) {
 		cookie, ok := ctx.Cookie(m.config.CookieName)
@@ -111,7 +111,7 @@ func (m *Module) MountAPI(r router.Router) {
 		})
 		ctx.SetHeader("Location", user.PathLogin)
 		ctx.WriteStatus(302)
-	})
+	}).Public()
 
 	for _, p := range m.registeredProviders() {
 		providerName := p.Name()
@@ -124,7 +124,7 @@ func (m *Module) MountAPI(r router.Router) {
 			}
 			ctx.SetHeader("Location", url)
 			ctx.WriteStatus(302)
-		})
+		}).Public()
 
 		r.Get("/oauth/callback/"+providerName, func(ctx router.Context) {
 			ip := extractClientIP(ctx, m.config.TrustProxy)
@@ -167,6 +167,6 @@ func (m *Module) MountAPI(r router.Router) {
 
 			ctx.SetHeader("Location", afterLogin)
 			ctx.WriteStatus(302)
-		})
+		}).Public()
 	}
 }
