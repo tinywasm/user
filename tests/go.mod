@@ -6,11 +6,11 @@ require (
 	github.com/tinywasm/context v0.0.18
 	github.com/tinywasm/form v0.2.13
 	github.com/tinywasm/json v0.5.11
-	github.com/tinywasm/jwt v0.0.3
+	github.com/tinywasm/jwt v0.1.0
 	github.com/tinywasm/mcp v0.1.21
 	github.com/tinywasm/model v0.0.12
 	github.com/tinywasm/orm v0.9.27
-	github.com/tinywasm/router v0.1.9
+	github.com/tinywasm/router v0.1.10
 	github.com/tinywasm/sqlite v0.2.5
 	github.com/tinywasm/user v0.0.33
 	golang.org/x/crypto v0.54.0
