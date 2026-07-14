@@ -3,7 +3,6 @@
 package tests
 
 import (
-	"context"
 	"testing"
 
 	"github.com/tinywasm/jwt"
@@ -14,7 +13,6 @@ import (
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/oauth2"
 )
 
 func newTestDB(t *testing.T) *orm.DB {
@@ -244,16 +242,16 @@ func testSessions(t *testing.T) {
 
 type MockProvider struct {
 	NameVal         string
-	ExchangeCodeVal *oauth2.Token
+	ExchangeCodeVal user.OAuthToken
 	UserInfoVal     user.OAuthUserInfo
 }
 
 func (m *MockProvider) Name() string                    { return m.NameVal }
 func (m *MockProvider) AuthCodeURL(state string) string { return "http://mock/" + state }
-func (m *MockProvider) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {
+func (m *MockProvider) ExchangeCode(code string) (user.OAuthToken, error) {
 	return m.ExchangeCodeVal, nil
 }
-func (m *MockProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (user.OAuthUserInfo, error) {
+func (m *MockProvider) GetUserInfo(token user.OAuthToken) (user.OAuthUserInfo, error) {
 	return m.UserInfoVal, nil
 }
 
@@ -261,7 +259,7 @@ func testOAuth(t *testing.T) {
 	db := newTestDB(t)
 	mockP := &MockProvider{
 		NameVal:         "mock",
-		ExchangeCodeVal: &oauth2.Token{AccessToken: "mocktoken"},
+		ExchangeCodeVal: user.OAuthToken{AccessToken: "mocktoken"},
 		UserInfoVal:     user.OAuthUserInfo{ID: "mockid", Email: "mock@example.com", Name: "Mock User"},
 	}
 

@@ -14,12 +14,10 @@ require (
 	github.com/tinywasm/sqlite v0.2.5
 	github.com/tinywasm/user v0.0.33
 	golang.org/x/crypto v0.54.0
-	golang.org/x/oauth2 v0.36.0
 	modernc.org/sqlite v1.53.0
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect

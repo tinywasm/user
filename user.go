@@ -1,11 +1,8 @@
 package user
 
 import (
-	"context"
-
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
-	"golang.org/x/oauth2"
 )
 
 var (
@@ -52,11 +49,39 @@ type OAuthUserInfo struct {
 	Name  string
 }
 
+// OAuthToken is what a provider returns when it exchanges the code. It replaces
+// oauth2.Token: that type dragged net/http in, and net/http does not exist under TinyGo —
+// which put this whole module out of the edge for one function call.
+type OAuthToken struct {
+	AccessToken string
+	TokenType   string
+	ExpiresIn   int
+}
+
+func (t *OAuthToken) DecodeFields(r model.FieldReader) {
+	t.AccessToken, _ = r.String("access_token")
+	t.TokenType, _ = r.String("token_type")
+	exp, _ := r.Int("expires_in")
+	t.ExpiresIn = int(exp)
+}
+
+func (t OAuthToken) IsNil() bool { return false }
+
+// OAuthConfig is the provider's registration: what the app declares in the provider console.
+type OAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       []string
+	AuthURL      string // provider's authorization endpoint
+	TokenURL     string // provider's token endpoint
+}
+
 type OAuthProvider interface {
 	Name() string
 	AuthCodeURL(state string) string
-	ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error)
-	GetUserInfo(ctx context.Context, token *oauth2.Token) (OAuthUserInfo, error)
+	ExchangeCode(code string) (OAuthToken, error)
+	GetUserInfo(token OAuthToken) (OAuthUserInfo, error)
 }
 
 // AuthMode selects the session strategy.

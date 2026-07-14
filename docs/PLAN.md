@@ -11,7 +11,7 @@ message: "fix!: purge golang.org/x/oauth2 so the module actually compiles for th
 
 | Orden | Plan | Estado | Asunto |
 |-------|------|--------|--------|
-| 1 | [PLAN_TINYGO_OAUTH.md](PLAN_TINYGO_OAUTH.md) | ☐ **PENDIENTE** — compuerta del demo | Purgar `golang.org/x/oauth2`: el intercambio de código pasa a `tinywasm/fetch`, y `Token`/`Config` a tipos locales. Sin esto el módulo **no entra en un Worker**. |
+| 1 | [PLAN_TINYGO_OAUTH.md](PLAN_TINYGO_OAUTH.md) | ✅ **COMPLETADO** | Purgar `golang.org/x/oauth2`: el intercambio de código pasa a `tinywasm/fetch`, y `Token`/`Config` a tipos locales. Sin esto el módulo **no entra en un Worker**. |
 
 ## Estado actual — "edge-ready" no lo era
 
