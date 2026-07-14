@@ -42,8 +42,8 @@ m, err := userserver.New(db, user.Config{
 `tinywasm/user` handles authentication flows, while views belong to the consumer.
 
 1. **Mount API**: Call `m.MountAPI(router)` to publish standard authentication routes (`POST /login`, `POST /logout`, `/oauth/:provider`).
-2. **Bootstrap**: Call `m.Bootstrap(email, password)` on startup to ensure a first administrator exists.
-3. **Consumer Views**: The application builds its own login page using `form.New(&user.LoginData{})` and posts to `user.PathLogin`.
+2. **Bootstrap**: Call `m.Bootstrap(Seed)` on startup to ensure a first user and their initial role/permissions exist.
+3. **Consumer Views**: The application builds its own login page using `form.New(&user.LoginData{})` and posts to `user.PathLogin` using JSON.
 4. **Protect Routes**: Inject `m.Authenticate()` (middleware) and `m.Can` (authorization) into your host router.
 5. **Client-side gating**: Use the `me` MCP tool to retrieve user profile and permissions for cosmetic UI gating.
 

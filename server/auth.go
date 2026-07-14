@@ -28,18 +28,18 @@ func (m *Module) Login(email, password string) (user.User, error) {
 		return user.User{}, user.ErrInvalidCredentials
 	}
 	if u.Status != "active" {
-		m.notify(user.SecurityEvent{Type: user.EventNonActiveAccess, UserID: u.ID})
+		m.notify(user.SecurityEvent{Type: user.EventNonActiveAccess, UserID: u.Id})
 		bcrypt.CompareHashAndPassword(getDummyHash(PasswordHashCost), []byte(password))
-		return user.User{}, user.ErrSuspended
+		return user.User{}, user.ErrInvalidCredentials
 	}
 
-	identity, err := getLocalIdentity(m.db, u.ID)
+	identity, err := getLocalIdentity(m.db, u.Id)
 	if err != nil {
 		bcrypt.CompareHashAndPassword(getDummyHash(PasswordHashCost), []byte(password))
 		return user.User{}, user.ErrInvalidCredentials
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderID), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderId), []byte(password)); err != nil {
 		return user.User{}, user.ErrInvalidCredentials
 	}
 	return u, nil
@@ -70,7 +70,7 @@ func (m *Module) VerifyPassword(userID, password string) error {
 	if err != nil {
 		return user.ErrInvalidCredentials
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderID), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderId), []byte(password)); err != nil {
 		return user.ErrInvalidCredentials
 	}
 	return nil

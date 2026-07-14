@@ -10,6 +10,7 @@ import (
 	"github.com/tinywasm/mcp"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/model"
 )
 
 func TestRBAC_ClosedByDefault(t *testing.T) {
@@ -20,7 +21,7 @@ func TestRBAC_ClosedByDefault(t *testing.T) {
 	}
 
 	t.Run("Anonymous has no permissions", func(t *testing.T) {
-		if m.Can("", "any", "r") {
+		if m.Can("", "any", model.Read) {
 			t.Error("anonymous user should have no permissions")
 		}
 	})
@@ -33,7 +34,7 @@ func TestRBAC_ClosedByDefault(t *testing.T) {
 		}
 		u := res.(user.User)
 
-		if m.Can(u.ID, "docs", "r") {
+		if m.Can(u.Id, "docs", model.Read) {
 			t.Error("user without roles should have no permissions")
 		}
 	})
@@ -46,20 +47,20 @@ func TestRBAC_ClosedByDefault(t *testing.T) {
 		if err := m.CreateRole("r1", "editor", "Editor", ""); err != nil {
 			t.Fatal(err)
 		}
-		if err := m.CreatePermission("p1", "Read", "docs", "r"); err != nil {
+		if err := m.CreatePermission("p1", "Read", "docs", model.Read); err != nil {
 			t.Fatal(err)
 		}
 		if err := m.AssignPermission("r1", "p1"); err != nil {
 			t.Fatal(err)
 		}
-		if err := m.AssignRole(u.ID, "r1"); err != nil {
+		if err := m.AssignRole(u.Id, "r1"); err != nil {
 			t.Fatal(err)
 		}
 
-		if !m.Can(u.ID, "docs", "r") {
+		if !m.Can(u.Id, "docs", model.Read) {
 			t.Error("expected true for assigned permission")
 		}
-		if m.Can(u.ID, "docs", "w") {
+		if m.Can(u.Id, "docs", model.Update) {
 			t.Error("expected false for unassigned action")
 		}
 	})
@@ -90,7 +91,7 @@ func TestTools_Me(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := ctx.Set(mcp.CtxKeyUserID, u.ID); err != nil {
+		if err := ctx.Set(mcp.CtxKeyUserID, u.Id); err != nil {
 			t.Fatal(err)
 		}
 
@@ -106,7 +107,7 @@ func TestTools_Me(t *testing.T) {
 		if err := json.Decode([]byte(res.Content), &profile); err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
-		if profile.ID != u.ID || profile.Email != u.Email {
+		if profile.Id != u.Id || profile.Email != u.Email {
 			t.Errorf("mismatch: got %v, want %v", profile, u)
 		}
 	})

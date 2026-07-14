@@ -5,10 +5,12 @@ package tests
 import (
 	"testing"
 
+	"github.com/tinywasm/jwt"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/model"
 )
 
 func TestMCPAuthorizer(t *testing.T) {
@@ -29,7 +31,7 @@ func TestMCPAuthorizer(t *testing.T) {
 	}
 	u := res.(user.User)
 
-	token, err := m.GenerateAPIToken(u.ID, 3600)
+	token, err := m.GenerateAPIToken(u.Id, 3600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +41,8 @@ func TestMCPAuthorizer(t *testing.T) {
 		ctx.SetHeader("Authorization", "Bearer "+token)
 
 		m.Authenticate()(func(c router.Context) {
-			if c.UserID() != u.ID {
-				t.Errorf("expected user %s, got %s", u.ID, c.UserID())
+			if c.UserID() != u.Id {
+				t.Errorf("expected user %s, got %s", u.Id, c.UserID())
 			}
 		})(ctx)
 	})
@@ -70,7 +72,7 @@ func TestMCPAuthorizer(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = m.CreatePermission("p1", "Read Data", "data", "R")
+		err = m.CreatePermission("p1", "Read Data", "data", model.Read)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,36 +80,39 @@ func TestMCPAuthorizer(t *testing.T) {
 		if err := m.AssignPermission("r1", "p1"); err != nil {
 			t.Fatal(err)
 		}
-		if err := m.AssignRole(u.ID, "r1"); err != nil {
+		if err := m.AssignRole(u.Id, "r1"); err != nil {
 			t.Fatal(err)
 		}
 
-		if !m.Can(u.ID, "data", "R") {
+		if !m.Can(u.Id, "data", model.Read) {
 			t.Error("expected Can to return true")
 		}
-		if m.Can(u.ID, "data", "W") {
+		if m.Can(u.Id, "data", model.Update) {
 			t.Error("expected Can to return false for wrong action")
 		}
-		if m.Can(u.ID, "other", "R") {
+		if m.Can(u.Id, "other", model.Read) {
 			t.Error("expected Can to return false for wrong resource")
 		}
 	})
 
 	t.Run("TestGenerateAPIToken_ZeroTTL", func(t *testing.T) {
-		token, err := m.GenerateAPIToken(u.ID, 0)
+		token, err := m.GenerateAPIToken(u.Id, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Should be valid
-		userID, err := userserver.ValidateJWT(secret, token)
-		if err != nil || userID != u.ID {
-			t.Errorf("token invalid: %v", err)
+		claims, outcome, err := jwt.Verify(secret, token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outcome != jwt.Valid || claims.Sub != u.Id {
+			t.Errorf("token not valid: outcome=%v sub=%q", outcome, claims.Sub)
 		}
 	})
 
 	t.Run("TestGenerateAPIToken_NoSecret", func(t *testing.T) {
 		m2, _ := userserver.New(db, user.Config{})
-		_, err := m2.GenerateAPIToken(u.ID, 0)
+		_, err := m2.GenerateAPIToken(u.Id, 0)
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing")
 		}

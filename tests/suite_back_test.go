@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/tinywasm/jwt"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
@@ -55,14 +56,14 @@ func testJWTCookieMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := res.(user.User)
-	_ = m.SetPassword(u.ID, "password123")
+	_ = m.SetPassword(u.Id, "password123")
 	logged, err := m.Login("jwt@test.com", "password123")
 	if err != nil {
 		t.Fatal("login failed:", err)
 	}
 
-	// Generar JWT como lo haría SetCookie
-	token, err := userserver.GenerateJWT(secret, logged.ID, 86400)
+	// Generar JWT como lo haría el módulo al emitir la cookie.
+	token, err := jwt.Sign(secret, jwt.NewClaims(logged.Id, 86400))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,8 +75,8 @@ func testJWTCookieMode(t *testing.T) {
 	m.Authenticate()(func(c router.Context) {
 		authID = c.UserID()
 	})(ctx)
-	if authID != logged.ID {
-		t.Errorf("JWT middleware: expected user %s, got %q", logged.ID, authID)
+	if authID != logged.Id {
+		t.Errorf("JWT middleware: expected user %s, got %q", logged.Id, authID)
 	}
 
 	// Token inválido → anónimo
@@ -143,13 +144,13 @@ func testCRUD(t *testing.T) {
 		t.Errorf("expected email 'test@example.com', got '%s'", u.Email)
 	}
 
-	res2, err := userCRUD.Read(u.ID)
+	res2, err := userCRUD.Read(u.Id)
 	if err != nil {
 		t.Fatalf("GetUser failed: %v", err)
 	}
 	u2 := res2.(user.User)
-	if u2.ID != u.ID {
-		t.Errorf("expected ID '%s', got '%s'", u.ID, u2.ID)
+	if u2.Id != u.Id {
+		t.Errorf("expected ID '%s', got '%s'", u.Id, u2.Id)
 	}
 
 	u2.Name = "Updated Name"
@@ -177,7 +178,7 @@ func testAuth(t *testing.T) {
 	}
 	u := res.(user.User)
 
-	if err := m.SetPassword(u.ID, "password123"); err != nil {
+	if err := m.SetPassword(u.Id, "password123"); err != nil {
 		t.Fatalf("SetPassword failed: %v", err)
 	}
 
@@ -185,7 +186,7 @@ func testAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
-	if u2.ID != u.ID {
+	if u2.Id != u.Id {
 		t.Errorf("Login returned wrong user")
 	}
 
@@ -194,7 +195,7 @@ func testAuth(t *testing.T) {
 		t.Errorf("expected ErrInvalidCredentials, got %v", err)
 	}
 
-	if err := m.VerifyPassword(u.ID, "password123"); err != nil {
+	if err := m.VerifyPassword(u.Id, "password123"); err != nil {
 		t.Fatalf("VerifyPassword failed: %v", err)
 	}
 }
@@ -213,29 +214,29 @@ func testSessions(t *testing.T) {
 	}
 	u := res.(user.User)
 
-	sess, err := m.CreateSession(u.ID, "127.0.0.1", "TestAgent")
+	sess, err := m.CreateSession(u.Id, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
 	// Get Session
-	s2, err := m.GetSession(sess.ID)
+	s2, err := m.GetSession(sess.Id)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if s2.UserID != u.ID {
+	if s2.UserId != u.Id {
 		t.Errorf("Session user ID mismatch")
 	}
 
 	// Instant expire via SQL
-	if err := db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess.ID); err != nil {
+	if err := db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess.Id); err != nil {
 		t.Fatalf("failed to expire session in DB: %v", err)
 	}
 
 	// Re-init to flush memory cache
 	m, _ = userserver.New(db, user.Config{TokenTTL: 3600})
 
-	_, err = m.GetSession(sess.ID)
+	_, err = m.GetSession(sess.Id)
 	if err != user.ErrSessionExpired {
 		t.Errorf("expected ErrSessionExpired, got %v", err)
 	}
@@ -304,7 +305,7 @@ func testOAuth(t *testing.T) {
 	if isNew2 {
 		t.Errorf("expected isNew=false")
 	}
-	if u2.ID != u.ID {
+	if u2.Id != u.Id {
 		t.Errorf("expected same user ID")
 	}
 }
@@ -323,11 +324,11 @@ func testLAN(t *testing.T) {
 	}
 	u := res.(user.User)
 
-	if err := m.RegisterLAN(u.ID, "12345678-5"); err != nil {
+	if err := m.RegisterLAN(u.Id, "12345678-5"); err != nil {
 		t.Fatalf("RegisterLAN failed: %v", err)
 	}
 
-	if err := m.AssignLANIP(u.ID, "192.168.1.10", "Home"); err != nil {
+	if err := m.AssignLANIP(u.Id, "192.168.1.10", "Home"); err != nil {
 		t.Fatalf("AssignLANIP failed: %v", err)
 	}
 
@@ -338,7 +339,7 @@ func testLAN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoginLAN failed: %v", err)
 	}
-	if u2.ID != u.ID {
+	if u2.Id != u.Id {
 		t.Errorf("expected same user ID")
 	}
 
@@ -361,11 +362,11 @@ func testLAN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoginLAN with proxy failed: %v", err)
 	}
-	if u3.ID != u.ID {
+	if u3.Id != u.Id {
 		t.Errorf("expected same user ID")
 	}
 
-	if err := m.RevokeLANIP(u.ID, "192.168.1.10"); err != nil {
+	if err := m.RevokeLANIP(u.Id, "192.168.1.10"); err != nil {
 		t.Fatalf("RevokeLANIP failed: %v", err)
 	}
 
@@ -374,7 +375,7 @@ func testLAN(t *testing.T) {
 		t.Errorf("expected ErrInvalidCredentials after revoke, got %v", err)
 	}
 
-	if err := m.UnregisterLAN(u.ID); err != nil {
+	if err := m.UnregisterLAN(u.Id); err != nil {
 		t.Fatalf("UnregisterLAN failed: %v", err)
 	}
 

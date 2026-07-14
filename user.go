@@ -26,7 +26,7 @@ var (
 type SecurityEventType uint8
 
 const (
-	EventJWTTampered        SecurityEventType = iota // ValidateJWT: HMAC mismatch
+	EventJWTTampered        SecurityEventType = iota // validateJWT: jwt.Forged (never jwt.Expired)
 	EventOAuthReplay                                 // consumeState: state already consumed (2nd use)
 	EventOAuthExpiredState                           // consumeState: state found but past ExpiresAt
 	EventOAuthCrossProvider                          // consumeState: provider mismatch (state preserved)
@@ -34,6 +34,7 @@ const (
 	EventNonActiveAccess                             // Login/LoginLAN: status != "active"
 	EventUnauthorizedAccess                          // validateSession: cookie present but session invalid
 	EventAccessDenied                                // AccessCheck: RBAC denied with valid session
+	EventPermissionCorrupt                           // HasPermission: permissions.action is not a CRUD string
 )
 
 type SecurityEvent struct {
@@ -102,6 +103,11 @@ type Config struct {
 	// AfterLoginPath is the path to redirect to after successful login.
 	// Default: PathAfterLogin ("/")
 	AfterLoginPath string
+
+	// RateLimit is called by endpoints before processing a request.
+	// Return a non-nil error to reject the request (429 Too Many Requests).
+	// remoteAddr is the client's IP address.
+	RateLimit func(remoteAddr string) error
 }
 
 const (
@@ -109,14 +115,11 @@ const (
 	PathLogout     = "/logout"
 	PathAfterLogin = "/"
 
-	RoleCodeAdmin = "admin"
-	ResourceAll   = "*"
-	ActionAll     = "*"
 )
 
 // ProfileDTO is a safe subset of User data for public/API consumption.
 type ProfileDTO struct {
-	ID          string
+	Id          string
 	Name        string
 	Email       string
 	Avatar      string
@@ -126,7 +129,7 @@ type ProfileDTO struct {
 }
 
 func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
-	w.String("id", p.ID)
+	w.String("id", p.Id)
 	w.String("name", p.Name)
 	w.String("email", p.Email)
 	w.String("avatar", p.Avatar)
@@ -146,7 +149,7 @@ func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
 func (p ProfileDTO) IsNil() bool { return false }
 
 func (p *ProfileDTO) DecodeFields(r model.FieldReader) {
-	p.ID, _ = r.String("id")
+	p.Id, _ = r.String("id")
 	p.Name, _ = r.String("name")
 	p.Email, _ = r.String("email")
 	p.Avatar, _ = r.String("avatar")

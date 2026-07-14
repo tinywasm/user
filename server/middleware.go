@@ -1,24 +1,26 @@
 package userserver
 
 import (
-	"strings"
-	"time"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/jwt"
+	"github.com/tinywasm/model"
+	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
 )
 
-// Can is an RBAC authority.
+var _ model.Authorizer = (*Module)(nil).Can
 
 // Authenticate returns a router.Middleware that validates the session (Cookie or Bearer).
-// If valid, it sets the UserID in the context via ctx.SetUserID(id).
-// If invalid, the UserID remains empty ("") indicating an anonymous user.
+// If valid, it sets the UserId in the context via ctx.SetUserID(id).
+// If invalid, the UserId remains empty ("") indicating an anonymous user.
 func (m *Module) Authenticate() router.Middleware {
 	return func(next router.HandlerFunc) router.HandlerFunc {
 		return func(ctx router.Context) {
 			u, err := m.validateSession(ctx)
 			if err == nil && u != nil {
-				ctx.SetUserID(u.ID)
+				ctx.SetUserID(u.Id)
 			}
 			next(ctx)
 		}
@@ -27,17 +29,28 @@ func (m *Module) Authenticate() router.Middleware {
 
 // Can checks if the userID has permission for the resource/action.
 // It also handles security event notification on failure.
-func (m *Module) Can(userID, resource, action string) bool {
+func (m *Module) Can(userID string, resource model.Resource, action model.Action) bool {
 	if userID == "" {
 		return false
 	}
-	ok, _ := m.HasPermission(userID, resource, action)
+	ok, err := m.HasPermission(userID, resource, action)
+	if err != nil {
+		// La firma de model.Authorizer solo devuelve bool: el error no cabe. Si no sale por
+		// aquí, no sale por ningún sitio. Denegamos, pero ruidosamente.
+		m.notify(user.SecurityEvent{
+			Type:      user.EventPermissionCorrupt,
+			UserID:    userID,
+			Resource:  string(resource),
+			Timestamp: time.Now() / 1e9,
+		})
+		return false
+	}
 	if !ok {
 		m.notify(user.SecurityEvent{
 			Type:      user.EventAccessDenied,
 			UserID:    userID,
-			Resource:  resource,
-			Timestamp: time.Now().Unix(),
+			Resource:  string(resource),
+			Timestamp: time.Now() / 1e9,
 		})
 	}
 	return ok
@@ -49,7 +62,7 @@ func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 	if m.config.AuthMode == user.AuthModeBearer {
 		const prefix = "Bearer "
 		auth := ctx.GetHeader("Authorization")
-		if !strings.HasPrefix(auth, prefix) {
+		if !fmt.HasPrefix(auth, prefix) {
 			return nil, user.ErrSessionExpired
 		}
 		return m.validateJWT(auth[len(prefix):])
@@ -70,7 +83,7 @@ func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 		return nil, err
 	}
 
-	u, err := m.GetUser(sess.UserID)
+	u, err := m.GetUser(sess.UserId)
 	if err != nil {
 		return nil, err
 	}
@@ -79,17 +92,25 @@ func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 
 // validateJWT validates a raw JWT string and returns the active user.
 func (m *Module) validateJWT(token string) (*user.User, error) {
-	userID, err := ValidateJWT(m.config.JWTSecret, token)
+	claims, outcome, err := jwt.Verify(m.config.JWTSecret, token)
 	if err != nil {
-		m.notify(user.SecurityEvent{Type: user.EventJWTTampered, Timestamp: time.Now().Unix()})
-		return nil, err
+		return nil, err // misconfigured (no JWTSecret): not an attack, not a bad token
 	}
-	u, err := m.GetUser(userID)
+	switch outcome {
+	case jwt.Expired:
+		// The quietest event there is: a session ran out. Raising the tampering alarm here
+		// would bury the real forgeries in noise.
+		return nil, user.ErrSessionExpired
+	case jwt.Forged:
+		m.notify(user.SecurityEvent{Type: user.EventJWTTampered, Timestamp: time.Now() / 1e9})
+		return nil, errInvalidToken
+	}
+	u, err := m.GetUser(claims.Sub)
 	if err != nil {
 		return nil, err
 	}
 	if u.Status != "active" {
-		m.notify(user.SecurityEvent{Type: user.EventNonActiveAccess, UserID: u.ID, Timestamp: time.Now().Unix()})
+		m.notify(user.SecurityEvent{Type: user.EventNonActiveAccess, UserID: u.Id, Timestamp: time.Now() / 1e9})
 		return nil, user.ErrSuspended
 	}
 	return &u, nil

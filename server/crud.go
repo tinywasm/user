@@ -1,6 +1,7 @@
 package userserver
 
 import (
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
 )
@@ -11,9 +12,11 @@ type userCRUD struct {
 	cache *userCache
 }
 
-func (h *userCRUD) HandlerName() string                   { return "users" }
-func (h *userCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
-func (h *userCRUD) ValidateData(action string, _ any) error { return nil }
+func (h *userCRUD) HandlerName() string { return "users" }
+func (h *userCRUD) AllowedRoles(action model.Action) []model.RoleCode {
+	return []model.RoleCode{model.RoleCode("admin")}
+}
+func (h *userCRUD) ValidateData(action model.Action, _ any) error { return nil }
 
 func (h *userCRUD) Create(payload any) (any, error) {
 	u := payload.(user.User)
@@ -23,20 +26,22 @@ func (h *userCRUD) Read(id string) (any, error) { return getUser(h.db, h.cache, 
 func (h *userCRUD) List() (any, error)          { return listUsers(h.db) }
 func (h *userCRUD) Update(payload any) (any, error) {
 	u := payload.(user.User)
-	return u, updateUser(h.db, h.cache, u.ID, u.Name, u.Phone)
+	return u, updateUser(h.db, h.cache, u.Id, u.Name, u.Phone)
 }
 func (h *userCRUD) Delete(id string) error { return deleteUser(h.db, h.cache, id) }
 
 // --- roleCRUD ---
 type roleCRUD struct{ m *Module }
 
-func (h *roleCRUD) HandlerName() string                   { return "roles" }
-func (h *roleCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
-func (h *roleCRUD) ValidateData(action string, _ any) error { return nil }
+func (h *roleCRUD) HandlerName() string { return "roles" }
+func (h *roleCRUD) AllowedRoles(action model.Action) []model.RoleCode {
+	return []model.RoleCode{model.RoleCode("admin")}
+}
+func (h *roleCRUD) ValidateData(action model.Action, _ any) error { return nil }
 
 func (h *roleCRUD) Create(payload any) (any, error) {
 	r := payload.(user.Role)
-	err := h.m.CreateRole(r.ID, r.Code, r.Name, r.Description)
+	err := h.m.CreateRole(r.Id, model.RoleCode(r.Code), r.Name, r.Description)
 	return r, err
 }
 func (h *roleCRUD) Read(id string) (any, error) { return h.m.GetRole(id) }
@@ -54,7 +59,7 @@ func (h *roleCRUD) List() (any, error) {
 }
 func (h *roleCRUD) Update(payload any) (any, error) {
 	r := payload.(user.Role)
-	err := h.m.CreateRole(r.ID, r.Code, r.Name, r.Description) // CreateRole does an upsert
+	err := h.m.CreateRole(r.Id, model.RoleCode(r.Code), r.Name, r.Description) // CreateRole does an upsert
 	return r, err
 }
 func (h *roleCRUD) Delete(id string) error { return h.m.DeleteRole(id) }
@@ -62,13 +67,19 @@ func (h *roleCRUD) Delete(id string) error { return h.m.DeleteRole(id) }
 // --- permissionCRUD ---
 type permissionCRUD struct{ m *Module }
 
-func (h *permissionCRUD) HandlerName() string                   { return "permissions" }
-func (h *permissionCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
-func (h *permissionCRUD) ValidateData(action string, _ any) error { return nil }
+func (h *permissionCRUD) HandlerName() string { return "permissions" }
+func (h *permissionCRUD) AllowedRoles(action model.Action) []model.RoleCode {
+	return []model.RoleCode{model.RoleCode("admin")}
+}
+func (h *permissionCRUD) ValidateData(action model.Action, _ any) error { return nil }
 
 func (h *permissionCRUD) Create(payload any) (any, error) {
 	p := payload.(user.Permission)
-	err := h.m.CreatePermission(p.ID, p.Name, p.Resource, p.Action)
+	pAction, err := model.ParseAction(p.Action)
+	if err != nil {
+		return nil, err
+	}
+	err = h.m.CreatePermission(p.Id, p.Name, model.Resource(p.Resource), pAction)
 	return p, err
 }
 func (h *permissionCRUD) Read(id string) (any, error) { return h.m.GetPermission(id) }
@@ -86,7 +97,11 @@ func (h *permissionCRUD) List() (any, error) {
 }
 func (h *permissionCRUD) Update(payload any) (any, error) {
 	p := payload.(user.Permission)
-	err := h.m.CreatePermission(p.ID, p.Name, p.Resource, p.Action) // CreatePermission does an upsert
+	pAction, err := model.ParseAction(p.Action)
+	if err != nil {
+		return nil, err
+	}
+	err = h.m.CreatePermission(p.Id, p.Name, model.Resource(p.Resource), pAction) // CreatePermission does an upsert
 	return p, err
 }
 func (h *permissionCRUD) Delete(id string) error { return h.m.DeletePermission(id) }
@@ -94,17 +109,19 @@ func (h *permissionCRUD) Delete(id string) error { return h.m.DeletePermission(i
 // --- lanipCRUD ---
 type lanipCRUD struct{ m *Module }
 
-func (h *lanipCRUD) HandlerName() string                   { return "lan_ips" }
-func (h *lanipCRUD) AllowedRoles(action string) []string     { return []string{"admin"} }
-func (h *lanipCRUD) ValidateData(action string, _ any) error { return nil }
+func (h *lanipCRUD) HandlerName() string { return "lan_ips" }
+func (h *lanipCRUD) AllowedRoles(action model.Action) []model.RoleCode {
+	return []model.RoleCode{model.RoleCode("admin")}
+}
+func (h *lanipCRUD) ValidateData(action model.Action, _ any) error { return nil }
 
 func (h *lanipCRUD) Create(payload any) (any, error) {
 	ip := payload.(user.LANIP)
-	err := h.m.AssignLANIP(ip.UserID, ip.IP, ip.Label)
+	err := h.m.AssignLANIP(ip.UserId, ip.Ip, ip.Label)
 	return ip, err
 }
 func (h *lanipCRUD) Read(id string) (any, error) {
-	qb := h.m.db.Query(&user.LANIP{}).Where(user.LANIP_.ID).Eq(id)
+	qb := h.m.db.Query(&user.LANIP{}).Where(user.LANIP_.Id).Eq(id)
 	results, err := user.ReadAllLANIP(qb)
 	if err != nil || len(results) == 0 {
 		return user.LANIP{}, err
@@ -127,10 +144,10 @@ func (h *lanipCRUD) Update(payload any) (any, error) {
 	return payload, nil // update isn't strictly defined for LANIPs beyond assigning
 }
 func (h *lanipCRUD) Delete(id string) error {
-	qb := h.m.db.Query(&user.LANIP{}).Where(user.LANIP_.ID).Eq(id)
+	qb := h.m.db.Query(&user.LANIP{}).Where(user.LANIP_.Id).Eq(id)
 	results, err := user.ReadAllLANIP(qb)
 	if err != nil || len(results) == 0 {
 		return err
 	}
-	return h.m.RevokeLANIP(results[0].UserID, results[0].IP)
+	return h.m.RevokeLANIP(results[0].UserId, results[0].Ip)
 }

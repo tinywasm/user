@@ -1,0 +1,114 @@
+//go:build !wasm
+
+package tests
+
+import (
+	"testing"
+
+	"github.com/tinywasm/json"
+	"github.com/tinywasm/router/mock"
+	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/model"
+)
+
+func TestOWASP(t *testing.T) {
+	db := newTestDB(t)
+	m, _ := userserver.New(db, user.Config{})
+
+	email := "active@test.com"
+	pass := "password123"
+	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	suspended := "suspended@test.com"
+	if err := m.Bootstrap(userserver.Seed{Email: suspended, Password: pass, Name: "Suspended", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
+		t.Fatal(err)
+	}
+	uSusp, _ := m.GetUserByEmail(suspended)
+	m.SuspendUser(uSusp.Id)
+
+	t.Run("Uniform 401 Responses", func(t *testing.T) {
+		r := &mock.Router{}
+		m.MountAPI(r)
+
+		cases := []struct {
+			name  string
+			email string
+			pass  string
+		}{
+			{"Non-existent user", "nonexistent@test.com", "anypass"},
+			{"Existing user, wrong pass", email, "wrongpass"},
+			{"Suspended user, right pass", suspended, pass},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				loginData := &user.LoginData{Email: tc.email, Password: tc.pass}
+				var body string
+				json.Encode(loginData, &body)
+				ctx := &mock.Context{
+					InMethod: "POST",
+					InPath:   user.PathLogin,
+					InBody:   []byte(body),
+				}
+				ctx.SetHeader("Content-Type", "application/json")
+				r.Invoke("POST", user.PathLogin, ctx)
+
+				if ctx.Status != 401 {
+					t.Errorf("expected 401, got %d", ctx.Status)
+				}
+				if string(ctx.ResponseBody()) != "access denied" {
+					t.Errorf("expected 'access denied', got %q", string(ctx.ResponseBody()))
+				}
+			})
+		}
+	})
+
+	t.Run("Rate Limit Hook", func(t *testing.T) {
+		db := newTestDB(t)
+		m, _ := userserver.New(db, user.Config{
+			RateLimit: func(ip string) error {
+				if ip == "1.2.3.4" {
+					return user.ErrInvalidCredentials // Simulating rejection
+				}
+				return nil
+			},
+		})
+		r := &mock.Router{}
+		m.MountAPI(r)
+
+		t.Run("Blocked IP", func(t *testing.T) {
+			ctx := &mock.Context{
+				InMethod: "POST",
+				InPath:   user.PathLogin,
+			}
+			ctx.SetValue("RemoteAddr", "1.2.3.4:1234")
+			ctx.SetHeader("Content-Type", "application/json")
+			json.Encode(&user.LoginData{Email: email, Password: pass}, &ctx.InBody)
+
+			r.Invoke("POST", user.PathLogin, ctx)
+			if ctx.Status != 429 {
+				t.Errorf("expected 429, got %d", ctx.Status)
+			}
+		})
+
+		t.Run("Allowed IP", func(t *testing.T) {
+			ctx := &mock.Context{
+				InMethod: "POST",
+				InPath:   user.PathLogin,
+			}
+			ctx.SetValue("RemoteAddr", "5.6.7.8:1234")
+			ctx.SetHeader("Content-Type", "application/json")
+			json.Encode(&user.LoginData{Email: email, Password: pass}, &ctx.InBody)
+
+			r.Invoke("POST", user.PathLogin, ctx)
+			// Status should be 401 (access denied) because user doesn't exist in this new DB,
+			// but NOT 429.
+			if ctx.Status != 401 {
+				t.Errorf("expected 401, got %d", ctx.Status)
+			}
+		})
+	})
+}

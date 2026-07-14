@@ -66,12 +66,7 @@ func testWidgets(t *testing.T) {
 			t.Fatalf("%s: form.New failed: %v", tc.name, err)
 		}
 		schema := tc.data.Schema()
-		count := 0
-		for _, field := range schema {
-			if field.Widget != nil {
-				count++
-			}
-		}
+		count := len(schema)
 		if count != tc.expected {
 			t.Errorf("%s: expected %d widgets, got %d", tc.name, tc.expected, count)
 		}
@@ -88,7 +83,7 @@ func testBootstrap(t *testing.T) {
 	email := "admin@test.com"
 	pass := "password123"
 
-	if err := m.Bootstrap(email, pass); err != nil {
+	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatalf("Bootstrap failed: %v", err)
 	}
 
@@ -97,18 +92,18 @@ func testBootstrap(t *testing.T) {
 		t.Fatalf("Admin login failed: %v", err)
 	}
 
-	ok := m.Can(u.ID, "any_resource", "any_action")
+	ok := m.Can(u.Id, model.Resource("any_resource"), model.Read)
 	if !ok {
 		t.Errorf("Admin should have wildcard permissions")
 	}
 
-	if err := m.Bootstrap(email, pass); err != nil {
+	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatalf("Bootstrap second call failed: %v", err)
 	}
 
 	db2 := newTestDB(t)
 	m2, _ := userserver.New(db2, user.Config{})
-	if err := m2.Bootstrap("", ""); err == nil {
+	if err := m2.Bootstrap(userserver.Seed{}); err == nil {
 		t.Errorf("Bootstrap with empty credentials on empty DB should fail")
 	}
 }
@@ -124,50 +119,14 @@ func testMountAPI(t *testing.T) {
 
 	email := "user@test.com"
 	pass := "password123"
-	if err := m.Bootstrap(email, pass); err != nil {
+	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatal(err)
 	}
 
 	r := &mock.Router{}
 	m.MountAPI(r)
 
-	// 1. POST /login (success) - urlencoded
-	ctxPost := &mock.Context{
-		InMethod: "POST",
-		InPath:   user.PathLogin,
-		InBody:   []byte("email=" + email + "&password=" + pass),
-	}
-	ctxPost.SetHeader("Content-Type", "application/x-www-form-urlencoded")
-
-	r.Invoke("POST", user.PathLogin, ctxPost)
-	if ctxPost.Status != 302 {
-		t.Errorf("POST /login (success) status: %d, body: %s", ctxPost.Status, string(ctxPost.ResponseBody()))
-	}
-	if ctxPost.GetHeader("Location") != user.PathAfterLogin {
-		t.Errorf("POST /login (success) redirect: %s", ctxPost.GetHeader("Location"))
-	}
-	c, ok := ctxPost.Cookie("test_session")
-	if !ok || c.Value == "" {
-		t.Errorf("POST /login (success) cookie missing or empty")
-	}
-
-	// 2. POST /login (failure) - urlencoded
-	ctxFail := &mock.Context{
-		InMethod: "POST",
-		InPath:   user.PathLogin,
-		InBody:   []byte("email=" + email + "&password=wrong"),
-	}
-	ctxFail.SetHeader("Content-Type", "application/x-www-form-urlencoded")
-
-	r.Invoke("POST", user.PathLogin, ctxFail)
-	if ctxFail.Status != 401 {
-		t.Errorf("POST /login (failure) status expected 401, got: %d", ctxFail.Status)
-	}
-	if !strings.Contains(string(ctxFail.ResponseBody()), "access denied") {
-		t.Errorf("POST /login (failure) missing error message: %s", string(ctxFail.ResponseBody()))
-	}
-
-	// 3. POST /login (success) - JSON
+	// 1. POST /login (success) - JSON
 	ctxJson := &mock.Context{
 		InMethod: "POST",
 		InPath:   user.PathLogin,
@@ -181,6 +140,26 @@ func testMountAPI(t *testing.T) {
 	r.Invoke("POST", user.PathLogin, ctxJson)
 	if ctxJson.Status != 302 {
 		t.Errorf("POST /login (JSON) status: %d", ctxJson.Status)
+	}
+	c, ok := ctxJson.Cookie("test_session")
+	if !ok || c.Value == "" {
+		t.Errorf("POST /login (JSON) cookie missing or empty")
+	}
+
+	// 2. POST /login (failure) - JSON
+	ctxFailJson := &mock.Context{
+		InMethod: "POST",
+		InPath:   user.PathLogin,
+	}
+	ctxFailJson.SetHeader("Content-Type", "application/json")
+	loginDataFail := &user.LoginData{Email: email, Password: "wrong_password"}
+	var postBodyFail string
+	json.Encode(loginDataFail, &postBodyFail)
+	ctxFailJson.InBody = []byte(postBodyFail)
+
+	r.Invoke("POST", user.PathLogin, ctxFailJson)
+	if ctxFailJson.Status != 401 {
+		t.Errorf("POST /login (JSON failure) status expected 401, got: %d", ctxFailJson.Status)
 	}
 
 	// 4. POST /logout
@@ -208,7 +187,7 @@ func testMeToolPermissions(t *testing.T) {
 	email := "tools@test.com"
 	pass := "password123"
 
-	if err := m.Bootstrap(email, pass); err != nil {
+	if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -230,7 +209,7 @@ func testMeToolPermissions(t *testing.T) {
 	}
 
 	ctx := twctx.Background()
-	ctx.Set(mcp.CtxKeyUserID, uObj.ID)
+	ctx.Set(mcp.CtxKeyUserID, uObj.Id)
 
 	res, err := meTool.Execute(ctx, mcp.Request{})
 	if err != nil {
@@ -242,7 +221,7 @@ func testMeToolPermissions(t *testing.T) {
 		t.Fatalf("failed to decode profile: %v", err)
 	}
 
-	if len(profile.Permissions) != 1 || profile.Permissions[0] != "*:*" {
-		t.Errorf("expected permission '*:*', got %v", profile.Permissions)
+	if len(profile.Permissions) != 1 || profile.Permissions[0] != "*:crud" {
+		t.Errorf("expected permission '*:crud', got %v", profile.Permissions)
 	}
 }

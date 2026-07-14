@@ -22,8 +22,8 @@ func newUserCache() *userCache {
 }
 
 func (c *userCache) Get(id string) (*user.User, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	u, ok := c.users[id]
 	return u, ok
 }
@@ -67,7 +67,7 @@ func (c *userCache) InvalidateByRole(roleID string) {
 	var toDelete []string
 	for id, u := range c.users {
 		for _, r := range u.Roles {
-			if r.ID == roleID {
+			if r.Id == roleID {
 				toDelete = append(toDelete, id)
 				break
 			}
@@ -93,7 +93,7 @@ func (c *userCache) InvalidateByPermission(permID string) {
 	var toDelete []string
 	for id, u := range c.users {
 		for _, p := range u.Permissions {
-			if p.ID == permID {
+			if p.Id == permID {
 				toDelete = append(toDelete, id)
 				break
 			}
