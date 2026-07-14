@@ -5,6 +5,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/tinywasm/jwt"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
@@ -100,9 +101,12 @@ func TestMCPAuthorizer(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Should be valid
-		userID, err := userserver.ValidateJWT(secret, token)
-		if err != nil || userID != u.Id {
-			t.Errorf("token invalid: %v", err)
+		userID, outcome, err := userserver.ValidateJWT(secret, token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outcome != jwt.Valid || userID != u.Id {
+			t.Errorf("token not valid: outcome=%v userID=%q", outcome, userID)
 		}
 	})
 

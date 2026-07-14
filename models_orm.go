@@ -887,3 +887,4 @@ func (s *PasswordDataList) DecodeFields(_ model.FieldReader) {}
 func (m *PasswordData) Validate(action byte) error {
 	return model.ValidateFields(action, m)
 }
+

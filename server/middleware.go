@@ -2,6 +2,7 @@ package userserver
 
 import (
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/jwt"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/time"
 
@@ -91,10 +92,18 @@ func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 
 // validateJWT validates a raw JWT string and returns the active user.
 func (m *Module) validateJWT(token string) (*user.User, error) {
-	userID, err := ValidateJWT(m.config.JWTSecret, token)
+	userID, outcome, err := ValidateJWT(m.config.JWTSecret, token)
 	if err != nil {
+		return nil, err // misconfigured (no JWTSecret): not an attack, not a bad token
+	}
+	switch outcome {
+	case jwt.Expired:
+		// The quietest event there is: a session ran out. Raising the tampering alarm here
+		// would bury the real forgeries in noise.
+		return nil, user.ErrSessionExpired
+	case jwt.Forged:
 		m.notify(user.SecurityEvent{Type: user.EventJWTTampered, Timestamp: time.Now() / 1e9})
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	u, err := m.GetUser(userID)
 	if err != nil {

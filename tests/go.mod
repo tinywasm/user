@@ -31,6 +31,7 @@ require (
 	github.com/tinywasm/dom v0.11.2 // indirect
 	github.com/tinywasm/fetch v0.1.24 // indirect
 	github.com/tinywasm/fmt v0.25.3 // indirect
+	github.com/tinywasm/jwt v0.0.3 // indirect
 	github.com/tinywasm/sqlt v0.0.7 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	github.com/tinywasm/unixid v0.2.23 // indirect
