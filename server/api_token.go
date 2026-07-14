@@ -31,11 +31,12 @@ func (m *Module) issueToken(userID string, ttl int) (string, error) {
 
 // GenerateAPIToken creates a signed JWT for API access (MCP clients, IDEs, LLMs).
 // Requires Config.JWTSecret — independent of the configured AuthMode.
-// ttl=0 → 100 years (effectively no expiry).
+// ttl=0 → 50 years (effectively no expiry). Not 100: this module compiles for the
+// edge, where int is 32-bit, and 100 years of seconds overflows int32.
 // The returned token is used as a Bearer token in Authorization headers.
 func (m *Module) GenerateAPIToken(userID string, ttl int) (string, error) {
 	if ttl == 0 {
-		ttl = 365 * 24 * 3600 * 100
+		ttl = 365 * 24 * 3600 * 50
 	}
 	return m.issueToken(userID, ttl)
 }
