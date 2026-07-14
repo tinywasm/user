@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/tinywasm/jwt"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
@@ -61,8 +62,8 @@ func testJWTCookieMode(t *testing.T) {
 		t.Fatal("login failed:", err)
 	}
 
-	// Generar JWT como lo haría SetCookie
-	token, err := userserver.GenerateJWT(secret, logged.Id, 86400)
+	// Generar JWT como lo haría el módulo al emitir la cookie.
+	token, err := jwt.Sign(secret, jwt.NewClaims(logged.Id, 86400))
 	if err != nil {
 		t.Fatal(err)
 	}

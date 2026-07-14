@@ -101,12 +101,12 @@ func TestMCPAuthorizer(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Should be valid
-		userID, outcome, err := userserver.ValidateJWT(secret, token)
+		claims, outcome, err := jwt.Verify(secret, token)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if outcome != jwt.Valid || userID != u.Id {
-			t.Errorf("token not valid: outcome=%v userID=%q", outcome, userID)
+		if outcome != jwt.Valid || claims.Sub != u.Id {
+			t.Errorf("token not valid: outcome=%v sub=%q", outcome, claims.Sub)
 		}
 	})
 

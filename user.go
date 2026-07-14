@@ -26,7 +26,7 @@ var (
 type SecurityEventType uint8
 
 const (
-	EventJWTTampered        SecurityEventType = iota // ValidateJWT: HMAC mismatch
+	EventJWTTampered        SecurityEventType = iota // validateJWT: jwt.Forged (never jwt.Expired)
 	EventOAuthReplay                                 // consumeState: state already consumed (2nd use)
 	EventOAuthExpiredState                           // consumeState: state found but past ExpiresAt
 	EventOAuthCrossProvider                          // consumeState: provider mismatch (state preserved)

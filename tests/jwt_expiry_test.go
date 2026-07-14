@@ -41,9 +41,9 @@ func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 	}
 	u := res.(user.User)
 
-	// Firmado con el secreto BUENO: es auténtico, solo que caducó hace años. Se firma con
-	// jwt.Sign y no con GenerateJWT porque NewClaims trata ttl<=0 como «usa el valor por
-	// defecto» — un ttl negativo daría un token VÁLIDO de 24h, no uno caducado.
+	// Firmado con el secreto BUENO: es auténtico, solo que caducó hace años. Se construyen
+	// los Claims a mano porque NewClaims trata ttl<=0 como «usa el valor por defecto» — un
+	// ttl negativo daría un token VÁLIDO de 24h, no uno caducado.
 	expired, err := jwt.Sign(secret, jwt.Claims{Sub: u.Id, Iat: 1, Exp: 2})
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +82,7 @@ func TestForgedTokenIsReportedAsTampering(t *testing.T) {
 	}
 
 	// Firmado con OTRO secreto: no es auténtico.
-	forged, err := userserver.GenerateJWT([]byte("a-completely-different-secret-00"), "u1", 3600)
+	forged, err := jwt.Sign([]byte("a-completely-different-secret-00"), jwt.NewClaims("u1", 3600))
 	if err != nil {
 		t.Fatal(err)
 	}

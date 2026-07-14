@@ -58,7 +58,7 @@ func (m *Module) MountAPI(r router.Router) {
 
 		var value string
 		if m.config.AuthMode == user.AuthModeJWT {
-			token, err := GenerateJWT(m.config.JWTSecret, u.Id, m.config.TokenTTL)
+			token, err := m.issueToken(u.Id, m.config.TokenTTL)
 			if err != nil {
 				ctx.WriteStatus(500)
 				ctx.Write([]byte(err.Error()))
@@ -138,7 +138,7 @@ func (m *Module) MountAPI(r router.Router) {
 
 			var value string
 			if m.config.AuthMode == user.AuthModeJWT {
-				token, err := GenerateJWT(m.config.JWTSecret, u.Id, m.config.TokenTTL)
+				token, err := m.issueToken(u.Id, m.config.TokenTTL)
 				if err != nil {
 					ctx.WriteStatus(500)
 					ctx.Write([]byte(err.Error()))

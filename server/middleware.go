@@ -92,7 +92,7 @@ func (m *Module) validateSession(ctx router.Context) (*user.User, error) {
 
 // validateJWT validates a raw JWT string and returns the active user.
 func (m *Module) validateJWT(token string) (*user.User, error) {
-	userID, outcome, err := ValidateJWT(m.config.JWTSecret, token)
+	claims, outcome, err := jwt.Verify(m.config.JWTSecret, token)
 	if err != nil {
 		return nil, err // misconfigured (no JWTSecret): not an attack, not a bad token
 	}
@@ -103,9 +103,9 @@ func (m *Module) validateJWT(token string) (*user.User, error) {
 		return nil, user.ErrSessionExpired
 	case jwt.Forged:
 		m.notify(user.SecurityEvent{Type: user.EventJWTTampered, Timestamp: time.Now() / 1e9})
-		return nil, ErrInvalidToken
+		return nil, errInvalidToken
 	}
-	u, err := m.GetUser(userID)
+	u, err := m.GetUser(claims.Sub)
 	if err != nil {
 		return nil, err
 	}
