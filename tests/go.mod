@@ -6,12 +6,13 @@ require (
 	github.com/tinywasm/context v0.0.18
 	github.com/tinywasm/form v0.2.13
 	github.com/tinywasm/json v0.5.11
+	github.com/tinywasm/jwt v0.0.3
 	github.com/tinywasm/mcp v0.1.21
 	github.com/tinywasm/model v0.0.12
 	github.com/tinywasm/orm v0.9.27
 	github.com/tinywasm/router v0.1.9
 	github.com/tinywasm/sqlite v0.2.5
-	github.com/tinywasm/user v0.0.0-00010101000000-000000000000
+	github.com/tinywasm/user v0.0.33
 	golang.org/x/crypto v0.54.0
 	golang.org/x/oauth2 v0.36.0
 	modernc.org/sqlite v1.53.0
@@ -31,7 +32,6 @@ require (
 	github.com/tinywasm/dom v0.11.2 // indirect
 	github.com/tinywasm/fetch v0.1.24 // indirect
 	github.com/tinywasm/fmt v0.25.3 // indirect
-	github.com/tinywasm/jwt v0.0.3 // indirect
 	github.com/tinywasm/sqlt v0.0.7 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	github.com/tinywasm/unixid v0.2.23 // indirect
