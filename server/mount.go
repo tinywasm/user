@@ -1,9 +1,7 @@
 package userserver
 
 import (
-	"strings"
 
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
@@ -30,33 +28,19 @@ func (m *Module) MountAPI(r router.Router) {
 	}
 
 	r.Post(user.PathLogin, func(ctx router.Context) {
-		data := &user.LoginData{}
-		ct := ctx.GetHeader("Content-Type")
-
-		if strings.Contains(ct, "application/x-www-form-urlencoded") {
-			body := string(ctx.Body())
-			parts := fmt.Split(body, "&")
-			for _, part := range parts {
-				kv := fmt.Split(part, "=")
-				if len(kv) == 2 {
-					key := kv[0]
-					val := kv[1]
-					if key == "email" {
-						data.Email = val
-					} else if key == "password" {
-						data.Password = val
-					}
-				}
-			}
-		} else if strings.Contains(ct, "application/json") {
-			if err := json.Decode(string(ctx.Body()), data); err != nil {
-				ctx.WriteStatus(400)
+		ip := extractClientIP(ctx, m.config.TrustProxy)
+		if m.config.RateLimit != nil {
+			if err := m.config.RateLimit(ip); err != nil {
+				ctx.WriteStatus(429)
 				ctx.Write([]byte(err.Error()))
 				return
 			}
-		} else {
+		}
+
+		data := &user.LoginData{}
+		if err := json.Decode(string(ctx.Body()), data); err != nil {
 			ctx.WriteStatus(400)
-			ctx.Write([]byte("unsupported content type"))
+			ctx.Write([]byte(err.Error()))
 			return
 		}
 
@@ -74,7 +58,7 @@ func (m *Module) MountAPI(r router.Router) {
 
 		var value string
 		if m.config.AuthMode == user.AuthModeJWT {
-			token, err := GenerateJWT(m.config.JWTSecret, u.ID, m.config.TokenTTL)
+			token, err := GenerateJWT(m.config.JWTSecret, u.Id, m.config.TokenTTL)
 			if err != nil {
 				ctx.WriteStatus(500)
 				ctx.Write([]byte(err.Error()))
@@ -83,13 +67,13 @@ func (m *Module) MountAPI(r router.Router) {
 			value = token
 		} else {
 			ua := ctx.GetHeader("User-Agent")
-			sess, err := m.CreateSession(u.ID, extractClientIP(ctx, m.config.TrustProxy), ua)
+			sess, err := m.CreateSession(u.Id, extractClientIP(ctx, m.config.TrustProxy), ua)
 			if err != nil {
 				ctx.WriteStatus(500)
 				ctx.Write([]byte(err.Error()))
 				return
 			}
-			value = sess.ID
+			value = sess.Id
 		}
 
 		ctx.SetCookie(router.Cookie{
@@ -111,9 +95,9 @@ func (m *Module) MountAPI(r router.Router) {
 		if ok {
 			if m.config.AuthMode == user.AuthModeCookie {
 				m.cache.delete(cookie.Value)
-				qb := m.db.Query(&user.Session{}).Where(user.Session_.ID).Eq(cookie.Value)
+				qb := m.db.Query(&user.Session{}).Where(user.Session_.Id).Eq(cookie.Value)
 				if sess, err := user.ReadOneSession(qb, &user.Session{}); err == nil {
-					m.db.Delete(sess, orm.Eq(user.Session_.ID, sess.ID))
+					m.db.Delete(sess, orm.Eq(user.Session_.Id, sess.Id))
 				}
 			}
 		}
@@ -154,7 +138,7 @@ func (m *Module) MountAPI(r router.Router) {
 
 			var value string
 			if m.config.AuthMode == user.AuthModeJWT {
-				token, err := GenerateJWT(m.config.JWTSecret, u.ID, m.config.TokenTTL)
+				token, err := GenerateJWT(m.config.JWTSecret, u.Id, m.config.TokenTTL)
 				if err != nil {
 					ctx.WriteStatus(500)
 					ctx.Write([]byte(err.Error()))
@@ -162,13 +146,13 @@ func (m *Module) MountAPI(r router.Router) {
 				}
 				value = token
 			} else {
-				sess, err := m.CreateSession(u.ID, ip, ua)
+				sess, err := m.CreateSession(u.Id, ip, ua)
 				if err != nil {
 					ctx.WriteStatus(500)
 					ctx.Write([]byte(err.Error()))
 					return
 				}
-				value = sess.ID
+				value = sess.Id
 			}
 
 			ctx.SetCookie(router.Cookie{

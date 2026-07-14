@@ -63,6 +63,10 @@ gotest
 - Cover frequent use cases: login/register/profile forms work after construction with **no lifecycle
   hook**; `lan` add/remove patches single IP rows (others keep identity). Publish with `gopush 'message'`.
 
+## Security Policy
+
+This library provides the **mechanism** (hashing, sessions, routes, permission checking). The **policy**—what roles exist, who receives what, if there's a wildcard—is declared by the consumer via `Bootstrap(Seed)`. No role or resource constants live here.
+
 ## Documentation First
 
 Update docs **before** code and before `gopush`: `docs/ARCHITECTURE.md` (remove `OnMount` delegation

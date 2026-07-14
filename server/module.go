@@ -3,7 +3,7 @@ package userserver
 import (
 	"github.com/tinywasm/fmt"
 	"sync"
-	"time"
+	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
@@ -70,7 +70,7 @@ func (m *Module) SetLog(fn func(...any)) {
 
 func (m *Module) notify(e user.SecurityEvent) {
 	if e.Timestamp == 0 {
-		e.Timestamp = time.Now().Unix()
+		e.Timestamp = time.Now() / 1e9
 	}
 	if m.config.OnSecurityEvent != nil {
 		m.config.OnSecurityEvent(e)
@@ -94,14 +94,14 @@ func (m *Module) ReactivateUser(id string) error {
 // PurgeSessionsByUser deletes all sessions belonging to userID from cache and DB.
 func (m *Module) PurgeSessionsByUser(userID string) error {
 	// First from DB
-	qb := m.db.Query(&user.Session{}).Where(user.Session_.UserID).Eq(userID)
+	qb := m.db.Query(&user.Session{}).Where(user.Session_.UserId).Eq(userID)
 	sessions, err := user.ReadAllSession(qb)
 	if err != nil {
 		return err
 	}
 	for _, s := range sessions {
-		m.db.Delete(s, orm.Eq(user.Session_.ID, s.ID))
-		m.cache.delete(s.ID)
+		m.db.Delete(s, orm.Eq(user.Session_.Id, s.Id))
+		m.cache.delete(s.Id)
 	}
 	return nil
 }
@@ -113,14 +113,14 @@ func (m *Module) registerProvider(p user.OAuthProvider) {
 }
 
 func (m *Module) getProvider(name string) user.OAuthProvider {
-	m.providersMu.RLock()
-	defer m.providersMu.RUnlock()
+	m.providersMu.Lock()
+	defer m.providersMu.Unlock()
 	return m.providers[name]
 }
 
 func (m *Module) registeredProviders() []user.OAuthProvider {
-	m.providersMu.RLock()
-	defer m.providersMu.RUnlock()
+	m.providersMu.Lock()
+	defer m.providersMu.Unlock()
 	var list []user.OAuthProvider
 	for _, p := range m.providers {
 		list = append(list, p)

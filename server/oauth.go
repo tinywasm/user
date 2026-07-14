@@ -2,13 +2,14 @@ package userserver
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/url"
-	"time"
 
+	"github.com/tinywasm/fetch"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
+	"github.com/tinywasm/time"
 	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 
@@ -29,7 +30,7 @@ func (m *Module) BeginOAuth(providerName string) (string, error) {
 	}
 	state := u.GetNewID()
 
-	now := time.Now().Unix()
+	now := time.Now() / 1e9
 	expiresAt := now + 600 // 10 minutes
 
 	stateObj := &user.OAuthState{
@@ -48,14 +49,19 @@ func (m *Module) BeginOAuth(providerName string) (string, error) {
 
 func (m *Module) CompleteOAuth(providerName string, ctx router.Context, ip, ua string) (user.User, bool, error) {
 	var state, code string
-	if q, ok := ctx.Value("query").(url.Values); ok {
-		state = q.Get("state")
-		code = q.Get("code")
-	} else {
-		// Fallback: parse from Path if it's a full URL or contains query
-		if u, err := url.Parse(ctx.Path()); err == nil {
-			state = u.Query().Get("state")
-			code = u.Query().Get("code")
+	path := ctx.Path()
+	if fmt.Contains(path, "?") {
+		query := fmt.Split(path, "?")[1]
+		parts := fmt.Split(query, "&")
+		for _, part := range parts {
+			kv := fmt.Split(part, "=")
+			if len(kv) == 2 {
+				if kv[0] == "state" {
+					state = kv[1]
+				} else if kv[0] == "code" {
+					code = kv[1]
+				}
+			}
 		}
 	}
 
@@ -83,13 +89,13 @@ func (m *Module) CompleteOAuth(providerName string, ctx router.Context, ip, ua s
 
 	identity, err := getIdentityByProvider(m.db, providerName, info.ID)
 	if err == nil {
-		u, err := getUser(m.db, m.ucache, identity.UserID)
+		u, err := getUser(m.db, m.ucache, identity.UserId)
 		return u, false, err
 	}
 
 	u, err := getUserByEmail(m.db, m.ucache, info.Email)
 	if err == nil {
-		_ = createIdentity(m.db, u.ID, providerName, info.ID, info.Email)
+		_ = createIdentity(m.db, u.Id, providerName, info.ID, info.Email)
 		return u, false, nil
 	}
 
@@ -97,7 +103,7 @@ func (m *Module) CompleteOAuth(providerName string, ctx router.Context, ip, ua s
 	if err != nil {
 		return user.User{}, false, err
 	}
-	_ = createIdentity(m.db, u.ID, providerName, info.ID, info.Email)
+	_ = createIdentity(m.db, u.Id, providerName, info.ID, info.Email)
 	return u, true, nil
 }
 
@@ -121,7 +127,7 @@ func consumeState(db *orm.DB, state, provider string) error {
 		return err
 	}
 
-	if stateObj.ExpiresAt < time.Now().Unix() {
+	if stateObj.ExpiresAt < time.Now()/1e9 {
 		return user.ErrInvalidOAuthState
 	}
 
@@ -129,7 +135,7 @@ func consumeState(db *orm.DB, state, provider string) error {
 }
 
 func (m *Module) PurgeExpiredOAuthStates() error {
-	qb := m.db.Query(&user.OAuthState{}).Where(user.OAuthState_.ExpiresAt).Lt(time.Now().Unix())
+	qb := m.db.Query(&user.OAuthState{}).Where(user.OAuthState_.ExpiresAt).Lt(time.Now() / 1e9)
 	states, _ := user.ReadAllOAuthState(qb)
 	for _, s := range states {
 		m.db.Delete(s, orm.Eq(user.OAuthState_.State, s.State))
@@ -170,32 +176,51 @@ func (p *GoogleProvider) ExchangeCode(ctx context.Context, code string) (*oauth2
 	return p.config.Exchange(ctx, code)
 }
 
+type googleData struct {
+	ID    string
+	Email string
+	Name  string
+}
+
+func (d *googleData) EncodeFields(w model.FieldWriter) {}
+func (d *googleData) IsNil() bool                     { return false }
+func (d *googleData) DecodeFields(r model.FieldReader) {
+	d.ID, _ = r.String("id")
+	d.Email, _ = r.String("email")
+	d.Name, _ = r.String("name")
+}
+
 func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (user.OAuthUserInfo, error) {
-	client := p.config.Client(ctx, token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		return user.OAuthUserInfo{}, err
-	}
-	defer resp.Body.Close()
+	var res user.OAuthUserInfo
+	var errOut error
+	done := make(chan bool)
 
-	if resp.StatusCode != http.StatusOK {
-		return user.OAuthUserInfo{}, user.ErrInvalidCredentials
-	}
+	fetch.Get("https://www.googleapis.com/oauth2/v2/userinfo").
+		Header("Authorization", "Bearer "+token.AccessToken).
+		Send(func(resp *fetch.Response, err error) {
+			defer func() { done <- true }()
+			if err != nil {
+				errOut = err
+				return
+			}
+			if resp.Status != 200 {
+				errOut = user.ErrInvalidCredentials
+				return
+			}
+			var data googleData
+			if err := json.Decode(resp.Text(), &data); err != nil {
+				errOut = err
+				return
+			}
+			res = user.OAuthUserInfo{
+				ID:    data.ID,
+				Email: data.Email,
+				Name:  data.Name,
+			}
+		})
 
-	var data struct {
-		ID    string `json:"id"`
-		Email string `json:"email"`
-		Name  string `json:"name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return user.OAuthUserInfo{}, err
-	}
-
-	return user.OAuthUserInfo{
-		ID:    data.ID,
-		Email: data.Email,
-		Name:  data.Name,
-	}, nil
+	<-done
+	return res, errOut
 }
 
 type MicrosoftProvider struct {
@@ -231,36 +256,55 @@ func (p *MicrosoftProvider) ExchangeCode(ctx context.Context, code string) (*oau
 	return p.config.Exchange(ctx, code)
 }
 
+type msData struct {
+	ID                string
+	Email             string
+	UserPrincipalName string
+	Name              string
+}
+
+func (d *msData) EncodeFields(w model.FieldWriter) {}
+func (d *msData) IsNil() bool                     { return false }
+func (d *msData) DecodeFields(r model.FieldReader) {
+	d.ID, _ = r.String("id")
+	d.Email, _ = r.String("mail")
+	d.UserPrincipalName, _ = r.String("userPrincipalName")
+	d.Name, _ = r.String("displayName")
+}
+
 func (p *MicrosoftProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (user.OAuthUserInfo, error) {
-	client := p.config.Client(ctx, token)
-	resp, err := client.Get("https://graph.microsoft.com/v1.0/me")
-	if err != nil {
-		return user.OAuthUserInfo{}, err
-	}
-	defer resp.Body.Close()
+	var res user.OAuthUserInfo
+	var errOut error
+	done := make(chan bool)
 
-	if resp.StatusCode != http.StatusOK {
-		return user.OAuthUserInfo{}, user.ErrInvalidCredentials
-	}
+	fetch.Get("https://graph.microsoft.com/v1.0/me").
+		Header("Authorization", "Bearer "+token.AccessToken).
+		Send(func(resp *fetch.Response, err error) {
+			defer func() { done <- true }()
+			if err != nil {
+				errOut = err
+				return
+			}
+			if resp.Status != 200 {
+				errOut = user.ErrInvalidCredentials
+				return
+			}
+			var data msData
+			if err := json.Decode(resp.Text(), &data); err != nil {
+				errOut = err
+				return
+			}
+			email := data.Email
+			if email == "" {
+				email = data.UserPrincipalName
+			}
+			res = user.OAuthUserInfo{
+				ID:    data.ID,
+				Email: email,
+				Name:  data.Name,
+			}
+		})
 
-	var data struct {
-		ID                string `json:"id"`
-		Email             string `json:"mail"`
-		UserPrincipalName string `json:"userPrincipalName"`
-		Name              string `json:"displayName"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return user.OAuthUserInfo{}, err
-	}
-
-	email := data.Email
-	if email == "" {
-		email = data.UserPrincipalName
-	}
-
-	return user.OAuthUserInfo{
-		ID:    data.ID,
-		Email: email,
-		Name:  data.Name,
-	}, nil
+	<-done
+	return res, errOut
 }

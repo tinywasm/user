@@ -2,7 +2,7 @@ package userserver
 
 import (
 	"sync"
-	"time"
+	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
@@ -21,7 +21,7 @@ func newSessionCache() *sessionCache {
 }
 
 func (c *sessionCache) warmUp(db *orm.DB) error {
-	qb := db.Query(&user.Session{}).Where(user.Session_.ExpiresAt).Gt(time.Now().Unix())
+	qb := db.Query(&user.Session{}).Where(user.Session_.ExpiresAt).Gt(time.Now() / 1e9)
 	sessions, err := user.ReadAllSession(qb)
 	if err != nil {
 		return err
@@ -31,7 +31,7 @@ func (c *sessionCache) warmUp(db *orm.DB) error {
 	defer c.mu.Unlock()
 
 	for _, s := range sessions {
-		c.items[s.ID] = *s
+		c.items[s.Id] = *s
 	}
 	return nil
 }
@@ -43,8 +43,8 @@ func (c *sessionCache) set(id string, s user.Session) {
 }
 
 func (c *sessionCache) get(id string) (user.Session, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	s, ok := c.items[id]
 	return s, ok
 }
@@ -69,7 +69,7 @@ func (m *Module) RotateSession(oldID, ip, userAgent string) (user.Session, error
 		return user.Session{}, err
 	}
 
-	return m.CreateSession(oldSess.UserID, ip, userAgent)
+	return m.CreateSession(oldSess.UserId, ip, userAgent)
 }
 
 func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, error) {
@@ -83,12 +83,12 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 		ttl = 86400
 	}
 
-	now := time.Now().Unix()
+	now := time.Now() / 1e9
 	sess := user.Session{
-		ID:        u.GetNewID(),
-		UserID:    userID,
+		Id:        u.GetNewID(),
+		UserId:    userID,
 		ExpiresAt: now + int64(ttl),
-		IP:        ip,
+		Ip:        ip,
 		UserAgent: userAgent,
 		CreatedAt: now,
 	}
@@ -96,20 +96,20 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 	if err := m.db.Create(&sess); err != nil {
 		return user.Session{}, err
 	}
-	m.cache.set(sess.ID, sess)
+	m.cache.set(sess.Id, sess)
 	return sess, nil
 }
 
 func (m *Module) GetSession(id string) (user.Session, error) {
 	if s, ok := m.cache.get(id); ok {
-		if s.ExpiresAt < time.Now().Unix() {
+		if s.ExpiresAt < time.Now() / 1e9 {
 			m.cache.delete(id)
 			return user.Session{}, user.ErrSessionExpired
 		}
 		return s, nil
 	}
 
-	qb := m.db.Query(&user.Session{}).Where(user.Session_.ID).Eq(id)
+	qb := m.db.Query(&user.Session{}).Where(user.Session_.Id).Eq(id)
 	results, err := user.ReadAllSession(qb)
 
 	if err != nil {
@@ -120,26 +120,26 @@ func (m *Module) GetSession(id string) (user.Session, error) {
 	}
 	s := *results[0]
 
-	if s.ExpiresAt < time.Now().Unix() {
+	if s.ExpiresAt < time.Now() / 1e9 {
 		return user.Session{}, user.ErrSessionExpired
 	}
 
-	m.cache.set(s.ID, s)
+	m.cache.set(s.Id, s)
 	return s, nil
 }
 
 func (m *Module) DeleteSession(id string) error {
 	m.cache.delete(id)
-	qb := m.db.Query(&user.Session{}).Where(user.Session_.ID).Eq(id)
+	qb := m.db.Query(&user.Session{}).Where(user.Session_.Id).Eq(id)
 	results, err := user.ReadAllSession(qb)
 	if err == nil && len(results) > 0 {
-		return m.db.Delete(results[0], orm.Eq(user.Session_.ID, results[0].ID))
+		return m.db.Delete(results[0], orm.Eq(user.Session_.Id, results[0].Id))
 	}
 	return err
 }
 
 func (m *Module) PurgeExpiredSessions() error {
-	now := time.Now().Unix()
+	now := time.Now() / 1e9
 
 	m.cache.mu.Lock()
 	for k, v := range m.cache.items {
@@ -152,7 +152,7 @@ func (m *Module) PurgeExpiredSessions() error {
 	qb := m.db.Query(&user.Session{}).Where(user.Session_.ExpiresAt).Lt(now)
 	sessions, _ := user.ReadAllSession(qb)
 	for _, s := range sessions {
-		m.db.Delete(s, orm.Eq(user.Session_.ID, s.ID))
+		m.db.Delete(s, orm.Eq(user.Session_.Id, s.Id))
 	}
 
 	return nil

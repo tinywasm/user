@@ -7,10 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tinywasm/json"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/model"
 )
 
 func TestCookieSecurity(t *testing.T) {
@@ -18,12 +20,15 @@ func TestCookieSecurity(t *testing.T) {
 		r := &mock.Router{}
 		m.MountAPI(r)
 
+		loginData := &user.LoginData{Email: email, Password: pass}
+		var postBody string
+		json.Encode(loginData, &postBody)
 		ctx := &mock.Context{
 			InMethod: "POST",
 			InPath:   user.PathLogin,
-			InBody:   []byte("email=" + email + "&password=" + pass),
+			InBody:   []byte(postBody),
 		}
-		ctx.SetHeader("Content-Type", "application/x-www-form-urlencoded")
+		ctx.SetHeader("Content-Type", "application/json")
 
 		r.Invoke("POST", user.PathLogin, ctx)
 		if ctx.Status != 302 {
@@ -41,7 +46,7 @@ func TestCookieSecurity(t *testing.T) {
 		db := newTestDB(t)
 		m, _ := userserver.New(db, user.Config{TokenTTL: 3600, CookieName: "session"})
 		email, pass := "cookie1@example.com", "password123"
-		if err := m.Bootstrap(email, pass); err != nil {
+		if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -71,7 +76,7 @@ func TestCookieSecurity(t *testing.T) {
 		db := newTestDB(t)
 		m, _ := userserver.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session"})
 		email, pass := "cookie2@example.com", "password123"
-		if err := m.Bootstrap(email, pass); err != nil {
+		if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -91,7 +96,7 @@ func TestCookieSecurity(t *testing.T) {
 		db := newTestDB(t)
 		m, _ := userserver.New(db, user.Config{CookieName: "custom_auth"})
 		email, pass := "cookie3@example.com", "password123"
-		if err := m.Bootstrap(email, pass); err != nil {
+		if err := m.Bootstrap(userserver.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -112,37 +117,37 @@ func TestSessionRotation(t *testing.T) {
 	u := resU.(user.User)
 
 	t.Run("RotateSession valid", func(t *testing.T) {
-		sess1, _ := m.CreateSession(u.ID, "10.0.0.1", "ua1")
+		sess1, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
 
-		sess2, err := m.RotateSession(sess1.ID, "10.0.0.2", "ua2")
+		sess2, err := m.RotateSession(sess1.Id, "10.0.0.2", "ua2")
 		if err != nil {
 			t.Fatalf("RotateSession failed: %v", err)
 		}
 
-		if sess2.ID == sess1.ID {
+		if sess2.Id == sess1.Id {
 			t.Errorf("expected new session ID")
 		}
-		if sess2.UserID != u.ID {
-			t.Errorf("expected same UserID")
+		if sess2.UserId != u.Id {
+			t.Errorf("expected same UserId")
 		}
-		if sess2.IP != "10.0.0.2" {
+		if sess2.Ip != "10.0.0.2" {
 			t.Errorf("expected updated IP")
 		}
 
 		// Ensure old session is gone
-		_, err = m.GetSession(sess1.ID)
+		_, err = m.GetSession(sess1.Id)
 		if err != user.ErrNotFound {
 			t.Errorf("expected ErrNotFound for old session, got %v", err)
 		}
 	})
 
 	t.Run("RotateSession expired", func(t *testing.T) {
-		sess3, _ := m.CreateSession(u.ID, "10.0.0.1", "ua1")
+		sess3, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
 		// Manually expire
-		db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.ID)
+		db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.Id)
 		m, _ = userserver.New(db, user.Config{TokenTTL: 3600}) // Clear cache
 
-		_, err := m.RotateSession(sess3.ID, "10.0.0.1", "ua1")
+		_, err := m.RotateSession(sess3.Id, "10.0.0.1", "ua1")
 		if err != user.ErrSessionExpired {
 			t.Errorf("expected ErrSessionExpired, got %v", err)
 		}
@@ -156,11 +161,11 @@ func TestSessionRotation(t *testing.T) {
 	})
 
 	t.Run("Middleware Continuity", func(t *testing.T) {
-		sessOld, _ := m.CreateSession(u.ID, "10.0.0.1", "ua1")
-		sessNew, _ := m.RotateSession(sessOld.ID, "10.0.0.1", "ua1")
+		sessOld, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
+		sessNew, _ := m.RotateSession(sessOld.Id, "10.0.0.1", "ua1")
 
 		ctxOld := &mock.Context{}
-		ctxOld.SetCookie(router.Cookie{Name: "session", Value: sessOld.ID})
+		ctxOld.SetCookie(router.Cookie{Name: "session", Value: sessOld.Id})
 		var authID string
 		m.Authenticate()(func(c router.Context) {
 			authID = c.UserID()
@@ -170,12 +175,12 @@ func TestSessionRotation(t *testing.T) {
 		}
 
 		ctxNew := &mock.Context{}
-		ctxNew.SetCookie(router.Cookie{Name: "session", Value: sessNew.ID})
+		ctxNew.SetCookie(router.Cookie{Name: "session", Value: sessNew.Id})
 		m.Authenticate()(func(c router.Context) {
 			authID = c.UserID()
 		})(ctxNew)
-		if authID != u.ID {
-			t.Errorf("expected identity %s for new session, got %q", u.ID, authID)
+		if authID != u.Id {
+			t.Errorf("expected identity %s for new session, got %q", u.Id, authID)
 		}
 	})
 }
@@ -197,33 +202,33 @@ func TestPasswordHook(t *testing.T) {
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "hook@example.com", Name: "Hook"})
 	u := resU.(user.User)
-	_ = m.SetPassword(u.ID, "goodpass123") // Baseline
+	_ = m.SetPassword(u.Id, "goodpass123") // Baseline
 
 	t.Run("Hook rejection", func(t *testing.T) {
-		err := m.SetPassword(u.ID, "thisisbadpass")
+		err := m.SetPassword(u.Id, "thisisbadpass")
 		if err != errHook {
 			t.Errorf("expected custom hook error, got %v", err)
 		}
 
 		// Old password should still work
-		if err := m.VerifyPassword(u.ID, "goodpass123"); err != nil {
+		if err := m.VerifyPassword(u.Id, "goodpass123"); err != nil {
 			t.Errorf("expected old password to still be valid")
 		}
 	})
 
 	t.Run("Hook success", func(t *testing.T) {
-		err := m.SetPassword(u.ID, "thisisokpass")
+		err := m.SetPassword(u.Id, "thisisokpass")
 		if err != nil {
 			t.Errorf("expected nil, got %v", err)
 		}
 
-		if err := m.VerifyPassword(u.ID, "thisisokpass"); err != nil {
+		if err := m.VerifyPassword(u.Id, "thisisokpass"); err != nil {
 			t.Errorf("expected new password to work")
 		}
 	})
 
 	t.Run("Length runs before hook", func(t *testing.T) {
-		err := m.SetPassword(u.ID, "bad") // short and "bad"
+		err := m.SetPassword(u.Id, "bad") // short and "bad"
 		if err != user.ErrWeakPassword {
 			t.Errorf("expected ErrWeakPassword, got %v", err)
 		}

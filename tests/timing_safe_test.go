@@ -17,18 +17,18 @@ func TestTimingSafeAuth(t *testing.T) {
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "timing@example.com", Name: "Timing User"})
 	u := resU.(user.User)
-	_ = m.SetPassword(u.ID, "password123")
+	_ = m.SetPassword(u.Id, "password123")
 
 	// Create an OAuth-only user (no local identity)
 	resO, _ := userCRUD.Create(user.User{Email: "oauth@example.com", Name: "OAuth User"})
 	uOauth := resO.(user.User)
-	_ = m.RegisterLAN(uOauth.ID, "12345")
+	_ = m.RegisterLAN(uOauth.Id, "12345")
 
 	// Suspend a user
 	resS, _ := userCRUD.Create(user.User{Email: "susp@example.com", Name: "Susp User"})
 	uSusp := resS.(user.User)
-	_ = m.SetPassword(uSusp.ID, "password123")
-	m.SuspendUser(uSusp.ID)
+	_ = m.SetPassword(uSusp.Id, "password123")
+	m.SuspendUser(uSusp.Id)
 
 	measure := func(email, pass string) (time.Duration, error) {
 		start := time.Now()
@@ -50,8 +50,8 @@ func TestTimingSafeAuth(t *testing.T) {
 
 	// 3. Suspended user
 	durSusp, err := measure("susp@example.com", "wrong")
-	if err != user.ErrSuspended {
-		t.Errorf("expected ErrSuspended")
+	if err != user.ErrInvalidCredentials {
+		t.Errorf("expected ErrInvalidCredentials")
 	}
 
 	// 4. OAuth-only user

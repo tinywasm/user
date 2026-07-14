@@ -13,12 +13,13 @@ The package is split into:
 
 ## Core Principles
 
-- **Separation of Concerns:** Backend logic (`userserver`) is decoupled from UI. Views belong to the consumer.
-- **Typed Definitions:** All models (DB and form DTOs) are authored as `model.Definition` literals. `ormc` generates concrete structs and codecs.
+- **Separation of Concerns:** Backend logic (`userserver`) is decoupled from UI. Views belong to the consumer. Forms are submitted as JSON only.
+- **Typed Definitions:** All models (DB and form DTOs) are authored as `model.Definition` literals using the Kind API. `ormc` generates concrete structs and codecs.
+- **Edge-Ready:** No Go standard library imports in `server/`. Everything compiles to WASM for edge deployment.
 - **Identity-based authentication:** `Login` routes through `user_identities` — only users
   with a `local` identity can authenticate via email+password.
 - **Shared ORM Connection:** Uses the injected `*orm.DB`. Entirely handled by `tinywasm/orm`.
-- **Integrated RBAC:** RBAC logic is fully integrated into the `user` domain.
+- **Integrated RBAC:** RBAC logic is fully integrated into the `user` domain. Security policy (roles, grants) is declared by the consumer.
 - **Integrated Cache:** In-memory read-through cache for sessions and hydrated users.
 - **No HTML in Library:** The library serves authentication flows via API endpoints; rendering is the consumer's responsibility.
 

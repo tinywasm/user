@@ -1,10 +1,8 @@
 package userserver
 
 import (
-	"net"
-	"strconv"
-	"strings"
-	"time"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
@@ -23,7 +21,7 @@ func (m *Module) LoginLAN(rut string, ctx router.Context) (user.User, error) {
 		return user.User{}, user.ErrInvalidCredentials
 	}
 
-	u, err := getUser(m.db, m.ucache, identity.UserID)
+	u, err := getUser(m.db, m.ucache, identity.UserId)
 	if err != nil {
 		return user.User{}, user.ErrInvalidCredentials
 	}
@@ -32,7 +30,7 @@ func (m *Module) LoginLAN(rut string, ctx router.Context) (user.User, error) {
 	}
 
 	clientIP := extractClientIP(ctx, m.config.TrustProxy)
-	if err := checkLANIP(m.db, identity.UserID, clientIP); err != nil {
+	if err := checkLANIP(m.db, identity.UserId, clientIP); err != nil {
 		return user.User{}, user.ErrInvalidCredentials
 	}
 
@@ -47,7 +45,7 @@ func (m *Module) RegisterLAN(userID, rut string) error {
 
 	id, err := getIdentityByProvider(m.db, "lan", normalized)
 	if err == nil {
-		if id.UserID != userID {
+		if id.UserId != userID {
 			return user.ErrRUTTaken
 		}
 		return nil
@@ -67,22 +65,22 @@ func (m *Module) UnregisterLAN(userID string) error {
 		return err
 	}
 
-	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.UserID).Eq(userID)
+	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.UserId).Eq(userID)
 	ips, _ := user.ReadAllLANIP(qb)
 	for _, ip := range ips {
-		m.db.Delete(ip, orm.Eq(user.LANIP_.ID, ip.ID))
+		m.db.Delete(ip, orm.Eq(user.LANIP_.Id, ip.Id))
 	}
 
-	qbId := m.db.Query(&user.Identity{}).Where(user.Identity_.UserID).Eq(userID).Where(user.Identity_.Provider).Eq("lan")
+	qbId := m.db.Query(&user.Identity{}).Where(user.Identity_.UserId).Eq(userID).Where(user.Identity_.Provider).Eq("lan")
 	ids, _ := user.ReadAllIdentity(qbId)
 	for _, id := range ids {
-		m.db.Delete(id, orm.Eq(user.Identity_.ID, id.ID))
+		m.db.Delete(id, orm.Eq(user.Identity_.Id, id.Id))
 	}
 	return nil
 }
 
 func (m *Module) AssignLANIP(userID, ip, label string) error {
-	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.IP).Eq(ip)
+	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.Ip).Eq(ip)
 	results, err := user.ReadAllLANIP(qb)
 	if err != nil {
 		return err
@@ -96,12 +94,12 @@ func (m *Module) AssignLANIP(userID, ip, label string) error {
 		return err
 	}
 	id := u.GetNewID()
-	now := time.Now().Unix()
+	now := time.Now() / 1e9
 
 	i := &user.LANIP{
-		ID:        id,
-		UserID:    userID,
-		IP:        ip,
+		Id:        id,
+		UserId:    userID,
+		Ip:        ip,
 		Label:     label,
 		CreatedAt: now,
 	}
@@ -109,7 +107,7 @@ func (m *Module) AssignLANIP(userID, ip, label string) error {
 }
 
 func (m *Module) RevokeLANIP(userID, ip string) error {
-	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.UserID).Eq(userID).Where(user.LANIP_.IP).Eq(ip)
+	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.UserId).Eq(userID).Where(user.LANIP_.Ip).Eq(ip)
 	results, err := user.ReadAllLANIP(qb)
 	if err != nil {
 		return err
@@ -118,11 +116,11 @@ func (m *Module) RevokeLANIP(userID, ip string) error {
 		return user.ErrNotFound
 	}
 
-	return m.db.Delete(results[0], orm.Eq(user.LANIP_.ID, results[0].ID))
+	return m.db.Delete(results[0], orm.Eq(user.LANIP_.Id, results[0].Id))
 }
 
 func (m *Module) GetLANIPs(userID string) ([]user.LANIP, error) {
-	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.UserID).Eq(userID).OrderBy(user.LANIP_.CreatedAt).Asc()
+	qb := m.db.Query(&user.LANIP{}).Where(user.LANIP_.UserId).Eq(userID).OrderBy(user.LANIP_.CreatedAt).Asc()
 	results, err := user.ReadAllLANIP(qb)
 	if err != nil {
 		return nil, err
@@ -136,7 +134,7 @@ func (m *Module) GetLANIPs(userID string) ([]user.LANIP, error) {
 }
 
 func checkLANIP(db *orm.DB, userID, ip string) error {
-	qb := db.Query(&user.LANIP{}).Where(user.LANIP_.UserID).Eq(userID).Where(user.LANIP_.IP).Eq(ip)
+	qb := db.Query(&user.LANIP{}).Where(user.LANIP_.UserId).Eq(userID).Where(user.LANIP_.Ip).Eq(ip)
 	results, err := user.ReadAllLANIP(qb)
 	if err != nil {
 		return user.ErrInvalidCredentials
@@ -148,19 +146,17 @@ func checkLANIP(db *orm.DB, userID, ip string) error {
 }
 
 func validateRUT(rut string) (string, error) {
-	rut = strings.TrimSpace(rut)
-	rut = strings.ReplaceAll(rut, ".", "")
-	rut = strings.ReplaceAll(rut, "-", "")
+	rut = fmt.Convert(rut).TrimSpace().String()
+	rut = fmt.Convert(rut).Replace(".", "").Replace("-", "").String()
 
 	if len(rut) < 2 { // At least 1 digit + 1 DV
 		return "", user.ErrInvalidRUT
 	}
 
 	bodyStr := rut[:len(rut)-1]
-	dvStr := strings.ToUpper(rut[len(rut)-1:])
+	dvStr := fmt.ToUpper(rut[len(rut)-1:])
 
-	_, err := strconv.Atoi(bodyStr)
-	if err != nil {
+	if _, err := fmt.Convert(bodyStr).Int(); err != nil {
 		return "", user.ErrInvalidRUT
 	}
 
@@ -182,35 +178,36 @@ func validateRUT(rut string) (string, error) {
 	} else if expectedDV == 10 {
 		expectedDVStr = "K"
 	} else {
-		expectedDVStr = strconv.Itoa(expectedDV)
+		expectedDVStr = fmt.Convert(expectedDV).String()
 	}
 
 	if dvStr != expectedDVStr {
 		return "", user.ErrInvalidRUT
 	}
 
-	return bodyStr + "-" + dvStr, nil
+	return bodyStr + "-" + expectedDVStr, nil
 }
 
 func extractClientIP(ctx router.Context, trustProxy bool) string {
 	if trustProxy {
 		xff := ctx.GetHeader("X-Forwarded-For")
 		if xff != "" {
-			parts := strings.Split(xff, ",")
-			return strings.TrimSpace(parts[0])
+			parts := fmt.Split(xff, ",")
+			return fmt.Convert(parts[0]).TrimSpace().String()
 		}
 		xri := ctx.GetHeader("X-Real-IP")
 		if xri != "" {
-			return strings.TrimSpace(xri)
+			return fmt.Convert(xri).TrimSpace().String()
 		}
 	}
 
 	if addr, ok := ctx.Value("RemoteAddr").(string); ok {
-		ip, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			return addr
+		// addr is often "ip:port"
+		parts := fmt.Split(addr, ":")
+		if len(parts) > 0 {
+			return parts[0]
 		}
-		return ip
+		return addr
 	}
 
 	return ""

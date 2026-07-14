@@ -7,15 +7,16 @@ import (
 
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
+	"github.com/tinywasm/model"
 )
 
 type mockHandler struct {
 	name  string
-	roles map[string][]string
+	roles map[model.Action][]model.RoleCode
 }
 
 func (h *mockHandler) HandlerName() string { return h.name }
-func (h *mockHandler) AllowedRoles(action string) []string {
+func (h *mockHandler) AllowedRoles(action model.Action) []model.RoleCode {
 	return h.roles[action]
 }
 
@@ -35,9 +36,9 @@ func TestIntegration_FullFlow(t *testing.T) {
 
 	h := &mockHandler{
 		name: "invoice",
-		roles: map[string][]string{
-			"r": {"a", "e"},
-			"w": {"a"},
+		roles: map[model.Action][]model.RoleCode{
+			model.Read:   {"a", "e"},
+			model.Update: {"a"},
 		},
 	}
 	if err := m.Register(h); err != nil {
@@ -51,11 +52,11 @@ func TestIntegration_FullFlow(t *testing.T) {
 	}
 	u := res.(user.User)
 
-	if err := m.AssignRole(u.ID, "rid2"); err != nil {
+	if err := m.AssignRole(u.Id, "rid2"); err != nil {
 		t.Fatalf("AssignRole failed: %v", err)
 	}
 
-	ok, err := m.HasPermission(u.ID, "invoice", "r")
+	ok, err := m.HasPermission(u.Id, "invoice", model.Read)
 	if err != nil {
 		t.Fatalf("HasPermission failed: %v", err)
 	}
@@ -63,7 +64,7 @@ func TestIntegration_FullFlow(t *testing.T) {
 		t.Error("Editor should be able to read invoice")
 	}
 
-	ok, err = m.HasPermission(u.ID, "invoice", "w")
+	ok, err = m.HasPermission(u.Id, "invoice", model.Update)
 	if err != nil {
 		t.Fatalf("HasPermission failed: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestIntegration_FullFlow(t *testing.T) {
 		t.Fatalf("DeleteRole failed: %v", err)
 	}
 
-	ok, err = m.HasPermission(u.ID, "invoice", "r")
+	ok, err = m.HasPermission(u.Id, "invoice", model.Read)
 	if err != nil {
 		t.Fatalf("HasPermission failed: %v", err)
 	}

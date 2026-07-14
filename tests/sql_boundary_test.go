@@ -3,9 +3,9 @@
 package tests
 
 import (
-	"database/sql"
 	"testing"
 
+	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/server"
 )
@@ -17,7 +17,7 @@ func TestSQLBoundary(t *testing.T) {
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "sql@example.com", Name: "SQL Test"})
 	u := resU.(user.User)
-	_ = m.SetPassword(u.ID, "password123")
+	_ = m.SetPassword(u.Id, "password123")
 
 	t.Run("Login Injection", func(t *testing.T) {
 		_, err := m.Login("' OR 1=1 --", "password123")
@@ -35,14 +35,14 @@ func TestSQLBoundary(t *testing.T) {
 		}
 
 		// Ensure table still exists
-		_, err = m.GetUser(u.ID)
+		_, err = m.GetUser(u.Id)
 		if err != nil {
 			t.Errorf("expected table to still exist, got %v", err)
 		}
 	})
 
 	t.Run("RegisterLAN Injection", func(t *testing.T) {
-		err := m.RegisterLAN(u.ID, "12345678-5'; --")
+		err := m.RegisterLAN(u.Id, "12345678-5'; --")
 		if err != user.ErrInvalidRUT {
 			t.Errorf("expected ErrInvalidRUT, got %v", err)
 		}
@@ -57,8 +57,8 @@ func TestSQLBoundary(t *testing.T) {
 
 	t.Run("GetRoleByCode Injection", func(t *testing.T) {
 		_, err := m.GetRoleByCode("admin' OR '1'='1")
-		if err != sql.ErrNoRows {
-			t.Errorf("expected sql.ErrNoRows, got %v", err)
+		if err != orm.ErrNoRows {
+			t.Errorf("expected orm.ErrNoRows, got %v", err)
 		}
 	})
 }

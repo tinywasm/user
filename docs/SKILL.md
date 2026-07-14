@@ -33,7 +33,7 @@ func New(db *orm.DB, cfg Config) (*Module, error)
 // POST /login, POST /logout, GET /oauth/:provider, GET /oauth/callback/:provider
 func (m *Module) MountAPI(r router.Router)
 
-func (m *Module) Bootstrap(email, password string) error
+func (m *Module) Bootstrap(s Seed) error
 
 func (m *Module) GetUserByEmail(email string) (User, error)
 ```
@@ -42,7 +42,7 @@ func (m *Module) GetUserByEmail(email string) (User, error)
 ```go
 func (m *Module) Login(email, password string) (User, error)
 func (m *Module) Authenticate() router.Middleware
-func (m *Module) Can(userID, resource, action string) bool
+func (m *Module) Can(userID string, resource model.Resource, action model.Action) bool
 ```
 
 ## Consumer Integration

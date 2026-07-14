@@ -4,6 +4,7 @@ import (
 	"github.com/tinywasm/context"
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/mcp"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/user"
 )
 
@@ -13,8 +14,8 @@ func (m *Module) Tools() []mcp.Tool {
 		{
 			Name:        "me",
 			Description: "Get the profile of the currently authenticated user.",
-			Resource:    "profile",
-			Action:      'r',
+			Access:      model.AccessAuthenticated,
+			Action:      model.Read,
 			Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
 				userID := ctx.Value(mcp.CtxKeyUserID)
 				if userID == "" {
@@ -27,7 +28,7 @@ func (m *Module) Tools() []mcp.Tool {
 				}
 
 				profile := user.ProfileDTO{
-					ID:    u.ID,
+					Id:    u.Id,
 					Name:  u.Name,
 					Email: u.Email,
 				}

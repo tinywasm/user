@@ -1,7 +1,7 @@
 package userserver
 
 import (
-	"time"
+	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/unixid"
@@ -10,7 +10,7 @@ import (
 
 func createIdentity(db *orm.DB, userID, provider, providerID, email string) error {
 	// Verify user exists to enforce relationship before insert
-	qb := db.Query(&user.User{}).Where(user.User_.ID).Eq(userID)
+	qb := db.Query(&user.User{}).Where(user.User_.Id).Eq(userID)
 	users, errRead := user.ReadAllUser(qb)
 	if errRead != nil || len(users) == 0 {
 		return user.ErrNotFound
@@ -22,13 +22,13 @@ func createIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 	}
 
 	id := u.GetNewID()
-	now := time.Now().Unix()
+	now := time.Now() / 1e9
 
 	i := &user.Identity{
-		ID:         id,
-		UserID:     userID,
+		Id:         id,
+		UserId:     userID,
 		Provider:   provider,
-		ProviderID: providerID,
+		ProviderId: providerID,
 		Email:      email,
 		CreatedAt:  now,
 	}
@@ -45,7 +45,7 @@ func createIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 func getIdentityByProvider(db *orm.DB, provider, providerID string) (user.Identity, error) {
 	qb := db.Query(&user.Identity{}).
 		Where(user.Identity_.Provider).Eq(provider).
-		Where(user.Identity_.ProviderID).Eq(providerID)
+		Where(user.Identity_.ProviderId).Eq(providerID)
 
 	results, err := user.ReadAllIdentity(qb)
 	if err != nil {
@@ -59,7 +59,7 @@ func getIdentityByProvider(db *orm.DB, provider, providerID string) (user.Identi
 
 func getIdentityByUserAndProvider(db *orm.DB, userID, provider string) (user.Identity, error) {
 	qb := db.Query(&user.Identity{}).
-		Where(user.Identity_.UserID).Eq(userID).
+		Where(user.Identity_.UserId).Eq(userID).
 		Where(user.Identity_.Provider).Eq(provider)
 
 	results, err := user.ReadAllIdentity(qb)
@@ -73,7 +73,7 @@ func getIdentityByUserAndProvider(db *orm.DB, userID, provider string) (user.Ide
 }
 
 func (m *Module) GetUserIdentities(userID string) ([]user.Identity, error) {
-	qb := m.db.Query(&user.Identity{}).Where(user.Identity_.UserID).Eq(userID)
+	qb := m.db.Query(&user.Identity{}).Where(user.Identity_.UserId).Eq(userID)
 	results, err := user.ReadAllIdentity(qb)
 	if err != nil {
 		return nil, err
@@ -88,15 +88,15 @@ func (m *Module) GetUserIdentities(userID string) ([]user.Identity, error) {
 
 func upsertIdentity(db *orm.DB, userID, provider, providerID, email string) error {
 	qb := db.Query(&user.Identity{}).
-		Where(user.Identity_.UserID).Eq(userID).
+		Where(user.Identity_.UserId).Eq(userID).
 		Where(user.Identity_.Provider).Eq(provider)
 
 	results, err := user.ReadAllIdentity(qb)
 	if err == nil && len(results) > 0 {
 		i := results[0]
-		i.ProviderID = providerID
+		i.ProviderId = providerID
 		i.Email = email
-		return db.Update(i, orm.Eq(user.Identity_.ID, i.ID))
+		return db.Update(i, orm.Eq(user.Identity_.Id, i.Id))
 	} else if len(results) == 0 {
 		return createIdentity(db, userID, provider, providerID, email)
 	} else {
@@ -125,13 +125,13 @@ func (m *Module) UnlinkIdentity(userID, provider string) error {
 		return user.ErrCannotUnlink
 	}
 
-	qb := m.db.Query(&user.Identity{}).Where(user.Identity_.UserID).Eq(userID).Where(user.Identity_.Provider).Eq(provider)
+	qb := m.db.Query(&user.Identity{}).Where(user.Identity_.UserId).Eq(userID).Where(user.Identity_.Provider).Eq(provider)
 	results, err := user.ReadAllIdentity(qb)
 	if err != nil {
 		return err
 	}
 	if len(results) > 0 {
-		return m.db.Delete(results[0], orm.Eq(user.Identity_.ID, results[0].ID))
+		return m.db.Delete(results[0], orm.Eq(user.Identity_.Id, results[0].Id))
 	}
 	return user.ErrNotFound
 }

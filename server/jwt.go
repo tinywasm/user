@@ -1,12 +1,11 @@
 package userserver
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
-	"strings"
-	"time"
+	"github.com/tinywasm/base64"
+	"github.com/tinywasm/crypto"
+	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
+	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/user"
@@ -15,54 +14,78 @@ import (
 var ErrInvalidToken = fmt.Err("token", "invalid")
 
 type jwtHeader struct {
-	Alg string `json:"alg"`
-	Typ string `json:"typ"`
+	Alg string
+	Typ string
 }
 
+func (h jwtHeader) EncodeFields(w model.FieldWriter) {
+	w.String("alg", h.Alg)
+	w.String("typ", h.Typ)
+}
+func (h jwtHeader) IsNil() bool { return false }
+
 type jwtPayload struct {
-	Sub string `json:"sub"` // userID
-	Exp int64  `json:"exp"`
-	Iat int64  `json:"iat"`
+	Sub string
+	Exp int64
+	Iat int64
+}
+
+func (p jwtPayload) EncodeFields(w model.FieldWriter) {
+	w.String("sub", p.Sub)
+	w.Int("exp", p.Exp)
+	w.Int("iat", p.Iat)
+}
+func (p jwtPayload) IsNil() bool { return false }
+func (p *jwtPayload) DecodeFields(r model.FieldReader) {
+	p.Sub, _ = r.String("sub")
+	p.Exp, _ = r.Int("exp")
+	p.Iat, _ = r.Int("iat")
 }
 
 func GenerateJWT(secret []byte, userID string, ttl int) (string, error) {
 	if ttl == 0 {
 		ttl = 86400
 	}
-	now := time.Now().Unix()
-	h, _ := json.Marshal(jwtHeader{Alg: "HS256", Typ: "JWT"})
-	p, _ := json.Marshal(jwtPayload{Sub: userID, Exp: now + int64(ttl), Iat: now})
-	header := base64.RawURLEncoding.EncodeToString(h)
-	payload := base64.RawURLEncoding.EncodeToString(p)
+	now := time.Now() / 1e9
+
+	headerObj := jwtHeader{Alg: "HS256", Typ: "JWT"}
+	var h string
+	json.Encode(headerObj, &h)
+
+	payloadObj := jwtPayload{Sub: userID, Exp: now + int64(ttl), Iat: now}
+	var p string
+	json.Encode(payloadObj, &p)
+
+	header := base64.URLEncode([]byte(h))
+	payload := base64.URLEncode([]byte(p))
 	sig := jwtSign(secret, header+"."+payload)
 	return header + "." + payload + "." + sig, nil
 }
 
 func ValidateJWT(secret []byte, token string) (string, error) {
-	parts := strings.SplitN(token, ".", 3)
+	parts := fmt.Split(token, ".")
 	if len(parts) != 3 {
 		return "", ErrInvalidToken
 	}
 	expected := jwtSign(secret, parts[0]+"."+parts[1])
-	if !hmac.Equal([]byte(parts[2]), []byte(expected)) {
+	if !crypto.HMACEqual([]byte(parts[2]), []byte(expected)) {
 		return "", ErrInvalidToken
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	raw, err := base64.URLDecode(parts[1])
 	if err != nil {
 		return "", ErrInvalidToken
 	}
 	var p jwtPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
+	if err := json.Decode(string(raw), &p); err != nil {
 		return "", ErrInvalidToken
 	}
-	if time.Now().Unix() > p.Exp {
+	if time.Now() / 1e9 > p.Exp {
 		return "", user.ErrSessionExpired
 	}
 	return p.Sub, nil
 }
 
 func jwtSign(secret []byte, data string) string {
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(data))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	sum := crypto.HMACSHA256(secret, []byte(data))
+	return base64.URLEncode(sum)
 }
