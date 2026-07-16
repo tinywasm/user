@@ -2,6 +2,7 @@ package authority
 
 import (
 	"sync"
+
 	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
@@ -85,7 +86,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 
 	now := time.Now() / 1e9
 	sess := user.Session{
-		Id:        u.GetNewID(),
+		Id:        u.NewID(),
 		UserId:    userID,
 		ExpiresAt: now + int64(ttl),
 		Ip:        ip,
@@ -102,7 +103,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 
 func (m *Module) GetSession(id string) (user.Session, error) {
 	if s, ok := m.cache.get(id); ok {
-		if s.ExpiresAt < time.Now() / 1e9 {
+		if s.ExpiresAt < time.Now()/1e9 {
 			m.cache.delete(id)
 			return user.Session{}, user.ErrSessionExpired
 		}
@@ -120,7 +121,7 @@ func (m *Module) GetSession(id string) (user.Session, error) {
 	}
 	s := *results[0]
 
-	if s.ExpiresAt < time.Now() / 1e9 {
+	if s.ExpiresAt < time.Now()/1e9 {
 		return user.Session{}, user.ErrSessionExpired
 	}
 

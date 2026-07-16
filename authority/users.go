@@ -15,7 +15,7 @@ func createUser(db *orm.DB, email, name, phone string) (user.User, error) {
 		return user.User{}, err
 	}
 
-	id := u.GetNewID()
+	id := u.NewID()
 	now := time.Now() / 1e9
 
 	newUser := user.User{

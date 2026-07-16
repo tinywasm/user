@@ -93,7 +93,7 @@ func (m *Module) AssignLANIP(userID, ip, label string) error {
 	if err != nil {
 		return err
 	}
-	id := u.GetNewID()
+	id := u.NewID()
 	now := time.Now() / 1e9
 
 	i := &user.LANIP{

@@ -30,7 +30,7 @@ func (m *Module) BeginOAuth(providerName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	state := u.GetNewID()
+	state := u.NewID()
 
 	now := time.Now() / 1e9
 	expiresAt := now + 600 // 10 minutes
@@ -178,7 +178,7 @@ type googleData struct {
 }
 
 func (d *googleData) EncodeFields(w model.FieldWriter) {}
-func (d *googleData) IsNil() bool                     { return false }
+func (d *googleData) IsNil() bool                      { return false }
 func (d *googleData) DecodeFields(r model.FieldReader) {
 	d.ID, _ = r.String("id")
 	d.Email, _ = r.String("email")
@@ -255,7 +255,7 @@ type msData struct {
 }
 
 func (d *msData) EncodeFields(w model.FieldWriter) {}
-func (d *msData) IsNil() bool                     { return false }
+func (d *msData) IsNil() bool                      { return false }
 func (d *msData) DecodeFields(r model.FieldReader) {
 	d.ID, _ = r.String("id")
 	d.Email, _ = r.String("mail")
