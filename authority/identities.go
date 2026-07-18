@@ -3,12 +3,12 @@ package authority
 import (
 	"github.com/tinywasm/time"
 
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
-func createIdentity(db *orm.DB, userID, provider, providerID, email string) error {
+func createIdentity(db *orm.DB, ids model.IDGenerator, userID, provider, providerID, email string) error {
 	// Verify user exists to enforce relationship before insert
 	qb := db.Query(&user.User{}).Where(user.User_.Id).Eq(userID)
 	users, errRead := user.ReadAllUser(qb)
@@ -16,12 +16,7 @@ func createIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 		return user.ErrNotFound
 	}
 
-	u, err := unixid.NewUnixID()
-	if err != nil {
-		return err
-	}
-
-	id := u.NewID()
+	id := ids.NewID()
 	now := time.Now() / 1e9
 
 	i := &user.Identity{
@@ -86,7 +81,7 @@ func (m *Module) GetUserIdentities(userID string) ([]user.Identity, error) {
 	return identities, nil
 }
 
-func upsertIdentity(db *orm.DB, userID, provider, providerID, email string) error {
+func upsertIdentity(db *orm.DB, ids model.IDGenerator, userID, provider, providerID, email string) error {
 	qb := db.Query(&user.Identity{}).
 		Where(user.Identity_.UserId).Eq(userID).
 		Where(user.Identity_.Provider).Eq(provider)
@@ -98,7 +93,7 @@ func upsertIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 		i.Email = email
 		return db.Update(i, orm.Eq(user.Identity_.Id, i.Id))
 	} else if len(results) == 0 {
-		return createIdentity(db, userID, provider, providerID, email)
+		return createIdentity(db, ids, userID, provider, providerID, email)
 	} else {
 		return err
 	}

@@ -12,7 +12,7 @@ import (
 
 func TestSQLBoundary(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
 
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "sql@example.com", Name: "SQL Test"})

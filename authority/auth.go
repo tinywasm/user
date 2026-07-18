@@ -62,7 +62,7 @@ func (m *Module) SetPassword(userID, password string) error {
 	if err != nil {
 		return err
 	}
-	return upsertIdentity(m.db, userID, "local", string(hash), "")
+	return upsertIdentity(m.db, m.ids, userID, "local", string(hash), "")
 }
 
 func (m *Module) VerifyPassword(userID, password string) error {

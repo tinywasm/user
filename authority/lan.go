@@ -6,7 +6,6 @@ import (
 
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
-	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
@@ -53,7 +52,7 @@ func (m *Module) RegisterLAN(userID, rut string) error {
 		return err
 	}
 
-	return createIdentity(m.db, userID, "lan", normalized, "")
+	return createIdentity(m.db, m.ids, userID, "lan", normalized, "")
 }
 
 func (m *Module) UnregisterLAN(userID string) error {
@@ -89,11 +88,7 @@ func (m *Module) AssignLANIP(userID, ip, label string) error {
 		return user.ErrIPTaken
 	}
 
-	u, err := unixid.NewUnixID()
-	if err != nil {
-		return err
-	}
-	id := u.NewID()
+	id := m.ids.NewID()
 	now := time.Now() / 1e9
 
 	i := &user.LANIP{

@@ -44,7 +44,10 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Cookie Mode Flags", func(t *testing.T) {
 		db := newTestDB(t)
-		m, _ := authority.New(db, user.Config{TokenTTL: 3600, CookieName: "session"})
+		m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, CookieName: "session"})
+		if err != nil {
+			t.Fatalf("authority.New failed: %v", err)
+		}
 		email, pass := "cookie1@example.com", "password123"
 		if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
@@ -74,7 +77,10 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("JWT Mode Cookie", func(t *testing.T) {
 		db := newTestDB(t)
-		m, _ := authority.New(db, user.Config{AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session"})
+		m, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session"})
+		if err != nil {
+			t.Fatalf("authority.New failed: %v", err)
+		}
 		email, pass := "cookie2@example.com", "password123"
 		if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
@@ -94,7 +100,10 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Custom Cookie Name", func(t *testing.T) {
 		db := newTestDB(t)
-		m, _ := authority.New(db, user.Config{CookieName: "custom_auth"})
+		m, err := authority.New(db, user.Config{IDs: testIDs, CookieName: "custom_auth"})
+		if err != nil {
+			t.Fatalf("authority.New failed: %v", err)
+		}
 		email, pass := "cookie3@example.com", "password123"
 		if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
@@ -110,10 +119,16 @@ func TestCookieSecurity(t *testing.T) {
 
 func TestSessionRotation(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{TokenTTL: 3600})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
+	if err != nil {
+		t.Fatalf("authority.New failed: %v", err)
+	}
 
 	userCRUD := getHandler(m, "users")
-	resU, _ := userCRUD.Create(user.User{Email: "rot@example.com", Name: "Rot"})
+	resU, err := userCRUD.Create(user.User{Email: "rot@example.com", Name: "Rot"})
+	if err != nil {
+		t.Fatalf("userCRUD.Create failed: %v", err)
+	}
 	u := resU.(user.User)
 
 	t.Run("RotateSession valid", func(t *testing.T) {
@@ -145,7 +160,10 @@ func TestSessionRotation(t *testing.T) {
 		sess3, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
 		// Manually expire
 		db.RawConn().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.Id)
-		m, _ = authority.New(db, user.Config{TokenTTL: 3600}) // Clear cache
+		m, err = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600}) // Clear cache
+		if err != nil {
+			t.Fatalf("authority.New failed: %v", err)
+		}
 
 		_, err := m.RotateSession(sess3.Id, "10.0.0.1", "ua1")
 		if err != user.ErrSessionExpired {
@@ -190,6 +208,7 @@ func TestPasswordHook(t *testing.T) {
 
 	errHook := errors.New("custom password hook error")
 	cfg := user.Config{
+		IDs: testIDs,
 		OnPasswordValidate: func(password string) error {
 			if strings.Contains(password, "bad") {
 				return errHook
@@ -197,10 +216,16 @@ func TestPasswordHook(t *testing.T) {
 			return nil
 		},
 	}
-	m, _ := authority.New(db, cfg)
+	m, err := authority.New(db, cfg)
+	if err != nil {
+		t.Fatalf("authority.New failed: %v", err)
+	}
 
 	userCRUD := getHandler(m, "users")
-	resU, _ := userCRUD.Create(user.User{Email: "hook@example.com", Name: "Hook"})
+	resU, err := userCRUD.Create(user.User{Email: "hook@example.com", Name: "Hook"})
+	if err != nil {
+		t.Fatalf("userCRUD.Create failed: %v", err)
+	}
 	u := resU.(user.User)
 	_ = m.SetPassword(u.Id, "goodpass123") // Baseline
 

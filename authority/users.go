@@ -4,18 +4,13 @@ import (
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/time"
 
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
-func createUser(db *orm.DB, email, name, phone string) (user.User, error) {
-	u, err := unixid.NewUnixID()
-	if err != nil {
-		return user.User{}, err
-	}
-
-	id := u.NewID()
+func createUser(db *orm.DB, ids model.IDGenerator, email, name, phone string) (user.User, error) {
+	id := ids.NewID()
 	now := time.Now() / 1e9
 
 	newUser := user.User{

@@ -6,7 +6,6 @@ import (
 	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
@@ -74,11 +73,6 @@ func (m *Module) RotateSession(oldID, ip, userAgent string) (user.Session, error
 }
 
 func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, error) {
-	u, err := unixid.NewUnixID()
-	if err != nil {
-		return user.Session{}, err
-	}
-
 	ttl := m.config.TokenTTL
 	if ttl == 0 {
 		ttl = 86400
@@ -86,7 +80,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 
 	now := time.Now() / 1e9
 	sess := user.Session{
-		Id:        u.NewID(),
+		Id:        m.ids.NewID(),
 		UserId:    userID,
 		ExpiresAt: now + int64(ttl),
 		Ip:        ip,

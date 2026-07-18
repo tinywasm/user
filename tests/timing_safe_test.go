@@ -12,7 +12,7 @@ import (
 
 func TestTimingSafeAuth(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
 
 	userCRUD := getHandler(m, "users")
 	resU, _ := userCRUD.Create(user.User{Email: "timing@example.com", Name: "Timing User"})

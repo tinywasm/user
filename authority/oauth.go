@@ -8,7 +8,6 @@ import (
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/time"
-	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
@@ -26,11 +25,7 @@ func (m *Module) BeginOAuth(providerName string) (string, error) {
 		return "", user.ErrProviderNotFound
 	}
 
-	u, err := unixid.NewUnixID()
-	if err != nil {
-		return "", err
-	}
-	state := u.NewID()
+	state := m.ids.NewID()
 
 	now := time.Now() / 1e9
 	expiresAt := now + 600 // 10 minutes
@@ -94,15 +89,15 @@ func (m *Module) CompleteOAuth(providerName string, ctx router.Context, ip, ua s
 
 	u, err := getUserByEmail(m.db, m.ucache, info.Email)
 	if err == nil {
-		_ = createIdentity(m.db, u.Id, providerName, info.ID, info.Email)
+		_ = createIdentity(m.db, m.ids, u.Id, providerName, info.ID, info.Email)
 		return u, false, nil
 	}
 
-	u, err = createUser(m.db, info.Email, info.Name, "")
+	u, err = createUser(m.db, m.ids, info.Email, info.Name, "")
 	if err != nil {
 		return user.User{}, false, err
 	}
-	_ = createIdentity(m.db, u.Id, providerName, info.ID, info.Email)
+	_ = createIdentity(m.db, m.ids, u.Id, providerName, info.ID, info.Email)
 	return u, true, nil
 }
 

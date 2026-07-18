@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/tinywasm/events"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
 )
@@ -43,6 +44,17 @@ type SecurityEvent struct {
 	Resource  string // RBAC resource, for EventAccessDenied
 	Timestamp int64  // time.Now().Unix()
 }
+
+func (e *SecurityEvent) EncodeFields(w model.FieldWriter) {
+	w.Int("type", int64(e.Type))
+	w.String("ip", e.IP)
+	w.String("user_id", e.UserID)
+	w.String("provider", e.Provider)
+	w.String("resource", e.Resource)
+	w.Int("timestamp", e.Timestamp)
+}
+
+func (e *SecurityEvent) IsNil() bool { return e == nil }
 
 type OAuthUserInfo struct {
 	ID    string
@@ -118,8 +130,14 @@ type Config struct {
 	TrustProxy     bool
 	OAuthProviders []OAuthProvider
 
-	// Optional hook for receiving security events (e.g. tampering, brute force)
-	OnSecurityEvent func(SecurityEvent)
+	// IDs mints primary keys for every record this module creates (users, sessions,
+	// oauth states, identities, LAN ips). REQUIRED: authority.New fails if nil —
+	// an auth module must never silently pick its own generator.
+	IDs model.IDGenerator
+
+	// Events receives security events (user.TopicSecurity). Optional: nil = events
+	// are dropped (fire-and-forget contract), never an error.
+	Events events.Publisher
 
 	// OnPasswordValidate is called by SetPassword before hashing.
 	// Return a non-nil error to reject the password.
@@ -140,7 +158,17 @@ const (
 	PathLogin      = "/login"
 	PathLogout     = "/logout"
 	PathAfterLogin = "/"
+)
 
+// TopicSecurity is the events topic every SecurityEvent is published on.
+const TopicSecurity = "user.security"
+
+// Op names — shared vocabulary between the wasm view and the server module.
+const (
+	OpMe         = "me"           // authenticated caller's profile
+	OpListUsers  = "list_users"   // admin: list users
+	OpUpsertUser = "upsert_user"  // admin: create (Id=="") or update
+	OpDeleteUser = "delete_user"  // admin: delete by record
 )
 
 // ProfileDTO is a safe subset of User data for public/API consumption.

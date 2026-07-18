@@ -41,6 +41,7 @@ func testJWTCookieMode(t *testing.T) {
 	db := newTestDB(t)
 	secret := []byte("test-secret-32-bytes-minimum-len")
 	m, err := authority.New(db, user.Config{
+		IDs:       testIDs,
 		AuthMode:  user.AuthModeJWT,
 		JWTSecret: secret,
 	})
@@ -92,6 +93,7 @@ func testJWTCookieMode(t *testing.T) {
 func testInit(t *testing.T) {
 	db := newTestDB(t)
 	cfg := user.Config{
+		IDs:        testIDs,
 		CookieName: "test_session",
 		TokenTTL:   3600,
 	}
@@ -123,7 +125,7 @@ func getHandler(m *authority.Module, name string) interface {
 
 func testCRUD(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +166,7 @@ func testCRUD(t *testing.T) {
 
 func testAuth(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +202,7 @@ func testAuth(t *testing.T) {
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{TokenTTL: 3600})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +234,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Re-init to flush memory cache
-	m, _ = authority.New(db, user.Config{TokenTTL: 3600})
+	m, _ = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
 
 	_, err = m.GetSession(sess.Id)
 	if err != user.ErrSessionExpired {
@@ -264,6 +266,7 @@ func testOAuth(t *testing.T) {
 	}
 
 	cfg := user.Config{
+		IDs:            testIDs,
 		OAuthProviders: []user.OAuthProvider{mockP},
 	}
 	m, err := authority.New(db, cfg)
@@ -310,7 +313,7 @@ func testOAuth(t *testing.T) {
 
 func testLAN(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{TrustProxy: true})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TrustProxy: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,6 +388,6 @@ func testLAN(t *testing.T) {
 
 func setupModule(t *testing.T) *authority.Module {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
 	return m
 }

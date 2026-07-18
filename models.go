@@ -9,9 +9,9 @@ var UserModel = model.Definition{
 	Name: "user",
 	Fields: model.Fields{
 		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
-		{Name: "email", Type: model.Text(), DB: &model.FieldDB{Unique: true}},
-		{Name: "name", Type: model.Text()},
-		{Name: "phone", Type: model.Text()},
+		{Name: "email", Type: input.Email(), DB: &model.FieldDB{Unique: true}},
+		{Name: "name", Type: input.Text()},
+		{Name: "phone", Type: input.Phone()},
 		{Name: "status", Type: model.Text()},
 		{Name: "created_at", Type: model.Int()},
 		{Name: "roles", Type: model.StructSlice(&RoleModel), Exclude: true},

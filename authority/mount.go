@@ -1,8 +1,6 @@
 package authority
 
 import (
-
-	"github.com/tinywasm/json"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
@@ -30,7 +28,7 @@ func (m *Module) MountAPI(r router.Router) {
 	r.Post(user.PathLogin, func(ctx router.Context) {
 		ip := extractClientIP(ctx, m.config.TrustProxy)
 		data := &user.LoginData{}
-		if err := json.Decode(string(ctx.Body()), data); err != nil {
+		if err := ctx.Decode(data); err != nil {
 			ctx.WriteStatus(400)
 			ctx.Write([]byte(err.Error()))
 			return

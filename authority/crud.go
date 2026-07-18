@@ -10,6 +10,7 @@ import (
 type userCRUD struct {
 	db    *orm.DB
 	cache *userCache
+	ids   model.IDGenerator
 }
 
 func (h *userCRUD) HandlerName() string { return "users" }
@@ -20,7 +21,7 @@ func (h *userCRUD) ValidateData(action model.Action, _ any) error { return nil }
 
 func (h *userCRUD) Create(payload any) (any, error) {
 	u := payload.(user.User)
-	return createUser(h.db, u.Email, u.Name, u.Phone)
+	return createUser(h.db, h.ids, u.Email, u.Name, u.Phone)
 }
 func (h *userCRUD) Read(id string) (any, error) { return getUser(h.db, h.cache, id) }
 func (h *userCRUD) List() (any, error)          { return listUsers(h.db) }

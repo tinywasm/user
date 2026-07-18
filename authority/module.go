@@ -1,11 +1,13 @@
 package authority
 
 import (
-	"github.com/tinywasm/fmt"
 	"sync"
-	"github.com/tinywasm/time"
 
+	"github.com/tinywasm/events"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/time"
 	"github.com/tinywasm/user"
 )
 
@@ -20,11 +22,17 @@ type Module struct {
 	providers   map[string]user.OAuthProvider
 	providersMu sync.RWMutex
 	mu          sync.RWMutex
+	ids         model.IDGenerator
+	events      events.Publisher
 }
 
 // New initializes the user/rbac schema, warms the cache, and returns a Module handle.
 // This is the ONLY entry point for this package on the backend.
 func New(db *orm.DB, cfg user.Config) (*Module, error) {
+	if cfg.IDs == nil {
+		return nil, fmt.Err("user:", "Config.IDs", "is", "required")
+	}
+
 	if cfg.AuthMode == user.AuthModeJWT || cfg.AuthMode == user.AuthModeBearer {
 		if len(cfg.JWTSecret) == 0 {
 			return nil, fmt.Err("authority: JWTSecret required for selected AuthMode")
@@ -43,6 +51,8 @@ func New(db *orm.DB, cfg user.Config) (*Module, error) {
 		ucache:    newUserCache(),
 		config:    cfg,
 		providers: make(map[string]user.OAuthProvider),
+		ids:       cfg.IDs,
+		events:    cfg.Events,
 	}
 	if err := initSchema(db, cfg.AuthMode); err != nil {
 		return nil, err
@@ -69,16 +79,11 @@ func (m *Module) SetLog(fn func(...any)) {
 }
 
 func (m *Module) notify(e user.SecurityEvent) {
-	if e.Timestamp == 0 {
-		e.Timestamp = time.Now() / 1e9
-	}
-	if m.config.OnSecurityEvent != nil {
-		m.config.OnSecurityEvent(e)
+	if m.events == nil {
 		return
 	}
-	if m.log != nil {
-		m.log("security_event", e.Type, e.IP, e.UserID)
-	}
+	e.Timestamp = time.Now() / 1e9
+	m.events.Publish(events.Event{Topic: user.TopicSecurity, Payload: &e})
 }
 
 // SuspendUser sets Status = "suspended". Evicts user from cache.
@@ -134,10 +139,9 @@ func (m *Module) registeredProviders() []user.OAuthProvider {
 // Usage: cp.RegisterHandlers(m.Add()...)
 func (m *Module) Add() []any {
 	return []any{
-		&userCRUD{db: m.db, cache: m.ucache},
+		&userCRUD{db: m.db, cache: m.ucache, ids: m.ids},
 		&roleCRUD{m: m},
 		&permissionCRUD{m: m},
 		&lanipCRUD{m: m},
 	}
 }
-

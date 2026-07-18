@@ -5,9 +5,8 @@ package tests
 import (
 	"testing"
 
-	"github.com/tinywasm/context"
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/mcp"
+	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/model"
@@ -15,7 +14,7 @@ import (
 
 func TestRBAC_ClosedByDefault(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func TestRBAC_ClosedByDefault(t *testing.T) {
 
 func TestTools_Me(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "me@test.com", Name: "Me User"})
@@ -78,33 +77,28 @@ func TestTools_Me(t *testing.T) {
 	u := res.(user.User)
 
 	t.Run("Authenticated me returns profile", func(t *testing.T) {
-		tools := m.Tools()
-		var meTool *mcp.Tool
-		for i := range tools {
-			if tools[i].Name == "me" {
-				meTool = &tools[i]
-				break
-			}
+		reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+		m.MountOps(reg)
+
+		route := reg.ops[user.OpMe]
+		if route == nil {
+			t.Fatal("me op not registered")
 		}
-		if meTool == nil {
-			t.Fatal("me tool not found")
+		if !route.authenticated {
+			t.Error("me op should be authenticated")
 		}
 
-		ctx := context.Background()
-		if err := ctx.Set(mcp.CtxKeyUserID, u.Id); err != nil {
-			t.Fatal(err)
-		}
+		ctx := &mock.Context{}
+		ctx.SetUserID(u.Id)
 
-		res, err := meTool.Execute(ctx, mcp.Request{})
-		if err != nil {
-			t.Fatalf("Execute failed: %v", err)
-		}
-		if res.IsError {
-			t.Fatalf("Execute returned error: %s", res.Content)
+		route.handler(ctx)
+
+		if ctx.Status != 0 && ctx.Status != 200 {
+			t.Fatalf("handler returned status: %d", ctx.Status)
 		}
 
 		var profile user.ProfileDTO
-		if err := json.Decode([]byte(res.Content), &profile); err != nil {
+		if err := json.Decode(ctx.ResponseBody(), &profile); err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
 		if profile.Id != u.Id || profile.Email != u.Email {
@@ -113,14 +107,15 @@ func TestTools_Me(t *testing.T) {
 	})
 
 	t.Run("Anonymous me returns error", func(t *testing.T) {
-		tools := m.Tools()
-		meTool := &tools[0] // Assume it's the first one
+		reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+		m.MountOps(reg)
 
-		ctx := context.Background()
+		route := reg.ops[user.OpMe]
+		ctx := &mock.Context{}
 		// No userID set
-		_, err := meTool.Execute(ctx, mcp.Request{})
-		if err == nil {
-			t.Error("expected error for anonymous user")
+		route.handler(ctx)
+		if ctx.Status != 401 {
+			t.Errorf("expected 401 for anonymous user, got %d", ctx.Status)
 		}
 	})
 }
@@ -129,21 +124,21 @@ func TestNew_Validation(t *testing.T) {
 	db := newTestDB(t)
 
 	t.Run("AuthModeBearer requires JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeBearer})
+		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeBearer})
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing for AuthModeBearer")
 		}
 	})
 
 	t.Run("AuthModeJWT requires JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeJWT})
+		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT})
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing for AuthModeJWT")
 		}
 	})
 
 	t.Run("AuthModeCookie does not require JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeCookie})
+		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeCookie})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
