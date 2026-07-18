@@ -5,7 +5,6 @@ package user
 import (
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/ddlc"
 )
 
 type User struct {
@@ -189,8 +188,8 @@ func ReadAllSession(qb *orm.QB) (SessionList, error) {
 	return results, err
 }
 
-func (m *Session) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
+func (m *Session) SchemaExt() []model.FieldExt {
+	return []model.FieldExt{
 		{Field: SessionModel.Fields[1], Ref: "user", RefColumn: "id", OnDelete: ""},
 	}
 }
@@ -278,8 +277,8 @@ func ReadAllIdentity(qb *orm.QB) (IdentityList, error) {
 	return results, err
 }
 
-func (m *Identity) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
+func (m *Identity) SchemaExt() []model.FieldExt {
+	return []model.FieldExt{
 		{Field: IdentityModel.Fields[1], Ref: "user", RefColumn: "id", OnDelete: ""},
 	}
 }
@@ -420,8 +419,8 @@ func ReadAllUserRole(qb *orm.QB) (UserRoleList, error) {
 	return results, err
 }
 
-func (m *UserRole) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
+func (m *UserRole) SchemaExt() []model.FieldExt {
+	return []model.FieldExt{
 		{Field: UserRoleModel.Fields[0], Ref: "user", RefColumn: "id", OnDelete: ""},
 		{Field: UserRoleModel.Fields[1], Ref: "role", RefColumn: "id", OnDelete: ""},
 	}
@@ -563,8 +562,8 @@ func ReadAllRolePermission(qb *orm.QB) (RolePermissionList, error) {
 	return results, err
 }
 
-func (m *RolePermission) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
+func (m *RolePermission) SchemaExt() []model.FieldExt {
+	return []model.FieldExt{
 		{Field: RolePermissionModel.Fields[0], Ref: "role", RefColumn: "id", OnDelete: ""},
 		{Field: RolePermissionModel.Fields[1], Ref: "permission", RefColumn: "id", OnDelete: ""},
 	}
@@ -648,8 +647,8 @@ func ReadAllLANIP(qb *orm.QB) (LANIPList, error) {
 	return results, err
 }
 
-func (m *LANIP) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
+func (m *LANIP) SchemaExt() []model.FieldExt {
+	return []model.FieldExt{
 		{Field: LANIPModel.Fields[1], Ref: "user", RefColumn: "id", OnDelete: ""},
 	}
 }

@@ -4,7 +4,6 @@ go 1.25.2
 
 require (
 	github.com/tinywasm/context v0.0.18
-	github.com/tinywasm/ddlc v0.0.4
 	github.com/tinywasm/fetch v0.1.24
 	github.com/tinywasm/fmt v0.25.3
 	github.com/tinywasm/form v0.2.14
@@ -22,6 +21,4 @@ require (
 require (
 	github.com/tinywasm/base64 v0.0.3 // indirect
 	github.com/tinywasm/crypto v0.0.20 // indirect
-	github.com/tinywasm/css v0.1.4 // indirect
-	github.com/tinywasm/dom v0.11.2 // indirect
 )
