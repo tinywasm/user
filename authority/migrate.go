@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"github.com/tinywasm/ddl"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
@@ -15,10 +16,15 @@ func initSchema(db *orm.DB, mode user.AuthMode) error {
 	if mode == user.AuthModeCookie {
 		models = append(models, &user.Session{})
 	}
-	for _, m := range models {
-		if err := db.CreateTable(m); err != nil {
-			return err
-		}
+	ddlCompiler, ok := db.RawConn().(ddl.Compiler)
+	if !ok {
+		// Backend sin capacidad DDL (p. ej. storage/mem en tests): crea tablas
+		// perezosamente en el primer Exec — no-op correcto, NO un error.
+		return nil
 	}
-	return nil
+	sorted, err := ddl.TopologicalSort(models)
+	if err != nil {
+		return err
+	}
+	return ddl.New(db.RawConn(), ddlCompiler).Sync(sorted...)
 }

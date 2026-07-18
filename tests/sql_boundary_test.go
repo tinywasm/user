@@ -57,8 +57,8 @@ func TestSQLBoundary(t *testing.T) {
 
 	t.Run("GetRoleByCode Injection", func(t *testing.T) {
 		_, err := m.GetRoleByCode("admin' OR '1'='1")
-		if err != orm.ErrNoRows {
-			t.Errorf("expected orm.ErrNoRows, got %v", err)
+		if err != orm.ErrNotFound {
+			t.Errorf("expected orm.ErrNotFound, got %v", err)
 		}
 	})
 }
