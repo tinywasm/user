@@ -190,7 +190,7 @@ func (m *Module) GetRoleByCode(code model.RoleCode) (*user.Role, error) {
 		return nil, err
 	}
 	if len(roles) == 0 {
-		return nil, orm.ErrNoRows
+		return nil, orm.ErrNotFound
 	}
 	return roles[0], nil
 }
@@ -234,7 +234,7 @@ func (m *Module) HasPermission(userID string, resource model.Resource, action mo
 	}
 	u, err := m.GetUser(userID)
 	if err != nil {
-		if err == user.ErrNotFound || err == orm.ErrNoRows {
+		if err == user.ErrNotFound || err == orm.ErrNotFound {
 			return false, nil
 		}
 		return false, err

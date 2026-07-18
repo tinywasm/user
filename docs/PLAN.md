@@ -1,8 +1,9 @@
 ---
 PLAN: "fix: migrar authority a orm v0.11 (ddl.Sync + ErrNotFound) y SchemaExt a model.FieldExt"
 TAG: v0.0.37
-STATUS: running
+STATUS: review
 SESSION: 15840828841376656452
+PR: https://github.com/tinywasm/user/pull/18
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.

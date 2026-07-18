@@ -16,14 +16,14 @@ import (
 )
 
 func newTestDB(t *testing.T) *orm.DB {
-	db, err := sqlite.Open(":memory:")
+	conn, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
 	t.Cleanup(func() {
-		db.Close()
+		conn.Close()
 	})
-	return db
+	return orm.New(conn)
 }
 
 func RunUserTests(t *testing.T) {
@@ -227,7 +227,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Instant expire via SQL
-	if err := db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess.Id); err != nil {
+	if err := db.RawConn().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess.Id); err != nil {
 		t.Fatalf("failed to expire session in DB: %v", err)
 	}
 

@@ -144,7 +144,7 @@ func TestSessionRotation(t *testing.T) {
 	t.Run("RotateSession expired", func(t *testing.T) {
 		sess3, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
 		// Manually expire
-		db.RawExecutor().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.Id)
+		db.RawConn().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.Id)
 		m, _ = authority.New(db, user.Config{TokenTTL: 3600}) // Clear cache
 
 		_, err := m.RotateSession(sess3.Id, "10.0.0.1", "ua1")
