@@ -4,6 +4,8 @@ import (
 	"github.com/tinywasm/events"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
+	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
 )
 
 var (
@@ -97,6 +99,27 @@ type OAuthProvider interface {
 	GetUserInfo(token OAuthToken) (OAuthUserInfo, error)
 }
 
+type Authenticator interface {
+	Name() string
+	Mount(r router.Router, module any)
+}
+
+type ModuleContext interface {
+	Config() Config
+	DB() *orm.DB
+	IDs() model.IDGenerator
+	Notify(e SecurityEvent)
+	IssueToken(userID string, ttl int) (string, error)
+	CreateSession(userID, ip, userAgent string) (Session, error)
+	DeleteSession(id string) error
+	GetSession(id string) (Session, error)
+	Login(email, password string) (User, error)
+	ExtractClientIP(ctx router.Context) string
+	RegisterProvider(p OAuthProvider)
+	BeginOAuth(providerName string) (string, error)
+	CompleteOAuth(providerName string, ctx router.Context, ip, ua string) (User, bool, error)
+}
+
 // AuthMode selects the session strategy.
 type AuthMode uint8
 
@@ -127,8 +150,10 @@ type Config struct {
 	// Also required to call GenerateAPIToken regardless of AuthMode.
 	JWTSecret []byte
 
-	TrustProxy     bool
-	OAuthProviders []OAuthProvider
+	TrustProxy bool
+
+	// Injected authenticators. The consumer can select 1 or N supported authentication modes.
+	Authenticators []Authenticator
 
 	// IDs mints primary keys for every record this module creates (users, sessions,
 	// oauth states, identities, LAN ips). REQUIRED: authority.New fails if nil —

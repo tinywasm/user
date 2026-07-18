@@ -21,8 +21,8 @@ func (m *Module) Login(email, password string) (user.User, error) {
 		m.notify(e)
 	}
 
-	auth := local.New(m.db, m.ids)
-	return auth.Login(email, password, getUserByEmailFn, getLocalIdentityFn, notifyFn)
+	auth := local.New()
+	return auth.Login(m.db, email, password, getUserByEmailFn, getLocalIdentityFn, notifyFn)
 }
 
 func getLocalIdentity(db *orm.DB, userID string) (user.Identity, error) {
@@ -42,8 +42,8 @@ func (m *Module) SetPassword(userID, password string) error {
 		return upsertIdentity(db, m.ids, uID, provider, providerID, email)
 	}
 
-	auth := local.New(m.db, m.ids)
-	return auth.SetPassword(userID, password, upsertIdentityFn)
+	auth := local.New()
+	return auth.SetPassword(m.db, m.ids, userID, password, upsertIdentityFn)
 }
 
 func (m *Module) VerifyPassword(userID, password string) error {
@@ -51,6 +51,6 @@ func (m *Module) VerifyPassword(userID, password string) error {
 		return getLocalIdentity(db, userID)
 	}
 
-	auth := local.New(m.db, m.ids)
-	return auth.VerifyPassword(userID, password, getLocalIdentityFn)
+	auth := local.New()
+	return auth.VerifyPassword(m.db, userID, password, getLocalIdentityFn)
 }

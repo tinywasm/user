@@ -12,6 +12,7 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/local"
 	"github.com/tinywasm/model"
 )
 
@@ -44,7 +45,7 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Cookie Mode Flags", func(t *testing.T) {
 		db := newTestDB(t)
-		m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, CookieName: "session"})
+		m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, CookieName: "session", Authenticators: []user.Authenticator{local.New()}})
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
@@ -77,7 +78,7 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("JWT Mode Cookie", func(t *testing.T) {
 		db := newTestDB(t)
-		m, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session"})
+		m, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session", Authenticators: []user.Authenticator{local.New()}})
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
@@ -100,7 +101,7 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Custom Cookie Name", func(t *testing.T) {
 		db := newTestDB(t)
-		m, err := authority.New(db, user.Config{IDs: testIDs, CookieName: "custom_auth"})
+		m, err := authority.New(db, user.Config{IDs: testIDs, CookieName: "custom_auth", Authenticators: []user.Authenticator{local.New()}})
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
@@ -119,7 +120,7 @@ func TestCookieSecurity(t *testing.T) {
 
 func TestSessionRotation(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}})
 	if err != nil {
 		t.Fatalf("authority.New failed: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestSessionRotation(t *testing.T) {
 		sess3, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
 		// Manually expire
 		db.RawConn().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.Id)
-		m, err = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600}) // Clear cache
+		m, err = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}}) // Clear cache
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
@@ -215,6 +216,7 @@ func TestPasswordHook(t *testing.T) {
 			}
 			return nil
 		},
+		Authenticators: []user.Authenticator{local.New()},
 	}
 	m, err := authority.New(db, cfg)
 	if err != nil {

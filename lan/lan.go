@@ -17,6 +17,12 @@ func New(db *orm.DB, ids model.IDGenerator) *Authenticator {
 	return &Authenticator{db: db, ids: ids}
 }
 
+func (a *Authenticator) Name() string {
+	return "lan"
+}
+
+func (a *Authenticator) Mount(r router.Router, module any) {}
+
 func (a *Authenticator) ValidateRUT(rut string) (string, error) {
 	rut = fmt.Convert(rut).TrimSpace().String()
 	rut = fmt.Convert(rut).Replace(".", "").Replace("-", "").String()

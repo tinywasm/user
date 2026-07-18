@@ -9,12 +9,13 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/local"
 	"github.com/tinywasm/model"
 )
 
 func TestOWASP(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{IDs: testIDs})
+	m, _ := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 
 	email := "active@test.com"
 	pass := "password123"
@@ -77,7 +78,8 @@ func TestOWASP(t *testing.T) {
 				}
 				return nil
 			},
-			Events: pub,
+			Events:          pub,
+			Authenticators: []user.Authenticator{local.New()},
 		})
 		r := &mock.Router{}
 		m.MountAPI(r)

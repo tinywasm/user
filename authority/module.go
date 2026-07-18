@@ -7,6 +7,7 @@ import (
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
 	"github.com/tinywasm/time"
 	"github.com/tinywasm/user"
 )
@@ -62,8 +63,8 @@ func New(db *orm.DB, cfg user.Config) (*Module, error) {
 	if err := initSchema(db, cfg.AuthMode); err != nil {
 		return nil, err
 	}
-	for _, p := range cfg.OAuthProviders {
-		m.registerProvider(p)
+	for _, auth := range cfg.Authenticators {
+		auth.Mount(nil, m)
 	}
 	if cfg.AuthMode == user.AuthModeCookie {
 		if err := m.cache.warmUp(db); err != nil {
@@ -71,6 +72,17 @@ func New(db *orm.DB, cfg user.Config) (*Module, error) {
 		}
 	}
 	return m, nil
+}
+
+// Expose public methods for modular authenticators to consume
+func (m *Module) Config() user.Config { return m.config }
+func (m *Module) DB() *orm.DB { return m.db }
+func (m *Module) IDs() model.IDGenerator { return m.ids }
+func (m *Module) Notify(e user.SecurityEvent) { m.notify(e) }
+func (m *Module) IssueToken(userID string, ttl int) (string, error) { return m.issueToken(userID, ttl) }
+
+func (m *Module) ExtractClientIP(ctx router.Context) string {
+	return extractClientIP(ctx, m.config.TrustProxy)
 }
 
 // SetLog configures optional logging. Call immediately after New().
@@ -116,7 +128,7 @@ func (m *Module) PurgeSessionsByUser(userID string) error {
 	return nil
 }
 
-func (m *Module) registerProvider(p user.OAuthProvider) {
+func (m *Module) RegisterProvider(p user.OAuthProvider) {
 	m.providersMu.Lock()
 	defer m.providersMu.Unlock()
 	for i, item := range m.providers {

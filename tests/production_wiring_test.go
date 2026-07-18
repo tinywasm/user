@@ -13,6 +13,7 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/local"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -73,7 +74,7 @@ func testWidgets(t *testing.T) {
 
 func testBootstrap(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs})
+	m, err := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func testBootstrap(t *testing.T) {
 	}
 
 	db2 := newTestDB(t)
-	m2, _ := authority.New(db2, user.Config{IDs: testIDs})
+	m2, _ := authority.New(db2, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 	if err := m2.Bootstrap(authority.Seed{}); err == nil {
 		t.Errorf("Bootstrap with empty credentials on empty DB should fail")
 	}
@@ -109,8 +110,9 @@ func testBootstrap(t *testing.T) {
 func testMountAPI(t *testing.T) {
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		IDs:        testIDs,
-		CookieName: "test_session",
+		IDs:            testIDs,
+		CookieName:     "test_session",
+		Authenticators: []user.Authenticator{local.New()},
 	})
 	if err != nil {
 		t.Fatal(err)
