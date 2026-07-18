@@ -12,7 +12,7 @@ require (
 	github.com/tinywasm/orm v0.11.1
 	github.com/tinywasm/router v0.1.14
 	github.com/tinywasm/sqlite v0.3.0
-	github.com/tinywasm/user v0.0.36
+	github.com/tinywasm/user v0.0.37
 	golang.org/x/crypto v0.54.0
 	modernc.org/sqlite v1.54.0
 )
