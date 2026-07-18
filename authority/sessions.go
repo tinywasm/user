@@ -86,7 +86,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 
 	now := time.Now() / 1e9
 	sess := user.Session{
-		Id:        u.GetNewID(),
+		Id:        u.NewID(),
 		UserId:    userID,
 		ExpiresAt: now + int64(ttl),
 		Ip:        ip,

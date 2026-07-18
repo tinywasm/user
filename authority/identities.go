@@ -21,7 +21,7 @@ func createIdentity(db *orm.DB, userID, provider, providerID, email string) erro
 		return err
 	}
 
-	id := u.GetNewID()
+	id := u.NewID()
 	now := time.Now() / 1e9
 
 	i := &user.Identity{

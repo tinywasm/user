@@ -30,7 +30,7 @@ func (m *Module) BeginOAuth(providerName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	state := u.GetNewID()
+	state := u.NewID()
 
 	now := time.Now() / 1e9
 	expiresAt := now + 600 // 10 minutes
