@@ -11,6 +11,11 @@ import (
 	"github.com/tinywasm/user"
 )
 
+type providerItem struct {
+	key string
+	val user.OAuthProvider
+}
+
 // Module is the user/auth/rbac handle. All backend operations are methods on this type.
 // Created exclusively via New().
 type Module struct {
@@ -19,7 +24,7 @@ type Module struct {
 	ucache      *userCache
 	config      user.Config
 	log         func(...any)
-	providers   map[string]user.OAuthProvider
+	providers   []providerItem
 	providersMu sync.RWMutex
 	mu          sync.RWMutex
 	ids         model.IDGenerator
@@ -50,7 +55,7 @@ func New(db *orm.DB, cfg user.Config) (*Module, error) {
 		cache:     newSessionCache(),
 		ucache:    newUserCache(),
 		config:    cfg,
-		providers: make(map[string]user.OAuthProvider),
+		providers: make([]providerItem, 0),
 		ids:       cfg.IDs,
 		events:    cfg.Events,
 	}
@@ -114,21 +119,32 @@ func (m *Module) PurgeSessionsByUser(userID string) error {
 func (m *Module) registerProvider(p user.OAuthProvider) {
 	m.providersMu.Lock()
 	defer m.providersMu.Unlock()
-	m.providers[p.Name()] = p
+	for i, item := range m.providers {
+		if item.key == p.Name() {
+			m.providers[i].val = p
+			return
+		}
+	}
+	m.providers = append(m.providers, providerItem{key: p.Name(), val: p})
 }
 
 func (m *Module) getProvider(name string) user.OAuthProvider {
-	m.providersMu.Lock()
-	defer m.providersMu.Unlock()
-	return m.providers[name]
+	m.providersMu.RLock()
+	defer m.providersMu.RUnlock()
+	for _, item := range m.providers {
+		if item.key == name {
+			return item.val
+		}
+	}
+	return nil
 }
 
 func (m *Module) registeredProviders() []user.OAuthProvider {
-	m.providersMu.Lock()
-	defer m.providersMu.Unlock()
+	m.providersMu.RLock()
+	defer m.providersMu.RUnlock()
 	var list []user.OAuthProvider
-	for _, p := range m.providers {
-		list = append(list, p)
+	for _, item := range m.providers {
+		list = append(list, item.val)
 	}
 	return list
 }

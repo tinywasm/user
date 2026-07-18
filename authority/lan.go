@@ -1,16 +1,16 @@
 package authority
 
 import (
-	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/time"
-
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
+	"github.com/tinywasm/time"
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/lan"
 )
 
 func (m *Module) LoginLAN(rut string, ctx router.Context) (user.User, error) {
-	normalized, err := validateRUT(rut)
+	auth := lan.New(m.db, m.ids)
+	normalized, err := auth.ValidateRUT(rut)
 	if err != nil {
 		return user.User{}, user.ErrInvalidRUT
 	}
@@ -28,7 +28,7 @@ func (m *Module) LoginLAN(rut string, ctx router.Context) (user.User, error) {
 		return user.User{}, user.ErrSuspended
 	}
 
-	clientIP := extractClientIP(ctx, m.config.TrustProxy)
+	clientIP := auth.ExtractClientIP(ctx, m.config.TrustProxy)
 	if err := checkLANIP(m.db, identity.UserId, clientIP); err != nil {
 		return user.User{}, user.ErrInvalidCredentials
 	}
@@ -37,7 +37,8 @@ func (m *Module) LoginLAN(rut string, ctx router.Context) (user.User, error) {
 }
 
 func (m *Module) RegisterLAN(userID, rut string) error {
-	normalized, err := validateRUT(rut)
+	auth := lan.New(m.db, m.ids)
+	normalized, err := auth.ValidateRUT(rut)
 	if err != nil {
 		return user.ErrInvalidRUT
 	}
@@ -140,70 +141,7 @@ func checkLANIP(db *orm.DB, userID, ip string) error {
 	return nil
 }
 
-func validateRUT(rut string) (string, error) {
-	rut = fmt.Convert(rut).TrimSpace().String()
-	rut = fmt.Convert(rut).Replace(".", "").Replace("-", "").String()
-
-	if len(rut) < 2 { // At least 1 digit + 1 DV
-		return "", user.ErrInvalidRUT
-	}
-
-	bodyStr := rut[:len(rut)-1]
-	dvStr := fmt.ToUpper(rut[len(rut)-1:])
-
-	if _, err := fmt.Convert(bodyStr).Int(); err != nil {
-		return "", user.ErrInvalidRUT
-	}
-
-	sum := 0
-	multiplier := 2
-	for i := len(bodyStr) - 1; i >= 0; i-- {
-		digit := int(bodyStr[i] - '0')
-		sum += digit * multiplier
-		multiplier++
-		if multiplier > 7 {
-			multiplier = 2
-		}
-	}
-
-	expectedDV := 11 - (sum % 11)
-	var expectedDVStr string
-	if expectedDV == 11 {
-		expectedDVStr = "0"
-	} else if expectedDV == 10 {
-		expectedDVStr = "K"
-	} else {
-		expectedDVStr = fmt.Convert(expectedDV).String()
-	}
-
-	if dvStr != expectedDVStr {
-		return "", user.ErrInvalidRUT
-	}
-
-	return bodyStr + "-" + expectedDVStr, nil
-}
-
 func extractClientIP(ctx router.Context, trustProxy bool) string {
-	if trustProxy {
-		xff := ctx.GetHeader("X-Forwarded-For")
-		if xff != "" {
-			parts := fmt.Split(xff, ",")
-			return fmt.Convert(parts[0]).TrimSpace().String()
-		}
-		xri := ctx.GetHeader("X-Real-IP")
-		if xri != "" {
-			return fmt.Convert(xri).TrimSpace().String()
-		}
-	}
-
-	if addr, ok := ctx.Value("RemoteAddr").(string); ok {
-		// addr is often "ip:port"
-		parts := fmt.Split(addr, ":")
-		if len(parts) > 0 {
-			return parts[0]
-		}
-		return addr
-	}
-
-	return ""
+	auth := lan.New(nil, nil)
+	return auth.ExtractClientIP(ctx, trustProxy)
 }

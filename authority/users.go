@@ -76,16 +76,21 @@ func hydrateUser(db *orm.DB, u *user.User) error {
 				return err
 			}
 
-			// Deduplicate permissions
-			permMap := make(map[string]user.Permission)
+			// Deduplicate permissions using slice lookup (no map)
+			var uniquePerms []user.Permission
 			for _, p := range perms {
-				permMap[p.Id] = *p
+				exists := false
+				for _, up := range uniquePerms {
+					if up.Id == p.Id {
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					uniquePerms = append(uniquePerms, *p)
+				}
 			}
-
-			u.Permissions = make([]user.Permission, 0, len(permMap))
-			for _, p := range permMap {
-				u.Permissions = append(u.Permissions, p)
-			}
+			u.Permissions = uniquePerms
 		} else {
 			u.Permissions = []user.Permission{}
 		}

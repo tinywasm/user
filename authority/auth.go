@@ -1,48 +1,28 @@
 package authority
 
 import (
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"
-
-	"golang.org/x/crypto/bcrypt"
+	"github.com/tinywasm/user/local"
 )
 
-var PasswordHashCost = bcrypt.DefaultCost
-var dummyHashOnce []byte
-
-func getDummyHash(cost int) []byte {
-	// Simple memoization for the specific cost.
-	// In practice, this could be a map if cost changes,
-	// but for now we follow the existing pattern.
-	if len(dummyHashOnce) == 0 {
-		dummyHashOnce, _ = bcrypt.GenerateFromPassword([]byte("dummy"), cost)
-	}
-	return dummyHashOnce
-}
+// PasswordHashCost delegates to local package
+var PasswordHashCost = local.PasswordHashCost
 
 func (m *Module) Login(email, password string) (user.User, error) {
-	u, err := getUserByEmail(m.db, m.ucache, email)
-	if err != nil {
-		// Dummy bcrypt: constant-time regardless of user existence.
-		bcrypt.CompareHashAndPassword(getDummyHash(PasswordHashCost), []byte(password))
-		return user.User{}, user.ErrInvalidCredentials
+	getUserByEmailFn := func(db *orm.DB, email string) (user.User, error) {
+		return getUserByEmail(db, m.ucache, email)
 	}
-	if u.Status != "active" {
-		m.notify(user.SecurityEvent{Type: user.EventNonActiveAccess, UserID: u.Id})
-		bcrypt.CompareHashAndPassword(getDummyHash(PasswordHashCost), []byte(password))
-		return user.User{}, user.ErrInvalidCredentials
+	getLocalIdentityFn := func(db *orm.DB, userID string) (user.Identity, error) {
+		return getLocalIdentity(db, userID)
+	}
+	notifyFn := func(e user.SecurityEvent) {
+		m.notify(e)
 	}
 
-	identity, err := getLocalIdentity(m.db, u.Id)
-	if err != nil {
-		bcrypt.CompareHashAndPassword(getDummyHash(PasswordHashCost), []byte(password))
-		return user.User{}, user.ErrInvalidCredentials
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderId), []byte(password)); err != nil {
-		return user.User{}, user.ErrInvalidCredentials
-	}
-	return u, nil
+	auth := local.New(m.db, m.ids)
+	return auth.Login(email, password, getUserByEmailFn, getLocalIdentityFn, notifyFn)
 }
 
 func getLocalIdentity(db *orm.DB, userID string) (user.Identity, error) {
@@ -58,20 +38,19 @@ func (m *Module) SetPassword(userID, password string) error {
 			return err
 		}
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), PasswordHashCost)
-	if err != nil {
-		return err
+	upsertIdentityFn := func(db *orm.DB, ids model.IDGenerator, uID, provider, providerID, email string) error {
+		return upsertIdentity(db, m.ids, uID, provider, providerID, email)
 	}
-	return upsertIdentity(m.db, m.ids, userID, "local", string(hash), "")
+
+	auth := local.New(m.db, m.ids)
+	return auth.SetPassword(userID, password, upsertIdentityFn)
 }
 
 func (m *Module) VerifyPassword(userID, password string) error {
-	identity, err := getLocalIdentity(m.db, userID)
-	if err != nil {
-		return user.ErrInvalidCredentials
+	getLocalIdentityFn := func(db *orm.DB, userID string) (user.Identity, error) {
+		return getLocalIdentity(db, userID)
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(identity.ProviderId), []byte(password)); err != nil {
-		return user.ErrInvalidCredentials
-	}
-	return nil
+
+	auth := local.New(m.db, m.ids)
+	return auth.VerifyPassword(userID, password, getLocalIdentityFn)
 }
