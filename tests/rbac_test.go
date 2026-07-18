@@ -120,6 +120,117 @@ func TestTools_Me(t *testing.T) {
 	})
 }
 
+func TestAdminOps(t *testing.T) {
+	db := newTestDB(t)
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
+
+	// 1. Verify MountOps registration and Gates
+	reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+	m.MountOps(reg)
+
+	listRoute := reg.ops[user.OpListUsers]
+	if listRoute == nil {
+		t.Fatal("list_users op not registered")
+	}
+	if listRoute.requiredRes != "users" || listRoute.requiredAct != model.Read {
+		t.Errorf("list_users has wrong gating: res=%s act=%v", listRoute.requiredRes, listRoute.requiredAct)
+	}
+
+	upsertRoute := reg.ops[user.OpUpsertUser]
+	if upsertRoute == nil {
+		t.Fatal("upsert_user op not registered")
+	}
+	if upsertRoute.requiredRes != "users" || upsertRoute.requiredAct != (model.Create|model.Update) {
+		t.Errorf("upsert_user has wrong gating: res=%s act=%v", upsertRoute.requiredRes, upsertRoute.requiredAct)
+	}
+
+	deleteRoute := reg.ops[user.OpDeleteUser]
+	if deleteRoute == nil {
+		t.Fatal("delete_user op not registered")
+	}
+	if deleteRoute.requiredRes != "users" || deleteRoute.requiredAct != model.Delete {
+		t.Errorf("delete_user has wrong gating: res=%s act=%v", deleteRoute.requiredRes, deleteRoute.requiredAct)
+	}
+
+	// 2. Exercise handlers
+	t.Run("list_users handler", func(t *testing.T) {
+		ctx := &mock.Context{}
+		listRoute.handler(ctx)
+
+		if ctx.Status != 0 && ctx.Status != 200 {
+			t.Fatalf("list_users handler failed: %d", ctx.Status)
+		}
+
+		var list user.UserList
+		if err := json.Decode(ctx.ResponseBody(), &list); err != nil {
+			t.Fatalf("failed to decode list: %v", err)
+		}
+	})
+
+	t.Run("upsert_user create handler", func(t *testing.T) {
+		u := &user.User{
+			Email: "created_op@test.com",
+			Name:  "Op Created",
+			Phone: "12345",
+		}
+		ctx := &mock.Context{}
+		var body string
+		if err := json.Encode(u, &body); err != nil {
+			t.Fatal(err)
+		}
+		ctx.InBody = []byte(body)
+
+		upsertRoute.handler(ctx)
+
+		// Verify user got created in DB
+		saved, err := m.GetUserByEmail("created_op@test.com")
+		if err != nil {
+			t.Fatalf("user was not created: %v", err)
+		}
+		if saved.Name != "Op Created" {
+			t.Errorf("wrong user name: %s", saved.Name)
+		}
+
+		t.Run("upsert_user update handler", func(t *testing.T) {
+			saved.Name = "Op Updated"
+			ctxUpdate := &mock.Context{}
+			var bodyUpdate string
+			if err := json.Encode(&saved, &bodyUpdate); err != nil {
+				t.Fatal(err)
+			}
+			ctxUpdate.InBody = []byte(bodyUpdate)
+
+			upsertRoute.handler(ctxUpdate)
+
+			// Verify user got updated in DB
+			updated, err := m.GetUser(saved.Id)
+			if err != nil {
+				t.Fatalf("failed to retrieve updated user: %v", err)
+			}
+			if updated.Name != "Op Updated" {
+				t.Errorf("user name not updated: %s", updated.Name)
+			}
+
+			t.Run("delete_user handler", func(t *testing.T) {
+				ctxDel := &mock.Context{}
+				var bodyDel string
+				if err := json.Encode(&updated, &bodyDel); err != nil {
+					t.Fatal(err)
+				}
+				ctxDel.InBody = []byte(bodyDel)
+
+				deleteRoute.handler(ctxDel)
+
+				// Verify user got deleted from DB
+				_, err := m.GetUser(updated.Id)
+				if err != user.ErrNotFound {
+					t.Errorf("expected ErrNotFound after deletion, got %v", err)
+				}
+			})
+		})
+	})
+}
+
 func TestNew_Validation(t *testing.T) {
 	db := newTestDB(t)
 

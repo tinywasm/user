@@ -12,7 +12,7 @@ require (
 	github.com/tinywasm/jwt v0.1.1
 	github.com/tinywasm/model v0.0.16
 	github.com/tinywasm/orm v0.11.1
-	github.com/tinywasm/router v0.1.14
+	github.com/tinywasm/router v0.1.15
 	github.com/tinywasm/time v0.5.0
 	github.com/tinywasm/view v0.1.1
 	golang.org/x/crypto v0.54.0
