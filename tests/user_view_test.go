@@ -7,6 +7,7 @@ import (
 
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/user"
+	"github.com/tinywasm/view"
 )
 
 type fakeCaller struct {
@@ -17,7 +18,7 @@ type fakeCaller struct {
 func (c *fakeCaller) Call(op string, args model.Encodable, out model.Decodable, cb func(error)) {
 	c.lastOp = op
 	c.lastArgs = args
-	if op == "list_users" {
+	if op == user.OpListUsers {
 		if l, ok := out.(*user.UserList); ok {
 			u1 := l.Append().(*user.User)
 			u1.Id = "u1"
@@ -32,7 +33,7 @@ func (c *fakeCaller) Call(op string, args model.Encodable, out model.Decodable, 
 		if cb != nil {
 			cb(nil)
 		}
-	} else if op == "upsert_user" || op == "delete_user" {
+	} else if op == user.OpUpsertUser || op == user.OpDeleteUser {
 		if cb != nil {
 			cb(nil)
 		}
@@ -68,7 +69,7 @@ func TestNewView(t *testing.T) {
 		t.Errorf("wrong item projection at 1: %+v", items[1])
 	}
 
-	// 4. Select Item and verify Fill callback logic via return value of Select()
+	// 4. Select Item and verify return value of Select()
 	rec := v.Select("u1")
 	if rec == nil {
 		t.Fatal("expected selected record to not be nil")
@@ -81,21 +82,48 @@ func TestNewView(t *testing.T) {
 		t.Errorf("wrong record selected: %+v", u)
 	}
 
-	// 5. Save record and verify caller payload
+	// 5. Test Deselect
+	if v.Selected() != "u1" {
+		t.Errorf("expected selected to be 'u1', got %s", v.Selected())
+	}
+	v.Deselect()
+	if v.Selected() != "" {
+		t.Errorf("expected selected to be empty after Deselect, got %s", v.Selected())
+	}
+
+	// 6. Test Filter
+	filtered := v.Filter("One")
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 item after filtering for 'One', got %d", len(filtered))
+	}
+	all := v.Filter("")
+	if len(all) != 2 {
+		t.Errorf("expected 2 items after clearing filter, got %d", len(all))
+	}
+
+	// 7. Save record and verify caller payload via view.Saver capability
 	u.Name = "Updated Via Presenter"
-	v.Save(u)
-	if fc.lastOp != "upsert_user" {
-		t.Errorf("expected upsert_user op on save, got %s", fc.lastOp)
+	s, ok := v.(view.Saver)
+	if !ok {
+		t.Fatal("expected view to implement view.Saver")
+	}
+	s.Save(u)
+	if fc.lastOp != user.OpUpsertUser {
+		t.Errorf("expected %s op on save, got %s", user.OpUpsertUser, fc.lastOp)
 	}
 	savedUser, ok := fc.lastArgs.(*user.User)
 	if !ok || savedUser.Name != "Updated Via Presenter" {
 		t.Errorf("wrong payload saved: %+v", fc.lastArgs)
 	}
 
-	// 6. Delete record and verify caller payload
-	v.Delete("u2")
-	if fc.lastOp != "delete_user" {
-		t.Errorf("expected delete_user op on delete, got %s", fc.lastOp)
+	// 8. Delete record and verify caller payload via view.Deleter capability
+	d, ok := v.(view.Deleter)
+	if !ok {
+		t.Fatal("expected view to implement view.Deleter")
+	}
+	d.Delete("u2")
+	if fc.lastOp != user.OpDeleteUser {
+		t.Errorf("expected %s op on delete, got %s", user.OpDeleteUser, fc.lastOp)
 	}
 	deletedUser, ok := fc.lastArgs.(*user.User)
 	if !ok || deletedUser.Id != "u2" {
