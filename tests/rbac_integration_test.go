@@ -22,7 +22,7 @@ func (h *mockHandler) AllowedRoles(action model.Action) []model.RoleCode {
 
 func TestIntegration_FullFlow(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}

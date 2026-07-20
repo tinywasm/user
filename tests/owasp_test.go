@@ -9,12 +9,13 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/local"
 	"github.com/tinywasm/model"
 )
 
 func TestOWASP(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 
 	email := "active@test.com"
 	pass := "password123"
@@ -68,23 +69,27 @@ func TestOWASP(t *testing.T) {
 
 	t.Run("Rate Limit Hook", func(t *testing.T) {
 		db := newTestDB(t)
-		var events []user.SecurityEvent
+		pub := &mockPublisher{}
 		m, _ := authority.New(db, user.Config{
+			IDs: testIDs,
 			RateLimit: func(ip string) error {
 				if ip == "1.2.3.4" {
 					return user.ErrInvalidCredentials // Simulating rejection
 				}
 				return nil
 			},
-			OnSecurityEvent: func(e user.SecurityEvent) {
-				events = append(events, e)
-			},
+			Events:          pub,
+			Authenticators: []user.Authenticator{local.New()},
 		})
 		r := &mock.Router{}
 		m.MountAPI(r)
 
 		t.Run("Blocked IP", func(t *testing.T) {
-			events = nil
+			// Clear events
+			pub.mu.Lock()
+			pub.events = nil
+			pub.mu.Unlock()
+
 			ctx := &mock.Context{
 				InMethod: "POST",
 				InPath:   user.PathLogin,
@@ -99,7 +104,7 @@ func TestOWASP(t *testing.T) {
 			}
 
 			found := false
-			for _, e := range events {
+			for _, e := range pub.SecurityEvents() {
 				if e.Type == user.EventRateLimited {
 					found = true
 					if e.UserID != email {

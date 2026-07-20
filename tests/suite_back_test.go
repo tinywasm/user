@@ -12,6 +12,9 @@ import (
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/lan"
+	"github.com/tinywasm/user/local"
+	"github.com/tinywasm/user/oauth2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -41,8 +44,10 @@ func testJWTCookieMode(t *testing.T) {
 	db := newTestDB(t)
 	secret := []byte("test-secret-32-bytes-minimum-len")
 	m, err := authority.New(db, user.Config{
-		AuthMode:  user.AuthModeJWT,
-		JWTSecret: secret,
+		IDs:            testIDs,
+		AuthMode:       user.AuthModeJWT,
+		JWTSecret:      secret,
+		Authenticators: []user.Authenticator{local.New()},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -92,8 +97,10 @@ func testJWTCookieMode(t *testing.T) {
 func testInit(t *testing.T) {
 	db := newTestDB(t)
 	cfg := user.Config{
-		CookieName: "test_session",
-		TokenTTL:   3600,
+		IDs:            testIDs,
+		CookieName:     "test_session",
+		TokenTTL:       3600,
+		Authenticators: []user.Authenticator{local.New()},
 	}
 	m, err := authority.New(db, cfg)
 	if err != nil {
@@ -123,7 +130,7 @@ func getHandler(m *authority.Module, name string) interface {
 
 func testCRUD(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +171,7 @@ func testCRUD(t *testing.T) {
 
 func testAuth(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +207,7 @@ func testAuth(t *testing.T) {
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{TokenTTL: 3600})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +239,7 @@ func testSessions(t *testing.T) {
 	}
 
 	// Re-init to flush memory cache
-	m, _ = authority.New(db, user.Config{TokenTTL: 3600})
+	m, _ = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}})
 
 	_, err = m.GetSession(sess.Id)
 	if err != user.ErrSessionExpired {
@@ -264,7 +271,8 @@ func testOAuth(t *testing.T) {
 	}
 
 	cfg := user.Config{
-		OAuthProviders: []user.OAuthProvider{mockP},
+		IDs:            testIDs,
+		Authenticators: []user.Authenticator{oauth2.New(mockP)},
 	}
 	m, err := authority.New(db, cfg)
 	if err != nil {
@@ -310,7 +318,7 @@ func testOAuth(t *testing.T) {
 
 func testLAN(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{TrustProxy: true})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TrustProxy: true, Authenticators: []user.Authenticator{lan.New(db, testIDs)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,6 +393,6 @@ func testLAN(t *testing.T) {
 
 func setupModule(t *testing.T) *authority.Module {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 	return m
 }

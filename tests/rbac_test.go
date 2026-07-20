@@ -5,9 +5,8 @@ package tests
 import (
 	"testing"
 
-	"github.com/tinywasm/context"
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/mcp"
+	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/model"
@@ -15,7 +14,7 @@ import (
 
 func TestRBAC_ClosedByDefault(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func TestRBAC_ClosedByDefault(t *testing.T) {
 
 func TestTools_Me(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "me@test.com", Name: "Me User"})
@@ -78,33 +77,28 @@ func TestTools_Me(t *testing.T) {
 	u := res.(user.User)
 
 	t.Run("Authenticated me returns profile", func(t *testing.T) {
-		tools := m.Tools()
-		var meTool *mcp.Tool
-		for i := range tools {
-			if tools[i].Name == "me" {
-				meTool = &tools[i]
-				break
-			}
+		reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+		m.MountOps(reg)
+
+		route := reg.ops[user.OpMe]
+		if route == nil {
+			t.Fatal("me op not registered")
 		}
-		if meTool == nil {
-			t.Fatal("me tool not found")
+		if !route.authenticated {
+			t.Error("me op should be authenticated")
 		}
 
-		ctx := context.Background()
-		if err := ctx.Set(mcp.CtxKeyUserID, u.Id); err != nil {
-			t.Fatal(err)
-		}
+		ctx := &mock.Context{}
+		ctx.SetUserID(u.Id)
 
-		res, err := meTool.Execute(ctx, mcp.Request{})
-		if err != nil {
-			t.Fatalf("Execute failed: %v", err)
-		}
-		if res.IsError {
-			t.Fatalf("Execute returned error: %s", res.Content)
+		route.handler(ctx)
+
+		if ctx.Status != 0 && ctx.Status != 200 {
+			t.Fatalf("handler returned status: %d", ctx.Status)
 		}
 
 		var profile user.ProfileDTO
-		if err := json.Decode([]byte(res.Content), &profile); err != nil {
+		if err := json.Decode(ctx.ResponseBody(), &profile); err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
 		if profile.Id != u.Id || profile.Email != u.Email {
@@ -113,15 +107,127 @@ func TestTools_Me(t *testing.T) {
 	})
 
 	t.Run("Anonymous me returns error", func(t *testing.T) {
-		tools := m.Tools()
-		meTool := &tools[0] // Assume it's the first one
+		reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+		m.MountOps(reg)
 
-		ctx := context.Background()
+		route := reg.ops[user.OpMe]
+		ctx := &mock.Context{}
 		// No userID set
-		_, err := meTool.Execute(ctx, mcp.Request{})
-		if err == nil {
-			t.Error("expected error for anonymous user")
+		route.handler(ctx)
+		if ctx.Status != 401 {
+			t.Errorf("expected 401 for anonymous user, got %d", ctx.Status)
 		}
+	})
+}
+
+func TestAdminOps(t *testing.T) {
+	db := newTestDB(t)
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
+
+	// 1. Verify MountOps registration and Gates
+	reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+	m.MountOps(reg)
+
+	listRoute := reg.ops[user.OpListUsers]
+	if listRoute == nil {
+		t.Fatal("list_users op not registered")
+	}
+	if listRoute.requiredRes != "users" || listRoute.requiredAct != model.Read {
+		t.Errorf("list_users has wrong gating: res=%s act=%v", listRoute.requiredRes, listRoute.requiredAct)
+	}
+
+	upsertRoute := reg.ops[user.OpUpsertUser]
+	if upsertRoute == nil {
+		t.Fatal("upsert_user op not registered")
+	}
+	if upsertRoute.requiredRes != "users" || upsertRoute.requiredAct != (model.Create|model.Update) {
+		t.Errorf("upsert_user has wrong gating: res=%s act=%v", upsertRoute.requiredRes, upsertRoute.requiredAct)
+	}
+
+	deleteRoute := reg.ops[user.OpDeleteUser]
+	if deleteRoute == nil {
+		t.Fatal("delete_user op not registered")
+	}
+	if deleteRoute.requiredRes != "users" || deleteRoute.requiredAct != model.Delete {
+		t.Errorf("delete_user has wrong gating: res=%s act=%v", deleteRoute.requiredRes, deleteRoute.requiredAct)
+	}
+
+	// 2. Exercise handlers
+	t.Run("list_users handler", func(t *testing.T) {
+		ctx := &mock.Context{}
+		listRoute.handler(ctx)
+
+		if ctx.Status != 0 && ctx.Status != 200 {
+			t.Fatalf("list_users handler failed: %d", ctx.Status)
+		}
+
+		var list user.UserList
+		if err := json.Decode(ctx.ResponseBody(), &list); err != nil {
+			t.Fatalf("failed to decode list: %v", err)
+		}
+	})
+
+	t.Run("upsert_user create handler", func(t *testing.T) {
+		u := &user.User{
+			Email: "created_op@test.com",
+			Name:  "Op Created",
+			Phone: "12345",
+		}
+		ctx := &mock.Context{}
+		var body string
+		if err := json.Encode(u, &body); err != nil {
+			t.Fatal(err)
+		}
+		ctx.InBody = []byte(body)
+
+		upsertRoute.handler(ctx)
+
+		// Verify user got created in DB
+		saved, err := m.GetUserByEmail("created_op@test.com")
+		if err != nil {
+			t.Fatalf("user was not created: %v", err)
+		}
+		if saved.Name != "Op Created" {
+			t.Errorf("wrong user name: %s", saved.Name)
+		}
+
+		t.Run("upsert_user update handler", func(t *testing.T) {
+			saved.Name = "Op Updated"
+			ctxUpdate := &mock.Context{}
+			var bodyUpdate string
+			if err := json.Encode(&saved, &bodyUpdate); err != nil {
+				t.Fatal(err)
+			}
+			ctxUpdate.InBody = []byte(bodyUpdate)
+
+			upsertRoute.handler(ctxUpdate)
+
+			// Verify user got updated in DB
+			updated, err := m.GetUser(saved.Id)
+			if err != nil {
+				t.Fatalf("failed to retrieve updated user: %v", err)
+			}
+			if updated.Name != "Op Updated" {
+				t.Errorf("user name not updated: %s", updated.Name)
+			}
+
+			t.Run("delete_user handler", func(t *testing.T) {
+				ctxDel := &mock.Context{}
+				var bodyDel string
+				if err := json.Encode(&updated, &bodyDel); err != nil {
+					t.Fatal(err)
+				}
+				ctxDel.InBody = []byte(bodyDel)
+
+				deleteRoute.handler(ctxDel)
+
+				// Verify user got deleted from DB
+				_, err := m.GetUser(updated.Id)
+				if err != user.ErrNotFound {
+					t.Errorf("expected ErrNotFound after deletion, got %v", err)
+				}
+			})
+		})
 	})
 }
 
@@ -129,21 +235,21 @@ func TestNew_Validation(t *testing.T) {
 	db := newTestDB(t)
 
 	t.Run("AuthModeBearer requires JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeBearer})
+		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeBearer})
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing for AuthModeBearer")
 		}
 	})
 
 	t.Run("AuthModeJWT requires JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeJWT})
+		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT})
 		if err == nil {
 			t.Error("expected error when JWTSecret is missing for AuthModeJWT")
 		}
 	})
 
 	t.Run("AuthModeCookie does not require JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{AuthMode: user.AuthModeCookie})
+		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeCookie})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

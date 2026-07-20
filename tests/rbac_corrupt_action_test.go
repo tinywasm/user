@@ -51,7 +51,7 @@ func seedCorruptPermission(t *testing.T, db *orm.DB, m *authority.Module) string
 // denegar EN SILENCIO no.
 func TestHasPermission_CorruptActionFailsLoudly(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,10 +70,11 @@ func TestHasPermission_CorruptActionFailsLoudly(t *testing.T) {
 // Can es la costura model.Authorizer: solo puede devolver bool. El error no cabe en la
 // firma, así que la corrupción tiene que salir por el canal de observabilidad, o no sale.
 func TestCan_CorruptActionDeniesAndNotifies(t *testing.T) {
-	var events []user.SecurityEvent
+	pub := &mockPublisher{}
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		OnSecurityEvent: func(e user.SecurityEvent) { events = append(events, e) },
+		IDs:    testIDs,
+		Events: pub,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +85,7 @@ func TestCan_CorruptActionDeniesAndNotifies(t *testing.T) {
 		t.Error("Can concedió permiso sobre una fila corrupta")
 	}
 
-	for _, e := range events {
+	for _, e := range pub.SecurityEvents() {
 		if e.Type == user.EventPermissionCorrupt {
 			return
 		}

@@ -1,13 +1,21 @@
 package authority
 
 import (
-	"github.com/tinywasm/fmt"
 	"sync"
-	"github.com/tinywasm/time"
 
+	"github.com/tinywasm/events"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
+	"github.com/tinywasm/time"
 	"github.com/tinywasm/user"
 )
+
+type providerItem struct {
+	key string
+	val user.OAuthProvider
+}
 
 // Module is the user/auth/rbac handle. All backend operations are methods on this type.
 // Created exclusively via New().
@@ -17,14 +25,20 @@ type Module struct {
 	ucache      *userCache
 	config      user.Config
 	log         func(...any)
-	providers   map[string]user.OAuthProvider
+	providers   []providerItem
 	providersMu sync.RWMutex
 	mu          sync.RWMutex
+	ids         model.IDGenerator
+	events      events.Publisher
 }
 
 // New initializes the user/rbac schema, warms the cache, and returns a Module handle.
 // This is the ONLY entry point for this package on the backend.
 func New(db *orm.DB, cfg user.Config) (*Module, error) {
+	if cfg.IDs == nil {
+		return nil, fmt.Err("user:", "Config.IDs", "is", "required")
+	}
+
 	if cfg.AuthMode == user.AuthModeJWT || cfg.AuthMode == user.AuthModeBearer {
 		if len(cfg.JWTSecret) == 0 {
 			return nil, fmt.Err("authority: JWTSecret required for selected AuthMode")
@@ -42,13 +56,15 @@ func New(db *orm.DB, cfg user.Config) (*Module, error) {
 		cache:     newSessionCache(),
 		ucache:    newUserCache(),
 		config:    cfg,
-		providers: make(map[string]user.OAuthProvider),
+		providers: make([]providerItem, 0),
+		ids:       cfg.IDs,
+		events:    cfg.Events,
 	}
 	if err := initSchema(db, cfg.AuthMode); err != nil {
 		return nil, err
 	}
-	for _, p := range cfg.OAuthProviders {
-		m.registerProvider(p)
+	for _, auth := range cfg.Authenticators {
+		auth.Mount(nil, m)
 	}
 	if cfg.AuthMode == user.AuthModeCookie {
 		if err := m.cache.warmUp(db); err != nil {
@@ -56,6 +72,17 @@ func New(db *orm.DB, cfg user.Config) (*Module, error) {
 		}
 	}
 	return m, nil
+}
+
+// Expose public methods for modular authenticators to consume
+func (m *Module) Config() user.Config { return m.config }
+func (m *Module) DB() *orm.DB { return m.db }
+func (m *Module) IDs() model.IDGenerator { return m.ids }
+func (m *Module) Notify(e user.SecurityEvent) { m.notify(e) }
+func (m *Module) IssueToken(userID string, ttl int) (string, error) { return m.issueToken(userID, ttl) }
+
+func (m *Module) ExtractClientIP(ctx router.Context) string {
+	return extractClientIP(ctx, m.config.TrustProxy)
 }
 
 // SetLog configures optional logging. Call immediately after New().
@@ -69,16 +96,11 @@ func (m *Module) SetLog(fn func(...any)) {
 }
 
 func (m *Module) notify(e user.SecurityEvent) {
-	if e.Timestamp == 0 {
-		e.Timestamp = time.Now() / 1e9
-	}
-	if m.config.OnSecurityEvent != nil {
-		m.config.OnSecurityEvent(e)
+	if m.events == nil {
 		return
 	}
-	if m.log != nil {
-		m.log("security_event", e.Type, e.IP, e.UserID)
-	}
+	e.Timestamp = time.Now() / 1e9
+	m.events.Publish(events.Event{Topic: user.TopicSecurity, Payload: &e})
 }
 
 // SuspendUser sets Status = "suspended". Evicts user from cache.
@@ -106,24 +128,35 @@ func (m *Module) PurgeSessionsByUser(userID string) error {
 	return nil
 }
 
-func (m *Module) registerProvider(p user.OAuthProvider) {
+func (m *Module) RegisterProvider(p user.OAuthProvider) {
 	m.providersMu.Lock()
 	defer m.providersMu.Unlock()
-	m.providers[p.Name()] = p
+	for i, item := range m.providers {
+		if item.key == p.Name() {
+			m.providers[i].val = p
+			return
+		}
+	}
+	m.providers = append(m.providers, providerItem{key: p.Name(), val: p})
 }
 
 func (m *Module) getProvider(name string) user.OAuthProvider {
-	m.providersMu.Lock()
-	defer m.providersMu.Unlock()
-	return m.providers[name]
+	m.providersMu.RLock()
+	defer m.providersMu.RUnlock()
+	for _, item := range m.providers {
+		if item.key == name {
+			return item.val
+		}
+	}
+	return nil
 }
 
 func (m *Module) registeredProviders() []user.OAuthProvider {
-	m.providersMu.Lock()
-	defer m.providersMu.Unlock()
+	m.providersMu.RLock()
+	defer m.providersMu.RUnlock()
 	var list []user.OAuthProvider
-	for _, p := range m.providers {
-		list = append(list, p)
+	for _, item := range m.providers {
+		list = append(list, item.val)
 	}
 	return list
 }
@@ -134,10 +167,9 @@ func (m *Module) registeredProviders() []user.OAuthProvider {
 // Usage: cp.RegisterHandlers(m.Add()...)
 func (m *Module) Add() []any {
 	return []any{
-		&userCRUD{db: m.db, cache: m.ucache},
+		&userCRUD{db: m.db, cache: m.ucache, ids: m.ids},
 		&roleCRUD{m: m},
 		&permissionCRUD{m: m},
 		&lanipCRUD{m: m},
 	}
 }
-

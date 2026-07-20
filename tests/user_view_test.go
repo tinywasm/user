@@ -1,4 +1,4 @@
-//go:build wasm
+//go:build !wasm
 
 package tests
 
@@ -10,12 +10,12 @@ import (
 	"github.com/tinywasm/view"
 )
 
-type fakeCallerWasm struct {
+type fakeCaller struct {
 	lastOp   string
 	lastArgs model.Encodable
 }
 
-func (c *fakeCallerWasm) Call(op string, args model.Encodable, out model.Decodable, cb func(error)) {
+func (c *fakeCaller) Call(op string, args model.Encodable, out model.Decodable, cb func(error)) {
 	c.lastOp = op
 	c.lastArgs = args
 	if op == user.OpListUsers {
@@ -40,10 +40,10 @@ func (c *fakeCallerWasm) Call(op string, args model.Encodable, out model.Decodab
 	}
 }
 
-func (c *fakeCallerWasm) Dispatch(s string, e model.Encodable) {}
+func (c *fakeCaller) Dispatch(s string, e model.Encodable) {}
 
 func TestNewView(t *testing.T) {
-	fc := &fakeCallerWasm{}
+	fc := &fakeCaller{}
 	v := user.NewView(fc)
 	if v == nil {
 		t.Fatal("expected view to not be nil")

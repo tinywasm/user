@@ -6,15 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	twctx "github.com/tinywasm/context"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/json"
-	"github.com/tinywasm/mcp"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/local"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -75,7 +74,7 @@ func testWidgets(t *testing.T) {
 
 func testBootstrap(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{})
+	m, err := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +101,7 @@ func testBootstrap(t *testing.T) {
 	}
 
 	db2 := newTestDB(t)
-	m2, _ := authority.New(db2, user.Config{})
+	m2, _ := authority.New(db2, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
 	if err := m2.Bootstrap(authority.Seed{}); err == nil {
 		t.Errorf("Bootstrap with empty credentials on empty DB should fail")
 	}
@@ -111,7 +110,9 @@ func testBootstrap(t *testing.T) {
 func testMountAPI(t *testing.T) {
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		CookieName: "test_session",
+		IDs:            testIDs,
+		CookieName:     "test_session",
+		Authenticators: []user.Authenticator{local.New()},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +191,7 @@ func testMountAPI(t *testing.T) {
 
 func testMeToolPermissions(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
 
 	email := "tools@test.com"
 	pass := "password123"
@@ -204,28 +205,21 @@ func testMeToolPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tools := m.Tools()
-	var meTool *mcp.Tool
-	for _, tool := range tools {
-		if tool.Name == "me" {
-			meTool = &tool
-			break
-		}
-	}
-	if meTool == nil {
-		t.Fatal("me tool not found")
+	reg := &mockOpRegistry{ops: make(map[string]*mockRoute)}
+	m.MountOps(reg)
+
+	route := reg.ops[user.OpMe]
+	if route == nil {
+		t.Fatal("me op not registered")
 	}
 
-	ctx := twctx.Background()
-	ctx.Set(mcp.CtxKeyUserID, uObj.Id)
+	ctx := &mock.Context{}
+	ctx.SetUserID(uObj.Id)
 
-	res, err := meTool.Execute(ctx, mcp.Request{})
-	if err != nil {
-		t.Fatalf("me tool execution failed: %v", err)
-	}
+	route.handler(ctx)
 
 	var profile user.ProfileDTO
-	if err := json.Decode(res.Content, &profile); err != nil {
+	if err := json.Decode(ctx.ResponseBody(), &profile); err != nil {
 		t.Fatalf("failed to decode profile: %v", err)
 	}
 

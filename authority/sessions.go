@@ -6,18 +6,22 @@ import (
 	"github.com/tinywasm/time"
 
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 )
 
+type sessionItem struct {
+	key string
+	val user.Session
+}
+
 type sessionCache struct {
 	mu    sync.RWMutex
-	items map[string]user.Session
+	items []sessionItem
 }
 
 func newSessionCache() *sessionCache {
 	return &sessionCache{
-		items: make(map[string]user.Session),
+		items: make([]sessionItem, 0),
 	}
 }
 
@@ -32,7 +36,7 @@ func (c *sessionCache) warmUp(db *orm.DB) error {
 	defer c.mu.Unlock()
 
 	for _, s := range sessions {
-		c.items[s.Id] = *s
+		c.items = append(c.items, sessionItem{key: s.Id, val: *s})
 	}
 	return nil
 }
@@ -40,20 +44,35 @@ func (c *sessionCache) warmUp(db *orm.DB) error {
 func (c *sessionCache) set(id string, s user.Session) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.items[id] = s
+	for i, item := range c.items {
+		if item.key == id {
+			c.items[i].val = s
+			return
+		}
+	}
+	c.items = append(c.items, sessionItem{key: id, val: s})
 }
 
 func (c *sessionCache) get(id string) (user.Session, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	s, ok := c.items[id]
-	return s, ok
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, item := range c.items {
+		if item.key == id {
+			return item.val, true
+		}
+	}
+	return user.Session{}, false
 }
 
 func (c *sessionCache) delete(id string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.items, id)
+	for i, item := range c.items {
+		if item.key == id {
+			c.items = append(c.items[:i], c.items[i+1:]...)
+			return
+		}
+	}
 }
 
 // RotateSession atomically deletes the old session and creates a new one
@@ -74,11 +93,6 @@ func (m *Module) RotateSession(oldID, ip, userAgent string) (user.Session, error
 }
 
 func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, error) {
-	u, err := unixid.NewUnixID()
-	if err != nil {
-		return user.Session{}, err
-	}
-
 	ttl := m.config.TokenTTL
 	if ttl == 0 {
 		ttl = 86400
@@ -86,7 +100,7 @@ func (m *Module) CreateSession(userID, ip, userAgent string) (user.Session, erro
 
 	now := time.Now() / 1e9
 	sess := user.Session{
-		Id:        u.NewID(),
+		Id:        m.ids.NewID(),
 		UserId:    userID,
 		ExpiresAt: now + int64(ttl),
 		Ip:        ip,
@@ -143,11 +157,13 @@ func (m *Module) PurgeExpiredSessions() error {
 	now := time.Now() / 1e9
 
 	m.cache.mu.Lock()
-	for k, v := range m.cache.items {
-		if v.ExpiresAt < now {
-			delete(m.cache.items, k)
+	var active []sessionItem
+	for _, item := range m.cache.items {
+		if item.val.ExpiresAt >= now {
+			active = append(active, item)
 		}
 	}
+	m.cache.items = active
 	m.cache.mu.Unlock()
 
 	qb := m.db.Query(&user.Session{}).Where(user.Session_.ExpiresAt).Lt(now)

@@ -5,6 +5,7 @@ package user
 import (
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/form/input"
 )
 
 type User struct {
@@ -22,9 +23,9 @@ func (m *User) ModelName() string { return "user" }
 
 var _schemaUser = []model.Field{
 		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
-		{Name: "email", Type: model.Text(), DB: &model.FieldDB{Unique: true}},
-		{Name: "name", Type: model.Text()},
-		{Name: "phone", Type: model.Text()},
+		{Name: "email", Type: input.Email(), DB: &model.FieldDB{Unique: true}},
+		{Name: "name", Type: input.Text()},
+		{Name: "phone", Type: input.Phone()},
 		{Name: "status", Type: model.Text()},
 		{Name: "created_at", Type: model.Int()},
 	}

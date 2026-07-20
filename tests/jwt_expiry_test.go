@@ -22,13 +22,14 @@ import (
 // desenlace es un jwt.Outcome cerrado y el compilador obliga a separarlos.
 func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 	secret := []byte("test-secret-32-bytes-long-000000")
-	var events []user.SecurityEvent
+	pub := &mockPublisher{}
 
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		AuthMode:        user.AuthModeBearer,
-		JWTSecret:       secret,
-		OnSecurityEvent: func(e user.SecurityEvent) { events = append(events, e) },
+		AuthMode:  user.AuthModeBearer,
+		JWTSecret: secret,
+		IDs:       testIDs,
+		Events:    pub,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +58,7 @@ func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 		}
 	})(ctx)
 
-	for _, e := range events {
+	for _, e := range pub.SecurityEvents() {
 		if e.Type == user.EventJWTTampered {
 			t.Fatal("una sesión caducada se reportó como manipulación (EventJWTTampered): " +
 				"la alarma de falsificación salta en el caso más rutinario del sistema")
@@ -69,13 +70,14 @@ func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 // notifiques nunca" pasaría el test de arriba.
 func TestForgedTokenIsReportedAsTampering(t *testing.T) {
 	secret := []byte("test-secret-32-bytes-long-000000")
-	var events []user.SecurityEvent
+	pub := &mockPublisher{}
 
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		AuthMode:        user.AuthModeBearer,
-		JWTSecret:       secret,
-		OnSecurityEvent: func(e user.SecurityEvent) { events = append(events, e) },
+		AuthMode:  user.AuthModeBearer,
+		JWTSecret: secret,
+		IDs:       testIDs,
+		Events:    pub,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +97,7 @@ func TestForgedTokenIsReportedAsTampering(t *testing.T) {
 		}
 	})(ctx)
 
-	for _, e := range events {
+	for _, e := range pub.SecurityEvents() {
 		if e.Type == user.EventJWTTampered {
 			return
 		}

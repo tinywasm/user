@@ -34,7 +34,7 @@ func (m *Module) Bootstrap(s Seed) error {
 	}
 
 	// 1. Create User
-	u, err := createUser(m.db, s.Email, s.Name, "")
+	u, err := createUser(m.db, m.ids, s.Email, s.Name, "")
 	if err != nil {
 		return err
 	}

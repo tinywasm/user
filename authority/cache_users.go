@@ -8,53 +8,59 @@ import (
 
 const maxCacheUsers = 1000
 
+type userCacheItem struct {
+	key string
+	val *user.User
+}
+
 type userCache struct {
 	mu    sync.RWMutex
-	users map[string]*user.User
-	keys  []string // Used for simple FIFO eviction
+	items []userCacheItem
 }
 
 func newUserCache() *userCache {
 	return &userCache{
-		users: make(map[string]*user.User),
-		keys:  make([]string, 0, maxCacheUsers),
+		items: make([]userCacheItem, 0, maxCacheUsers),
 	}
 }
 
 func (c *userCache) Get(id string) (*user.User, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	u, ok := c.users[id]
-	return u, ok
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, item := range c.items {
+		if item.key == id {
+			return item.val, true
+		}
+	}
+	return nil, false
 }
 
 func (c *userCache) Set(id string, u *user.User) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, exists := c.users[id]; !exists {
-		if len(c.keys) >= maxCacheUsers {
-			// Evict oldest (FIFO)
-			oldest := c.keys[0]
-			c.keys = c.keys[1:]
-			delete(c.users, oldest)
+	for i, item := range c.items {
+		if item.key == id {
+			c.items[i].val = u
+			return
 		}
-		c.keys = append(c.keys, id)
 	}
-	c.users[id] = u
+
+	if len(c.items) >= maxCacheUsers {
+		// Evict oldest (FIFO)
+		c.items = c.items[1:]
+	}
+	c.items = append(c.items, userCacheItem{key: id, val: u})
 }
 
 func (c *userCache) Delete(id string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, exists := c.users[id]; exists {
-		delete(c.users, id)
-		for i, k := range c.keys {
-			if k == id {
-				c.keys = append(c.keys[:i], c.keys[i+1:]...)
-				break
-			}
+	for i, item := range c.items {
+		if item.key == id {
+			c.items = append(c.items[:i], c.items[i+1:]...)
+			return
 		}
 	}
 }
@@ -63,57 +69,44 @@ func (c *userCache) InvalidateByRole(roleID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Evict any user that has this role
-	var toDelete []string
-	for id, u := range c.users {
-		for _, r := range u.Roles {
+	var active []userCacheItem
+	for _, item := range c.items {
+		hasRole := false
+		for _, r := range item.val.Roles {
 			if r.Id == roleID {
-				toDelete = append(toDelete, id)
+				hasRole = true
 				break
 			}
 		}
-	}
-
-	for _, id := range toDelete {
-		delete(c.users, id)
-		for i, k := range c.keys {
-			if k == id {
-				c.keys = append(c.keys[:i], c.keys[i+1:]...)
-				break
-			}
+		if !hasRole {
+			active = append(active, item)
 		}
 	}
+	c.items = active
 }
 
 func (c *userCache) InvalidateByPermission(permID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Evict any user that has this permission
-	var toDelete []string
-	for id, u := range c.users {
-		for _, p := range u.Permissions {
+	var active []userCacheItem
+	for _, item := range c.items {
+		hasPerm := false
+		for _, p := range item.val.Permissions {
 			if p.Id == permID {
-				toDelete = append(toDelete, id)
+				hasPerm = true
 				break
 			}
 		}
-	}
-
-	for _, id := range toDelete {
-		delete(c.users, id)
-		for i, k := range c.keys {
-			if k == id {
-				c.keys = append(c.keys[:i], c.keys[i+1:]...)
-				break
-			}
+		if !hasPerm {
+			active = append(active, item)
 		}
 	}
+	c.items = active
 }
 
 func (c *userCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.users = make(map[string]*user.User)
-	c.keys = make([]string, 0, maxCacheUsers)
+	c.items = make([]userCacheItem, 0, maxCacheUsers)
 }

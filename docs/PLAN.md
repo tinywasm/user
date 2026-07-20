@@ -1,8 +1,9 @@
 ---
 PLAN: "refactor: user como módulo reutilizable — IDGenerator/events inyectados, ops neutrales, codec agnóstico y vista admin de usuarios"
 TAG: v0.1.0
-STATUS: running
+STATUS: review
 SESSION: 12999216777245032472
+PR: https://github.com/tinywasm/user/pull/19
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.

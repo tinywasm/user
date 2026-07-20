@@ -1,8 +1,11 @@
 package user
 
 import (
+	"github.com/tinywasm/events"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
+	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
 )
 
 var (
@@ -43,6 +46,17 @@ type SecurityEvent struct {
 	Resource  string // RBAC resource, for EventAccessDenied
 	Timestamp int64  // time.Now().Unix()
 }
+
+func (e *SecurityEvent) EncodeFields(w model.FieldWriter) {
+	w.Int("type", int64(e.Type))
+	w.String("ip", e.IP)
+	w.String("user_id", e.UserID)
+	w.String("provider", e.Provider)
+	w.String("resource", e.Resource)
+	w.Int("timestamp", e.Timestamp)
+}
+
+func (e *SecurityEvent) IsNil() bool { return e == nil }
 
 type OAuthUserInfo struct {
 	ID    string
@@ -85,6 +99,27 @@ type OAuthProvider interface {
 	GetUserInfo(token OAuthToken) (OAuthUserInfo, error)
 }
 
+type Authenticator interface {
+	Name() string
+	Mount(r router.Router, module any)
+}
+
+type ModuleContext interface {
+	Config() Config
+	DB() *orm.DB
+	IDs() model.IDGenerator
+	Notify(e SecurityEvent)
+	IssueToken(userID string, ttl int) (string, error)
+	CreateSession(userID, ip, userAgent string) (Session, error)
+	DeleteSession(id string) error
+	GetSession(id string) (Session, error)
+	Login(email, password string) (User, error)
+	ExtractClientIP(ctx router.Context) string
+	RegisterProvider(p OAuthProvider)
+	BeginOAuth(providerName string) (string, error)
+	CompleteOAuth(providerName string, ctx router.Context, ip, ua string) (User, bool, error)
+}
+
 // AuthMode selects the session strategy.
 type AuthMode uint8
 
@@ -115,11 +150,19 @@ type Config struct {
 	// Also required to call GenerateAPIToken regardless of AuthMode.
 	JWTSecret []byte
 
-	TrustProxy     bool
-	OAuthProviders []OAuthProvider
+	TrustProxy bool
 
-	// Optional hook for receiving security events (e.g. tampering, brute force)
-	OnSecurityEvent func(SecurityEvent)
+	// Injected authenticators. The consumer can select 1 or N supported authentication modes.
+	Authenticators []Authenticator
+
+	// IDs mints primary keys for every record this module creates (users, sessions,
+	// oauth states, identities, LAN ips). REQUIRED: authority.New fails if nil —
+	// an auth module must never silently pick its own generator.
+	IDs model.IDGenerator
+
+	// Events receives security events (user.TopicSecurity). Optional: nil = events
+	// are dropped (fire-and-forget contract), never an error.
+	Events events.Publisher
 
 	// OnPasswordValidate is called by SetPassword before hashing.
 	// Return a non-nil error to reject the password.
@@ -140,7 +183,17 @@ const (
 	PathLogin      = "/login"
 	PathLogout     = "/logout"
 	PathAfterLogin = "/"
+)
 
+// TopicSecurity is the events topic every SecurityEvent is published on.
+const TopicSecurity = "user.security"
+
+// Op names — shared vocabulary between the wasm view and the server module.
+const (
+	OpMe         = "me"           // authenticated caller's profile
+	OpListUsers  = "list_users"   // admin: list users
+	OpUpsertUser = "upsert_user"  // admin: create (Id=="") or update
+	OpDeleteUser = "delete_user"  // admin: delete by record
 )
 
 // ProfileDTO is a safe subset of User data for public/API consumption.
