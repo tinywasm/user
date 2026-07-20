@@ -13,12 +13,12 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
-	"github.com/tinywasm/user/local"
+	emailpassword "github.com/tinywasm/user/email_password"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func TestProductionWiring(t *testing.T) {
-	authority.PasswordHashCost = bcrypt.MinCost
+	emailpassword.DefaultHashCost = bcrypt.MinCost
 
 	t.Run("Widgets", testWidgets)
 	t.Run("ConsumerViewSSR", testConsumerViewSSR)
@@ -74,10 +74,11 @@ func testWidgets(t *testing.T) {
 
 func testBootstrap(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 
 	email := "admin@test.com"
 	pass := "password123"
@@ -101,7 +102,8 @@ func testBootstrap(t *testing.T) {
 	}
 
 	db2 := newTestDB(t)
-	m2, _ := authority.New(db2, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
+	m2, _ := authority.New(db2, user.Config{IDs: testIDs})
+	m2.Enable(emailpassword.New(m2, m2, m2))
 	if err := m2.Bootstrap(authority.Seed{}); err == nil {
 		t.Errorf("Bootstrap with empty credentials on empty DB should fail")
 	}
@@ -110,13 +112,13 @@ func testBootstrap(t *testing.T) {
 func testMountAPI(t *testing.T) {
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		IDs:            testIDs,
-		CookieName:     "test_session",
-		Authenticators: []user.Authenticator{local.New()},
+		IDs:        testIDs,
+		CookieName: "test_session",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 
 	email := "user@test.com"
 	pass := "password123"

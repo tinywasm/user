@@ -7,19 +7,15 @@ import (
 	"github.com/tinywasm/user"
 )
 
-func initSchema(db *orm.DB, mode user.AuthMode) error {
+func initSchema(db *orm.DB) error {
 	models := []model.Model{
 		&user.User{}, &user.Role{}, &user.Permission{},
 		&user.Identity{}, &user.LANIP{},
 		&user.OAuthState{}, &user.UserRole{}, &user.RolePermission{},
-	}
-	if mode == user.AuthModeCookie {
-		models = append(models, &user.Session{})
+		&user.Session{},
 	}
 	ddlCompiler, ok := db.RawConn().(ddl.Compiler)
 	if !ok {
-		// Backend sin capacidad DDL (p. ej. storage/mem en tests): crea tablas
-		// perezosamente en el primer Exec — no-op correcto, NO un error.
 		return nil
 	}
 	sorted, err := ddl.TopologicalSort(models)

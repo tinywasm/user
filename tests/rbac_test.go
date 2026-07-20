@@ -9,6 +9,7 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	"github.com/tinywasm/user/session/jwt"
 	"github.com/tinywasm/model"
 )
 
@@ -115,7 +116,7 @@ func TestTools_Me(t *testing.T) {
 		// No userID set
 		route.handler(ctx)
 		if ctx.Status != 401 {
-			t.Errorf("expected 401 for anonymous user, got %d", ctx.Status)
+			t.Errorf("expected 401, got %d", ctx.Status)
 		}
 	})
 }
@@ -234,24 +235,18 @@ func TestAdminOps(t *testing.T) {
 func TestNew_Validation(t *testing.T) {
 	db := newTestDB(t)
 
-	t.Run("AuthModeBearer requires JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeBearer})
+	t.Run("JWT strategy requires a secret", func(t *testing.T) {
+		m, _ := authority.New(db, user.Config{IDs: testIDs})
+		_, err := jwt.New(nil, 0, m, m)
 		if err == nil {
-			t.Error("expected error when JWTSecret is missing for AuthModeBearer")
+			t.Error("expected error when secret is empty")
 		}
 	})
 
-	t.Run("AuthModeJWT requires JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT})
-		if err == nil {
-			t.Error("expected error when JWTSecret is missing for AuthModeJWT")
-		}
-	})
-
-	t.Run("AuthModeCookie does not require JWTSecret", func(t *testing.T) {
-		_, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeCookie})
+	t.Run("Cookie strategy (default) needs no secret", func(t *testing.T) {
+		_, err := authority.New(db, user.Config{IDs: testIDs})
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Fatal(err)
 		}
 	})
 }

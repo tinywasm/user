@@ -3,18 +3,20 @@
 package tests
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/tinywasm/jwt"
+	tinyjwt "github.com/tinywasm/jwt"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
-	"github.com/tinywasm/user/lan"
-	"github.com/tinywasm/user/local"
+	emailpassword "github.com/tinywasm/user/email_password"
 	"github.com/tinywasm/user/oauth2"
+	jwt "github.com/tinywasm/user/session/jwt"
+	trustedip "github.com/tinywasm/user/trusted_ip"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -30,7 +32,7 @@ func newTestDB(t *testing.T) *orm.DB {
 }
 
 func RunUserTests(t *testing.T) {
-	authority.PasswordHashCost = bcrypt.MinCost
+	emailpassword.DefaultHashCost = bcrypt.MinCost
 	t.Run("TestInit", testInit)
 	t.Run("TestCRUD", testCRUD)
 	t.Run("TestAuth", testAuth)
@@ -43,15 +45,17 @@ func RunUserTests(t *testing.T) {
 func testJWTCookieMode(t *testing.T) {
 	db := newTestDB(t)
 	secret := []byte("test-secret-32-bytes-minimum-len")
-	m, err := authority.New(db, user.Config{
-		IDs:            testIDs,
-		AuthMode:       user.AuthModeJWT,
-		JWTSecret:      secret,
-		Authenticators: []user.Authenticator{local.New()},
-	})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	strategy, err := jwt.New(secret, 86400, m, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.SetStrategy(strategy)
+	m.Enable(emailpassword.New(m, m, m))
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "jwt@test.com", Name: "JWT User"})
@@ -66,7 +70,7 @@ func testJWTCookieMode(t *testing.T) {
 	}
 
 	// Generar JWT como lo haría el módulo al emitir la cookie.
-	token, err := jwt.Sign(secret, jwt.NewClaims(logged.Id, 86400))
+	token, err := tinyjwt.Sign(secret, tinyjwt.NewClaims(logged.Id, 86400))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,15 +101,15 @@ func testJWTCookieMode(t *testing.T) {
 func testInit(t *testing.T) {
 	db := newTestDB(t)
 	cfg := user.Config{
-		IDs:            testIDs,
-		CookieName:     "test_session",
-		TokenTTL:       3600,
-		Authenticators: []user.Authenticator{local.New()},
+		IDs:        testIDs,
+		CookieName: "test_session",
+		TokenTTL:   3600,
 	}
 	m, err := authority.New(db, cfg)
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 	_ = m // to be used later
 }
 
@@ -171,10 +175,11 @@ func testCRUD(t *testing.T) {
 
 func testAuth(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
+	m, err := authority.New(db, user.Config{IDs: testIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "auth@example.com", Name: "Auth User"})
@@ -207,10 +212,11 @@ func testAuth(t *testing.T) {
 
 func testSessions(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "sess@example.com", Name: "Sess User"})
@@ -239,7 +245,8 @@ func testSessions(t *testing.T) {
 	}
 
 	// Re-init to flush memory cache
-	m, _ = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}})
+	m, _ = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
+	m.Enable(emailpassword.New(m, m, m))
 
 	_, err = m.GetSession(sess.Id)
 	if err != user.ErrSessionExpired {
@@ -270,58 +277,88 @@ func testOAuth(t *testing.T) {
 		UserInfoVal:     user.OAuthUserInfo{ID: "mockid", Email: "mock@example.com", Name: "Mock User"},
 	}
 
-	cfg := user.Config{
-		IDs:            testIDs,
-		Authenticators: []user.Authenticator{oauth2.New(mockP)},
-	}
+	cfg := user.Config{IDs: testIDs}
 	m, err := authority.New(db, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Enable(oauth2.New(m, m, m, []user.OAuthProvider{mockP}))
 
-	url, err := m.BeginOAuth("mock")
+	r := &mock.Router{}
+	m.MountAPI(r)
+
+	// Simulate hitting GET /oauth/mock
+	ctxBegin := &mock.Context{
+		InMethod: "GET",
+		InPath:   "/oauth/mock",
+	}
+	r.Invoke("GET", "/oauth/mock", ctxBegin)
+	if ctxBegin.Status != 302 {
+		t.Fatalf("expected status 302, got %d", ctxBegin.Status)
+	}
+	loc := ctxBegin.GetHeader("Location")
+	if !strings.HasPrefix(loc, "http://mock/") {
+		t.Fatalf("expected redirect to mock URL, got %s", loc)
+	}
+	state := strings.TrimPrefix(loc, "http://mock/")
+
+	// Simulate hitting GET /oauth/callback/mock
+	ctxCallback := &mock.Context{
+		InMethod: "GET",
+		InPath:   "/oauth/callback/mock?state=" + state + "&code=mockcode",
+	}
+	r.Invoke("GET", "/oauth/callback/mock", ctxCallback)
+	if ctxCallback.Status != 302 {
+		t.Fatalf("expected callback status 302, got %d", ctxCallback.Status)
+	}
+	if ctxCallback.GetHeader("Location") != user.PathAfterLogin {
+		t.Errorf("expected redirect after login to %s, got %s", user.PathAfterLogin, ctxCallback.GetHeader("Location"))
+	}
+
+	// Verify user got created
+	u, err := m.UserByEmail("mock@example.com")
 	if err != nil {
-		t.Fatalf("BeginOAuth failed: %v", err)
+		t.Fatalf("expected user mock@example.com to be created: %v", err)
 	}
-	if len(url) < 12 {
-		t.Fatalf("invalid url: %s", url)
+	if u.Name != "Mock User" {
+		t.Errorf("expected name 'Mock User', got %s", u.Name)
 	}
-	state := url[12:]
 
-	ctx := &mock.Context{InPath: "/callback?state=" + state + "&code=mockcode"}
-	u, isNew, err := m.CompleteOAuth("mock", ctx, "127.0.0.1", "TestAgent")
+	// Second login (existing user)
+	ctxBegin2 := &mock.Context{
+		InMethod: "GET",
+		InPath:   "/oauth/mock",
+	}
+	r.Invoke("GET", "/oauth/mock", ctxBegin2)
+	loc2 := ctxBegin2.GetHeader("Location")
+	state2 := strings.TrimPrefix(loc2, "http://mock/")
+
+	ctxCallback2 := &mock.Context{
+		InMethod: "GET",
+		InPath:   "/oauth/callback/mock?state=" + state2 + "&code=mockcode",
+	}
+	r.Invoke("GET", "/oauth/callback/mock", ctxCallback2)
+	if ctxCallback2.Status != 302 {
+		t.Fatalf("expected callback 2 status 302, got %d", ctxCallback2.Status)
+	}
+
+	// Verify we still have the same user
+	u2, err := m.UserByEmail("mock@example.com")
 	if err != nil {
-		t.Fatalf("CompleteOAuth failed: %v", err)
-	}
-	if !isNew {
-		t.Errorf("expected isNew=true")
-	}
-	if u.Email != "mock@example.com" {
-		t.Errorf("expected email mock@example.com, got %s", u.Email)
-	}
-
-	url2, _ := m.BeginOAuth("mock")
-	state2 := url2[12:]
-	ctx2 := &mock.Context{InPath: "/callback?state=" + state2 + "&code=mockcode"}
-
-	u2, isNew2, err := m.CompleteOAuth("mock", ctx2, "127.0.0.1", "TestAgent")
-	if err != nil {
-		t.Fatalf("CompleteOAuth 2 failed: %v", err)
-	}
-	if isNew2 {
-		t.Errorf("expected isNew=false")
+		t.Fatal(err)
 	}
 	if u2.Id != u.Id {
-		t.Errorf("expected same user ID")
+		t.Errorf("expected same user ID, got %s vs %s", u.Id, u2.Id)
 	}
 }
 
 func testLAN(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs, TrustProxy: true, Authenticators: []user.Authenticator{lan.New(db, testIDs)}})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TrustProxy: true})
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Enable(trustedip.New(m, m, m, m, true))
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "lan@example.com", Name: "LAN User"})
@@ -393,6 +430,7 @@ func testLAN(t *testing.T) {
 
 func setupModule(t *testing.T) *authority.Module {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
+	m.Enable(emailpassword.New(m, m, m))
 	return m
 }

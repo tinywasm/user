@@ -12,7 +12,8 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
-	"github.com/tinywasm/user/local"
+	emailpassword "github.com/tinywasm/user/email_password"
+	"github.com/tinywasm/user/session/jwt"
 	"github.com/tinywasm/model"
 )
 
@@ -45,10 +46,11 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Cookie Mode Flags", func(t *testing.T) {
 		db := newTestDB(t)
-		m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, CookieName: "session", Authenticators: []user.Authenticator{local.New()}})
+		m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, CookieName: "session"})
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
+		m.Enable(emailpassword.New(m, m, m))
 		email, pass := "cookie1@example.com", "password123"
 		if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
@@ -78,10 +80,16 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("JWT Mode Cookie", func(t *testing.T) {
 		db := newTestDB(t)
-		m, err := authority.New(db, user.Config{IDs: testIDs, AuthMode: user.AuthModeJWT, JWTSecret: []byte("sec"), TokenTTL: 7200, CookieName: "session", Authenticators: []user.Authenticator{local.New()}})
+		m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 7200, CookieName: "session"})
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
+		strategy, err := jwt.New([]byte("sec"), 7200, m, m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.SetStrategy(strategy)
+		m.Enable(emailpassword.New(m, m, m))
 		email, pass := "cookie2@example.com", "password123"
 		if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
@@ -101,10 +109,11 @@ func TestCookieSecurity(t *testing.T) {
 
 	t.Run("Custom Cookie Name", func(t *testing.T) {
 		db := newTestDB(t)
-		m, err := authority.New(db, user.Config{IDs: testIDs, CookieName: "custom_auth", Authenticators: []user.Authenticator{local.New()}})
+		m, err := authority.New(db, user.Config{IDs: testIDs, CookieName: "custom_auth"})
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
+		m.Enable(emailpassword.New(m, m, m))
 		email, pass := "cookie3@example.com", "password123"
 		if err := m.Bootstrap(authority.Seed{Email: email, Password: pass, Name: "Admin", Role: "admin", Grants: []model.Grant{{Resource: model.Wildcard, Actions: model.AllActions}}}); err != nil {
 			t.Fatal(err)
@@ -120,17 +129,18 @@ func TestCookieSecurity(t *testing.T) {
 
 func TestSessionRotation(t *testing.T) {
 	db := newTestDB(t)
-	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}})
+	m, err := authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600})
 	if err != nil {
 		t.Fatalf("authority.New failed: %v", err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 
 	userCRUD := getHandler(m, "users")
-	resU, err := userCRUD.Create(user.User{Email: "rot@example.com", Name: "Rot"})
+	res, err := userCRUD.Create(user.User{Email: "rot@example.com", Name: "Rot"})
 	if err != nil {
 		t.Fatalf("userCRUD.Create failed: %v", err)
 	}
-	u := resU.(user.User)
+	u := res.(user.User)
 
 	t.Run("RotateSession valid", func(t *testing.T) {
 		sess1, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
@@ -161,10 +171,11 @@ func TestSessionRotation(t *testing.T) {
 		sess3, _ := m.CreateSession(u.Id, "10.0.0.1", "ua1")
 		// Manually expire
 		db.RawConn().Exec("UPDATE session SET expires_at = 0 WHERE id = ?", sess3.Id)
-		m, err = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600, Authenticators: []user.Authenticator{local.New()}}) // Clear cache
+		m, err = authority.New(db, user.Config{IDs: testIDs, TokenTTL: 3600}) // Clear cache
 		if err != nil {
 			t.Fatalf("authority.New failed: %v", err)
 		}
+		m.Enable(emailpassword.New(m, m, m))
 
 		_, err := m.RotateSession(sess3.Id, "10.0.0.1", "ua1")
 		if err != user.ErrSessionExpired {
@@ -216,12 +227,12 @@ func TestPasswordHook(t *testing.T) {
 			}
 			return nil
 		},
-		Authenticators: []user.Authenticator{local.New()},
 	}
 	m, err := authority.New(db, cfg)
 	if err != nil {
 		t.Fatalf("authority.New failed: %v", err)
 	}
+	m.Enable(emailpassword.New(m, m, m))
 
 	userCRUD := getHandler(m, "users")
 	resU, err := userCRUD.Create(user.User{Email: "hook@example.com", Name: "Hook"})

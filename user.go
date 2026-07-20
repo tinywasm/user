@@ -4,7 +4,6 @@ import (
 	"github.com/tinywasm/events"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
 )
 
@@ -99,84 +98,133 @@ type OAuthProvider interface {
 	GetUserInfo(token OAuthToken) (OAuthUserInfo, error)
 }
 
+// Authenticator is one login mode. It owns its HTTP routes completely — authority
+// never inspects, duplicates, or knows the shape of what it mounts.
 type Authenticator interface {
 	Name() string
-	Mount(r router.Router, module any)
+	Mount(r router.Router)
 }
 
-type ModuleContext interface {
-	Config() Config
-	DB() *orm.DB
-	IDs() model.IDGenerator
+// SessionStrategy is how identity survives across requests after a successful
+// login. authority holds exactly one (default: session/cookie); the consumer may
+// swap it via Module.SetStrategy before mounting. Implementations: session/cookie,
+// session/jwt.
+type SessionStrategy interface {
+	Issue(ctx router.Context, userID string) error       // starts a session, writes the credential onto ctx's response
+	Identify(ctx router.Context) (userID string, err error) // reads the incoming credential; "" only alongside a non-nil err
+	Revoke(ctx router.Context) error                      // ends the session named by ctx's incoming credential
+}
+
+// --- Ports a mode receives at construction. It asks for ONLY the ones it needs —
+// none of these is a "god interface"; authority implements all of them, a mode
+// never sees *authority.Module itself. ---
+
+// SessionIssuer lets a mode start a session after verifying credentials, without
+// knowing whether the app carries it in a cookie or a signed JWT.
+type SessionIssuer interface {
+	IssueSession(ctx router.Context, userID string) error
+}
+
+// IdentityStore is the persistence port a mode uses to resolve or register the
+// domain User/Identity behind a credential. A mode never queries *orm.DB itself.
+type IdentityStore interface {
+	UserByID(id string) (User, error)
+	UserByEmail(email string) (User, error)
+	CreateUser(email, name, phone string) (User, error)
+	// IdentityByProvider finds who owns a (provider, providerID) pair — an OAuth
+	// (provider name, external subject) or a trusted_ip (provider="trusted_ip",
+	// the normalized RUT).
+	IdentityByProvider(provider, providerID string) (Identity, error)
+	// IdentityFor returns userID's identity row for provider — e.g. email_password
+	// reads its bcrypt hash from Identity.ProviderId here.
+	IdentityFor(userID, provider string) (Identity, error)
+	UpsertIdentity(userID, provider, providerID, email string) error
+}
+
+// StateStore is the anti-CSRF port the oauth2 mode uses for its one-time state
+// token. authority owns the oauth_state table; a mode never touches it directly.
+type StateStore interface {
+	CreateState(provider string) (state string, err error)
+	ConsumeState(state, provider string) error // single-use: deletes on read, validates provider+expiry
+}
+
+// TrustedIPStore is the read-only port the trusted_ip mode uses to check whether
+// a request's IP is on userID's allowlist. Kept separate from IdentityStore
+// because an allowed IP is not a login credential — it's an authorization check
+// applied AFTER the RUT already identified the user.
+type TrustedIPStore interface {
+	IsTrustedIP(userID, ip string) bool
+}
+
+// SecurityNotifier lets a mode report a SecurityEvent without knowing whether
+// anything is subscribed.
+type SecurityNotifier interface {
 	Notify(e SecurityEvent)
-	IssueToken(userID string, ttl int) (string, error)
-	CreateSession(userID, ip, userAgent string) (Session, error)
-	DeleteSession(id string) error
-	GetSession(id string) (Session, error)
-	Login(email, password string) (User, error)
-	ExtractClientIP(ctx router.Context) string
-	RegisterProvider(p OAuthProvider)
-	BeginOAuth(providerName string) (string, error)
-	CompleteOAuth(providerName string, ctx router.Context, ip, ua string) (User, bool, error)
 }
 
-// AuthMode selects the session strategy.
-type AuthMode uint8
+// SessionRepo is the storage port a SessionStrategy uses to persist stateful
+// sessions. authority.Module implements it with its own table + cache.
+type SessionRepo interface {
+	CreateSession(userID, ip, userAgent string) (Session, error)
+	GetSession(id string) (Session, error)
+	DeleteSession(id string) error
+}
 
-const (
-	// AuthModeCookie stores a session ID in an HttpOnly cookie.
-	// Stateful: requires user_sessions table. Supports immediate revocation.
-	AuthModeCookie AuthMode = iota // default
-
-	// AuthModeJWT stores a signed JWT in an HttpOnly cookie.
-	// Stateless: no DB lookup per request. No immediate revocation.
-	// Ideal for SPA/PWA and multi-server deployments.
-	AuthModeJWT
-
-	// AuthModeBearer reads a signed JWT from the "Authorization: Bearer <token>" header.
-	// Stateless: for API clients (MCP servers, IDEs, LLMs) that cannot use cookies.
-	// Requires JWTSecret.
-	AuthModeBearer
-)
+// ClientIP extracts the caller's IP from ctx. When trustProxy is true it reads
+// X-Forwarded-For / X-Real-IP first (only safe behind a reverse proxy you control —
+// otherwise a client can spoof its own IP). Shared by every mode/strategy that
+// needs an IP for a SecurityEvent or an audit column: it is mechanism-agnostic,
+// so it lives at the root, not inside any one mode.
+func ClientIP(ctx router.Context, trustProxy bool) string {
+	if trustProxy {
+		xff := ctx.GetHeader("X-Forwarded-For")
+		if xff != "" {
+			parts := fmt.Split(xff, ",")
+			return fmt.Convert(parts[0]).TrimSpace().String()
+		}
+		xri := ctx.GetHeader("X-Real-IP")
+		if xri != "" {
+			return fmt.Convert(xri).TrimSpace().String()
+		}
+	}
+	if addr, ok := ctx.Value("RemoteAddr").(string); ok {
+		parts := fmt.Split(addr, ":")
+		if len(parts) > 0 {
+			return parts[0]
+		}
+		return addr
+	}
+	return ""
+}
 
 type Config struct {
-	AuthMode AuthMode // default: AuthModeCookie
-
-	// Shared by all modes
+	// CookieName/TokenTTL configure authority's OWN default session strategy
+	// (session/cookie) and the lifetime of every session row it creates,
+	// regardless of which strategy ends up carrying the credential.
 	CookieName string // default: "session"
-	TokenTTL   int    // default: 86400 (seconds). Session TTL in cookie mode, JWT expiry in JWT mode.
+	TokenTTL   int    // default: 86400 (seconds)
 
-	// Required when AuthMode == AuthModeJWT or AuthMode == AuthModeBearer.
-	// Also required to call GenerateAPIToken regardless of AuthMode.
-	JWTSecret []byte
-
+	// TrustProxy tells every IP-extracting collaborator (the default cookie
+	// strategy, Module.LoginLAN) whether to trust X-Forwarded-For/X-Real-IP.
+	// The composition root passes this SAME value to any mode it constructs
+	// that also needs it (trusted_ip.New's trustProxy param, WithTrustProxy on
+	// the others) — one environmental fact, told explicitly to every consumer,
+	// same idiom as IDs/Events.
 	TrustProxy bool
 
-	// Injected authenticators. The consumer can select 1 or N supported authentication modes.
-	Authenticators []Authenticator
-
-	// IDs mints primary keys for every record this module creates (users, sessions,
-	// oauth states, identities, LAN ips). REQUIRED: authority.New fails if nil —
-	// an auth module must never silently pick its own generator.
+	// IDs mints primary keys for every record this module creates. REQUIRED:
+	// New fails if nil — an auth module must never silently pick its own
+	// generator.
 	IDs model.IDGenerator
 
-	// Events receives security events (user.TopicSecurity). Optional: nil = events
+	// Events receives security events (TopicSecurity). Optional: nil = events
 	// are dropped (fire-and-forget contract), never an error.
 	Events events.Publisher
 
-	// OnPasswordValidate is called by SetPassword before hashing.
-	// Return a non-nil error to reject the password.
-	// If nil, only the built-in len >= 8 check applies.
+	// OnPasswordValidate is consulted by Module.SetPassword before hashing.
+	// Return a non-nil error to reject the password. nil = only the built-in
+	// len>=8 check applies.
 	OnPasswordValidate func(password string) error
-
-	// AfterLoginPath is the path to redirect to after successful login.
-	// Default: PathAfterLogin ("/")
-	AfterLoginPath string
-
-	// RateLimit is called by endpoints before processing a request.
-	// Return a non-nil error to reject the request (429 Too Many Requests).
-	// remoteAddr is the client's IP address.
-	RateLimit func(remoteAddr string) error
 }
 
 const (
