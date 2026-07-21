@@ -18,9 +18,11 @@ type Authenticator struct {
 
 type Option func(*Authenticator)
 
-func WithAfterLogin(path string) Option           { return func(a *Authenticator) { a.afterLogin = path } }
-func WithRateLimit(fn func(ip string) error) Option { return func(a *Authenticator) { a.rateLimit = fn } }
-func WithTrustProxy(v bool) Option                 { return func(a *Authenticator) { a.trustProxy = v } }
+func WithAfterLogin(path string) Option { return func(a *Authenticator) { a.afterLogin = path } }
+func WithRateLimit(fn func(ip string) error) Option {
+	return func(a *Authenticator) { a.rateLimit = fn }
+}
+func WithTrustProxy(v bool) Option { return func(a *Authenticator) { a.trustProxy = v } }
 
 // New builds the email+password mode. store/sessions/notify are required ports;
 // everything else is an Option with a safe zero-value default.

@@ -24,23 +24,151 @@ In `v0.2.0`, the system has been refactored to make `authority` a pure orchestra
 
 ---
 
+## Getting Started (Complete Guide)
+
+Here is a complete, edge-compatible example demonstrating how to set up the database connection, initialize the authority orchestrator with a JWT session strategy, configure two authentication modes, protect paths, and seed initial data.
+
+```go
+package main
+
+import (
+	"github.com/tinywasm/model"
+	"github.com/tinywasm/orm"
+	"github.com/tinywasm/router"
+	"github.com/tinywasm/sqlite"
+	"github.com/tinywasm/unixid"
+	"github.com/tinywasm/user"
+	"github.com/tinywasm/user/authority"
+	emailpassword "github.com/tinywasm/user/email_password"
+	"github.com/tinywasm/user/session/jwt"
+	trustedip "github.com/tinywasm/user/trusted_ip"
+)
+
+func main() {
+	// 1. Establish database connection and wrap in ORM
+	conn, err := sqlite.Open("app.db")
+	if err != nil {
+		panic(err)
+	}
+	db := orm.New(conn)
+
+	// 2. Generate required ID Generator (e.g. tinywasm/unixid)
+	ids, err := unixid.NewUnixID()
+	if err != nil {
+		panic(err)
+	}
+
+	// 3. Initialize the pure authority orchestrator
+	m, err := authority.New(db, user.Config{
+		IDs:        ids,
+		CookieName: "session",
+		TokenTTL:   86400, // 24 hours
+		TrustProxy: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	// 4. Opt into a stateless JWT strategy (replacing default cookie session)
+	secret := []byte("your-secret-key-must-be-32-bytes")
+	strategy, err := jwt.New(secret, 86400, m, m)
+	if err != nil {
+		panic(err)
+	}
+	m.SetStrategy(strategy)
+
+	// 5. Construct and configure authentication modes.
+	// We inject Module 'm' which implements the narrow ports.
+	//
+	// emailpassword.New receives 'm' three times:
+	// - 1st 'm' (user.IdentityStore): finds user identities & verifies passwords
+	// - 2nd 'm' (user.SessionIssuer): issues cookies/JWT sessions on login
+	// - 3rd 'm' (user.SecurityNotifier): reports logins/failures to events publisher
+	epAuth := emailpassword.New(m, m, m, emailpassword.WithTrustProxy(true))
+
+	// trustedip.New receives 'm' four times:
+	// - 1st 'm' (user.IdentityStore): resolves users/identities
+	// - 2nd 'm' (user.TrustedIPStore): checks if the caller's IP is allowed
+	// - 3rd 'm' (user.SessionIssuer): issues the session
+	// - 4th 'm' (user.SecurityNotifier): publishes security events (IPMismatch, etc.)
+	// - true: trust proxy headers for IP check
+	tiAuth := trustedip.New(m, m, m, m, true)
+
+	// 6. Enable the authenticators in the authority orchestrator
+	m.Enable(epAuth, tiAuth)
+
+	// 7. Initialize router and mount endpoints
+	r := router.New()
+
+	// Mounts:
+	// - POST /logout (centrally managed)
+	// - POST /login (mounted by emailpassword)
+	// - POST /login/rut (mounted by trustedip)
+	m.MountAPI(r)
+
+	// 8. Protect Routes using Orchestrator middleware & RBAC Can
+	// m.Authenticate() is a neutral middleware that identifies the user and injects their ID.
+	api := r.Group("/api", m.Authenticate())
+
+	api.Get("/dashboard", func(ctx router.Context) {
+		userID := ctx.UserID()
+		if userID == "" {
+			ctx.WriteStatus(401)
+			return
+		}
+
+		// Perform RBAC action-based authorization check
+		if !m.Can(userID, "reports", model.Read) {
+			ctx.WriteStatus(403)
+			return
+		}
+
+		ctx.Write([]byte("Welcome to reports dashboard"))
+	})
+
+	// 9. Bootstrap / Seed first administrator user
+	err = m.Bootstrap(authority.Seed{
+		Email:    "admin@company.com",
+		Password: "super-secure-admin-password",
+		Name:     "Administrator",
+		Role:     "admin",
+		Grants: []model.Grant{
+			{Resource: model.Wildcard, Actions: model.AllActions}, // full permissions
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
+---
+
 ## Composition Examples
 
 ### Example 1: App with ONLY OAuth2 login and cookie sessions
 
 ```go
 import (
+	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/user/oauth2"
 	"github.com/tinywasm/user/oauth2/provider/google"
 )
 
-// Initialize pure orchestrator
-m, err := authority.New(db, user.Config{IDs: testIDs})
+// Initialize UnixID generator
+ids, _ := unixid.NewUnixID()
 
-// Build Google Provider
-gProv := google.New(user.OAuthConfig{...})
+// Initialize pure orchestrator
+m, err := authority.New(db, user.Config{IDs: ids})
+
+// Build Google Provider via struct literal
+gProv := &google.GoogleProvider{
+	ClientID:     "your-google-client-id",
+	ClientSecret: "your-google-client-secret",
+	RedirectURL:  "https://miapp.cl/oauth/callback/google",
+}
 
 // Construct independent OAuth2 authenticator
 oaAuth := oauth2.New(m, m, m, []user.OAuthProvider{gProv})
@@ -56,6 +184,7 @@ m.MountAPI(router)
 
 ```go
 import (
+	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	emailpassword "github.com/tinywasm/user/email_password"
@@ -63,8 +192,11 @@ import (
 	trustedip "github.com/tinywasm/user/trusted_ip"
 )
 
+// Initialize UnixID generator
+ids, _ := unixid.NewUnixID()
+
 // Initialize pure orchestrator
-m, err := authority.New(db, user.Config{IDs: testIDs})
+m, err := authority.New(db, user.Config{IDs: ids})
 
 // Build and set the stateless JWT session strategy
 strategy, err := jwt.New([]byte("your-secret-key-must-be-32-bytes"), 3600, m, m)
@@ -80,6 +212,19 @@ m.Enable(epAuth, tiAuth)
 // Mount logout and all enabled authenticator login routes
 m.MountAPI(router)
 ```
+
+---
+
+## Upgrading from v0.1.0 to v0.2.0 (Breaking)
+
+This release shifts `Identity.Provider` values from `"local"` and `"lan"` to `"email_password"` and `"trusted_ip"`. To upgrade an existing database in production, run the following SQL statements:
+
+```sql
+UPDATE identity SET provider = 'email_password' WHERE provider = 'local';
+UPDATE identity SET provider = 'trusted_ip'    WHERE provider = 'lan';
+```
+
+---
 
 ## Diagrams
 

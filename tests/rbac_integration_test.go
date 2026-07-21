@@ -5,9 +5,9 @@ package tests
 import (
 	"testing"
 
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
-	"github.com/tinywasm/model"
 )
 
 type mockHandler struct {

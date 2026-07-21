@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	"github.com/tinywasm/user/session/jwt"
-	"github.com/tinywasm/model"
 )
 
 func TestRBAC_ClosedByDefault(t *testing.T) {

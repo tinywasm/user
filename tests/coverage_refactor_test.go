@@ -3,20 +3,20 @@
 package tests
 
 import (
-	"testing"
 	"strings"
+	"testing"
 
+	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	emailpassword "github.com/tinywasm/user/email_password"
 	"github.com/tinywasm/user/oauth2"
-	jwt "github.com/tinywasm/user/session/jwt"
 	"github.com/tinywasm/user/session/cookie"
+	jwt "github.com/tinywasm/user/session/jwt"
 	trustedip "github.com/tinywasm/user/trusted_ip"
-	"github.com/tinywasm/json"
-	"github.com/tinywasm/model"
 )
 
 func TestCoverage_SessionCookie(t *testing.T) {

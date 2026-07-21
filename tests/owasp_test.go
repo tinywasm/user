@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	emailpassword "github.com/tinywasm/user/email_password"
-	"github.com/tinywasm/model"
 )
 
 func TestOWASP(t *testing.T) {

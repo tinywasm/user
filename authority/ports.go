@@ -42,7 +42,9 @@ func (m *Module) CreateState(provider string) (string, error) {
 	}
 	return state, nil
 }
-func (m *Module) ConsumeState(state, provider string) error { return consumeState(m.db, state, provider) }
+func (m *Module) ConsumeState(state, provider string) error {
+	return consumeState(m.db, state, provider)
+}
 
 // PurgeExpiredOAuthStates is maintenance, not part of any port — call it
 // periodically from a cron-like task in the consuming app.

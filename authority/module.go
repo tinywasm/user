@@ -13,13 +13,13 @@ import (
 // Module is the user/auth/rbac handle. All backend operations are methods on
 // this type. Created exclusively via New().
 type Module struct {
-	db       *orm.DB
-	cache    *sessionCache
-	ucache   *userCache
-	config   user.Config
-	log      func(...any)
-	ids      model.IDGenerator
-	events   events.Publisher
+	db     *orm.DB
+	cache  *sessionCache
+	ucache *userCache
+	config user.Config
+	log    func(...any)
+	ids    model.IDGenerator
+	events events.Publisher
 
 	strategy       user.SessionStrategy
 	authenticators []user.Authenticator

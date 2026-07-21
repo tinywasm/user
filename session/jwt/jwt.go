@@ -129,7 +129,7 @@ func (s *Strategy) sign(userID string, ttl int) (string, error) {
 
 type tokenResponse struct{ Token string }
 
-func (t *tokenResponse) IsNil() bool                        { return t == nil }
-func (t *tokenResponse) EncodeFields(w model.FieldWriter)   { w.String("token", t.Token) }
+func (t *tokenResponse) IsNil() bool                      { return t == nil }
+func (t *tokenResponse) EncodeFields(w model.FieldWriter) { w.String("token", t.Token) }
 
 var _ user.SessionStrategy = (*Strategy)(nil)

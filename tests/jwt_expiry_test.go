@@ -27,8 +27,8 @@ func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		IDs:       testIDs,
-		Events:    pub,
+		IDs:    testIDs,
+		Events: pub,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -80,8 +80,8 @@ func TestForgedTokenIsReportedAsTampering(t *testing.T) {
 
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		IDs:       testIDs,
-		Events:    pub,
+		IDs:    testIDs,
+		Events: pub,
 	})
 	if err != nil {
 		t.Fatal(err)

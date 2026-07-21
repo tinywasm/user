@@ -1,7 +1,6 @@
 package authority
 
 import (
-
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/user"

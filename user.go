@@ -110,9 +110,9 @@ type Authenticator interface {
 // swap it via Module.SetStrategy before mounting. Implementations: session/cookie,
 // session/jwt.
 type SessionStrategy interface {
-	Issue(ctx router.Context, userID string) error       // starts a session, writes the credential onto ctx's response
+	Issue(ctx router.Context, userID string) error          // starts a session, writes the credential onto ctx's response
 	Identify(ctx router.Context) (userID string, err error) // reads the incoming credential; "" only alongside a non-nil err
-	Revoke(ctx router.Context) error                      // ends the session named by ctx's incoming credential
+	Revoke(ctx router.Context) error                        // ends the session named by ctx's incoming credential
 }
 
 // --- Ports a mode receives at construction. It asks for ONLY the ones it needs —
@@ -238,10 +238,10 @@ const TopicSecurity = "user.security"
 
 // Op names — shared vocabulary between the wasm view and the server module.
 const (
-	OpMe         = "me"           // authenticated caller's profile
-	OpListUsers  = "list_users"   // admin: list users
-	OpUpsertUser = "upsert_user"  // admin: create (Id=="") or update
-	OpDeleteUser = "delete_user"  // admin: delete by record
+	OpMe         = "me"          // authenticated caller's profile
+	OpListUsers  = "list_users"  // admin: list users
+	OpUpsertUser = "upsert_user" // admin: create (Id=="") or update
+	OpDeleteUser = "delete_user" // admin: delete by record
 )
 
 // ProfileDTO is a safe subset of User data for public/API consumption.
