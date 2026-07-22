@@ -35,6 +35,7 @@ import (
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
+	"github.com/tinywasm/server/httpd"
 	"github.com/tinywasm/sqlite"
 	"github.com/tinywasm/unixid"
 	"github.com/tinywasm/user"
@@ -97,34 +98,25 @@ func main() {
 	// 6. Enable the authenticators in the authority orchestrator
 	m.Enable(epAuth, tiAuth)
 
-	// 7. Initialize router and mount endpoints
-	r := router.New()
+	// 7. Mount central user APIs and start the server.
+	// The concrete Router is managed by httpd under the hood.
+	// Authn globally identifies the user and injects their ID in ctx.UserID().
+	// Authorize evaluates declarative RBAC checks specified on routes via .Requires(...).
+	srv := httpd.New(httpd.Config{
+		Port:      "8080",
+		Authn:     m.Authenticate(), // router.Middleware: identifies the user and injects their ID
+		Authorize: m.Can,            // model.Authorizer: central RBAC evaluator
+	}).Mount(m)                      // m is a router.APIModule -> mounts central flows (POST /logout, etc.)
 
-	// Mounts:
-	// - POST /logout (centrally managed)
-	// - POST /login (mounted by emailpassword)
-	// - POST /login/rut (mounted by trustedip)
-	m.MountAPI(r)
-
-	// 8. Protect Routes using Orchestrator middleware & RBAC Can
-	// m.Authenticate() is a neutral middleware that identifies the user and injects their ID.
-	api := r.Group("/api", m.Authenticate())
-
-	api.Get("/dashboard", func(ctx router.Context) {
-		userID := ctx.UserID()
-		if userID == "" {
-			ctx.WriteStatus(401)
-			return
-		}
-
-		// Perform RBAC action-based authorization check
-		if !m.Can(userID, "reports", model.Read) {
+	// 8. Protect custom routes.
+	// We can declare permission gates via .Requires(...) or check m.Can manually inside the handler.
+	srv.Router().Get("/api/dashboard", func(ctx router.Context) {
+		if !m.Can(ctx.UserID(), "reports", model.Read) {
 			ctx.WriteStatus(403)
 			return
 		}
-
 		ctx.Write([]byte("Welcome to reports dashboard"))
-	})
+	}).Requires("reports", model.Read)
 
 	// 9. Bootstrap / Seed first administrator user
 	err = m.Bootstrap(authority.Seed{
@@ -139,6 +131,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	srv.ListenAndServe()
 }
 ```
 
