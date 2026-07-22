@@ -2,19 +2,25 @@ package authority
 
 import (
 	"github.com/tinywasm/router"
+	"github.com/tinywasm/user"
 )
 
-// Module is an APIModule: it mounts its own routes and carries its own identity.
 var _ router.APIModule = (*Module)(nil)
 
-// ModelName is the module's identity (model.ModuleNaming), used as the RBAC resource
-// and as the key by which a host registers it.
 func (m *Module) ModelName() string { return "user" }
 
-// MountAPI publishes the authentication flows on the host router. The module
-// owns its routes; consumers just Mount it like any other APIModule.
+// MountAPI mounts the one session-termination endpoint centrally — logout ends
+// a session the same way no matter which mode started it (strategy.Revoke) —
+// then lets every enabled Authenticator mount its own login route. authority
+// never inspects what a mode mounts.
 func (m *Module) MountAPI(r router.Router) {
-	for _, auth := range m.config.Authenticators {
-		auth.Mount(r, m)
+	r.Post(user.PathLogout, func(ctx router.Context) {
+		m.strategy.Revoke(ctx)
+		ctx.SetHeader("Location", user.PathLogin)
+		ctx.WriteStatus(302)
+	}).Public()
+
+	for _, auth := range m.authenticators {
+		auth.Mount(r)
 	}
 }

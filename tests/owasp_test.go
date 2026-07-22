@@ -6,16 +6,17 @@ import (
 	"testing"
 
 	"github.com/tinywasm/json"
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
-	"github.com/tinywasm/user/local"
-	"github.com/tinywasm/model"
+	emailpassword "github.com/tinywasm/user/email_password"
 )
 
 func TestOWASP(t *testing.T) {
 	db := newTestDB(t)
-	m, _ := authority.New(db, user.Config{IDs: testIDs, Authenticators: []user.Authenticator{local.New()}})
+	m, _ := authority.New(db, user.Config{IDs: testIDs})
+	m.Enable(emailpassword.New(m, m, m))
 
 	email := "active@test.com"
 	pass := "password123"
@@ -71,16 +72,16 @@ func TestOWASP(t *testing.T) {
 		db := newTestDB(t)
 		pub := &mockPublisher{}
 		m, _ := authority.New(db, user.Config{
-			IDs: testIDs,
-			RateLimit: func(ip string) error {
-				if ip == "1.2.3.4" {
-					return user.ErrInvalidCredentials // Simulating rejection
-				}
-				return nil
-			},
-			Events:          pub,
-			Authenticators: []user.Authenticator{local.New()},
+			IDs:    testIDs,
+			Events: pub,
 		})
+		rateLimitFn := func(ip string) error {
+			if ip == "1.2.3.4" {
+				return user.ErrInvalidCredentials // Simulating rejection
+			}
+			return nil
+		}
+		m.Enable(emailpassword.New(m, m, m, emailpassword.WithRateLimit(rateLimitFn)))
 		r := &mock.Router{}
 		m.MountAPI(r)
 

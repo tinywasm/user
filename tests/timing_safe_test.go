@@ -67,13 +67,13 @@ func TestTimingSafeAuth(t *testing.T) {
 		t.Logf("real hash check took %v, might be too fast to test timing reliably", durReal)
 	}
 
-	if durMiss < durReal / 2 {
+	if durMiss < durReal/2 {
 		t.Errorf("non-existent user check is too fast: %v vs %v", durMiss, durReal)
 	}
-	if durSusp < durReal / 2 {
+	if durSusp < durReal/2 {
 		t.Errorf("suspended user check is too fast: %v vs %v", durSusp, durReal)
 	}
-	if durOauth < durReal / 2 {
+	if durOauth < durReal/2 {
 		t.Errorf("oauth user check is too fast: %v vs %v", durOauth, durReal)
 	}
 }

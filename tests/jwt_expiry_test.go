@@ -10,6 +10,7 @@ import (
 	"github.com/tinywasm/router/mock"
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
+	jwtstrategy "github.com/tinywasm/user/session/jwt"
 )
 
 // Un token caducado es el evento más rutinario que existe: una sesión que se acaba.
@@ -26,14 +27,19 @@ func TestExpiredTokenIsNotReportedAsTampering(t *testing.T) {
 
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		AuthMode:  user.AuthModeBearer,
-		JWTSecret: secret,
-		IDs:       testIDs,
-		Events:    pub,
+		IDs:    testIDs,
+		Events: pub,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	strategy, err := jwtstrategy.New(secret, 0, m, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	strategy.AsBearer()
+	m.SetStrategy(strategy)
 
 	userCRUD := getHandler(m, "users")
 	res, err := userCRUD.Create(user.User{Email: "exp@test.com", Name: "Exp"})
@@ -74,14 +80,19 @@ func TestForgedTokenIsReportedAsTampering(t *testing.T) {
 
 	db := newTestDB(t)
 	m, err := authority.New(db, user.Config{
-		AuthMode:  user.AuthModeBearer,
-		JWTSecret: secret,
-		IDs:       testIDs,
-		Events:    pub,
+		IDs:    testIDs,
+		Events: pub,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	strategy, err := jwtstrategy.New(secret, 0, m, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	strategy.AsBearer()
+	m.SetStrategy(strategy)
 
 	// Firmado con OTRO secreto: no es auténtico.
 	forged, err := jwt.Sign([]byte("a-completely-different-secret-00"), jwt.NewClaims("u1", 3600))
