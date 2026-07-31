@@ -160,7 +160,7 @@ func getUserByEmail(db *orm.DB, cache *userCache, email string) (user.User, erro
 	return *u, nil
 }
 
-func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
+func updateUser(db *orm.DB, cache *userCache, id, name, phone, area string) error {
 	if cache != nil {
 		cache.Delete(id)
 	}
@@ -172,6 +172,7 @@ func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
 	u := results[0]
 	u.Name = name
 	u.Phone = phone
+	u.Area = area
 	return db.Update(u, orm.Eq(user.User_.Id, u.Id))
 }
 

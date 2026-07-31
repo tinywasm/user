@@ -3,7 +3,7 @@ PLAN: "satisfy platformd.Identity — expose the logged-in user to the shell"
 TAG: v0.1.0
 EXECUTOR: pending
 REVIEWER: none
-STATUS: running
+STATUS: completed
 SESSION: 14909466989555226837
 ---
 

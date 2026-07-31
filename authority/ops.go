@@ -26,7 +26,18 @@ func (m *Module) opMe(ctx router.Context) {
 		ctx.WriteStatus(404)
 		return
 	}
-	profile := user.ProfileDTO{Id: u.Id, Name: u.Name, Email: u.Email}
+	var area string
+	if u.Area != "" {
+		area = u.Area
+	} else if len(u.Roles) > 0 {
+		area = u.Roles[0].Name
+	}
+	profile := user.ProfileDTO{
+		Id:    u.Id,
+		Name:  u.Name,
+		Email: u.Email,
+		Area:  area,
+	}
 	for _, r := range u.Roles {
 		profile.Roles = append(profile.Roles, r.Code)
 	}
@@ -58,12 +69,20 @@ func (m *Module) opUpsertUser(ctx router.Context) {
 		return
 	}
 	if u.Id == "" {
-		if _, err := createUser(m.db, m.ids, u.Email, u.Name, u.Phone); err != nil {
+		created, err := createUser(m.db, m.ids, u.Email, u.Name, u.Phone)
+		if err != nil {
 			ctx.WriteStatus(500)
+			return
+		}
+		if u.Area != "" {
+			if err := updateUser(m.db, m.ucache, created.Id, created.Name, created.Phone, u.Area); err != nil {
+				ctx.WriteStatus(500)
+				return
+			}
 		}
 		return
 	}
-	if err := updateUser(m.db, m.ucache, u.Id, u.Name, u.Phone); err != nil {
+	if err := updateUser(m.db, m.ucache, u.Id, u.Name, u.Phone, u.Area); err != nil {
 		ctx.WriteStatus(500)
 	}
 }

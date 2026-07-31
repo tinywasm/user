@@ -124,4 +124,20 @@ type SessionRepo interface {
 	GetSession(id string) (Session, error)
 	DeleteSession(id string) error
 }
+
+---
+
+## Logged-in Identity & User Area (`platformd.Identity` integration)
+
+To satisfy the frontend app chassis shell contract (`github.com/tinywasm/layout/platformd.Identity`), the user module provides:
+
+1. **`ShellProfile`**: A lightweight, read-only representation of the authenticated session that compiles successfully under `GOOS=js GOARCH=wasm` (as it has no dependency on backend routes, router, or orm).
+   - `UserName() string`: returns the user's name.
+   - `UserArea() string`: returns the user's active department, tenant, or role.
+2. **`Area` Field on `UserModel`**: A persistent text field in the user database.
+3. **Fallback Resolution for `UserArea()`**:
+   - If the user's explicit `Area` column is populated, it is used directly.
+   - If `Area` is empty, it falls back to the display `Name` of the user's first assigned `Role`.
+   - If the user has no roles and `Area` is empty, it defaults to `""`.
+4. **`ProfileDTO.Shell()`**: A simple converter method that transforms the DTO into the shape the frontend shell expects, separating wire-level JSON serialization from the presentation interface.
 ```

@@ -250,6 +250,7 @@ type ProfileDTO struct {
 	Name        string
 	Email       string
 	Avatar      string
+	Area        string
 	Roles       []string
 	Permissions []string // "resource:actions" pairs, e.g. "service_catalog:rc"
 	Locale      string
@@ -260,6 +261,7 @@ func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
 	w.String("name", p.Name)
 	w.String("email", p.Email)
 	w.String("avatar", p.Avatar)
+	w.String("area", p.Area)
 	w.String("locale", p.Locale)
 	aw := w.Array("roles", len(p.Roles))
 	for _, r := range p.Roles {
@@ -280,6 +282,7 @@ func (p *ProfileDTO) DecodeFields(r model.FieldReader) {
 	p.Name, _ = r.String("name")
 	p.Email, _ = r.String("email")
 	p.Avatar, _ = r.String("avatar")
+	p.Area, _ = r.String("area")
 	p.Locale, _ = r.String("locale")
 	if ar, ok := r.Array("roles"); ok {
 		p.Roles = make([]string, ar.Len())
@@ -292,5 +295,26 @@ func (p *ProfileDTO) DecodeFields(r model.FieldReader) {
 		for i := 0; i < ap.Len(); i++ {
 			p.Permissions[i] = ap.String(i)
 		}
+	}
+}
+
+// ShellProfile is the read-only view of a session that an application shell
+// renders. It satisfies the layout platformd.Identity interface if declared by the shell.
+//
+// NOT to be confused with Identity in this package, which is the ORM row tying
+// a user to an auth provider.
+type ShellProfile struct {
+	Name string
+	Area string
+}
+
+func (p ShellProfile) UserName() string { return p.Name }
+func (p ShellProfile) UserArea() string { return p.Area }
+
+// Shell converts a profile into the shape an application shell renders.
+func (p ProfileDTO) Shell() ShellProfile {
+	return ShellProfile{
+		Name: p.Name,
+		Area: p.Area,
 	}
 }

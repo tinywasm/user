@@ -21,13 +21,23 @@ func (h *userCRUD) ValidateData(action model.Action, _ any) error { return nil }
 
 func (h *userCRUD) Create(payload any) (any, error) {
 	u := payload.(user.User)
-	return createUser(h.db, h.ids, u.Email, u.Name, u.Phone)
+	created, err := createUser(h.db, h.ids, u.Email, u.Name, u.Phone)
+	if err != nil {
+		return nil, err
+	}
+	if u.Area != "" {
+		err = updateUser(h.db, h.cache, created.Id, created.Name, created.Phone, u.Area)
+		if err == nil {
+			created.Area = u.Area
+		}
+	}
+	return created, err
 }
 func (h *userCRUD) Read(id string) (any, error) { return getUser(h.db, h.cache, id) }
 func (h *userCRUD) List() (any, error)          { return listUsers(h.db) }
 func (h *userCRUD) Update(payload any) (any, error) {
 	u := payload.(user.User)
-	return u, updateUser(h.db, h.cache, u.Id, u.Name, u.Phone)
+	return u, updateUser(h.db, h.cache, u.Id, u.Name, u.Phone, u.Area)
 }
 func (h *userCRUD) Delete(id string) error { return deleteUser(h.db, h.cache, id) }
 
