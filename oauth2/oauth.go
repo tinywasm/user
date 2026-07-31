@@ -116,6 +116,12 @@ func (a *Authenticator) Mount(r router.Router) {
 				_ = a.store.UpsertIdentity(u.Id, providerName, info.ID, info.Email)
 			}
 
+			if info.Avatar != "" {
+				if err := a.store.UpdateUserAvatar(u.Id, info.Avatar); err == nil {
+					u.Avatar = info.Avatar
+				}
+			}
+
 			if err := a.sessions.IssueSession(ctx, u.Id); err != nil {
 				ctx.WriteStatus(500)
 				return

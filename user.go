@@ -58,9 +58,10 @@ func (e *SecurityEvent) EncodeFields(w model.FieldWriter) {
 func (e *SecurityEvent) IsNil() bool { return e == nil }
 
 type OAuthUserInfo struct {
-	ID    string
-	Email string
-	Name  string
+	ID     string
+	Email  string
+	Name   string
+	Avatar string
 }
 
 // OAuthToken is what a provider returns when it exchanges the code. It replaces
@@ -139,6 +140,7 @@ type IdentityStore interface {
 	// reads its bcrypt hash from Identity.ProviderId here.
 	IdentityFor(userID, provider string) (Identity, error)
 	UpsertIdentity(userID, provider, providerID, email string) error
+	UpdateUserAvatar(userID, avatar string) error
 }
 
 // StateStore is the anti-CSRF port the oauth2 mode uses for its one-time state
@@ -251,6 +253,7 @@ type ProfileDTO struct {
 	Email       string
 	Avatar      string
 	Roles       []string
+	RoleNames   []string
 	Permissions []string // "resource:actions" pairs, e.g. "service_catalog:rc"
 	Locale      string
 }
@@ -266,6 +269,11 @@ func (p ProfileDTO) EncodeFields(w model.FieldWriter) {
 		aw.String(r)
 	}
 	aw.Close()
+	awn := w.Array("role_names", len(p.RoleNames))
+	for _, rn := range p.RoleNames {
+		awn.String(rn)
+	}
+	awn.Close()
 	pw := w.Array("permissions", len(p.Permissions))
 	for _, perm := range p.Permissions {
 		pw.String(perm)
@@ -287,10 +295,40 @@ func (p *ProfileDTO) DecodeFields(r model.FieldReader) {
 			p.Roles[i] = ar.String(i)
 		}
 	}
+	if arn, ok := r.Array("role_names"); ok {
+		p.RoleNames = make([]string, arn.Len())
+		for i := 0; i < arn.Len(); i++ {
+			p.RoleNames[i] = arn.String(i)
+		}
+	}
 	if ap, ok := r.Array("permissions"); ok {
 		p.Permissions = make([]string, ap.Len())
 		for i := 0; i < ap.Len(); i++ {
 			p.Permissions[i] = ap.String(i)
 		}
+	}
+}
+
+// ShellProfile is the read-only view of a session that an application shell
+// renders.
+//
+// NOT to be confused with Identity in this package, which is the ORM row tying
+// a user to an auth provider.
+type ShellProfile struct {
+	Name   string
+	Avatar string
+	Roles  []string // display names, never codes
+}
+
+func (p ShellProfile) UserName() string    { return p.Name }
+func (p ShellProfile) UserAvatar() string  { return p.Avatar }
+func (p ShellProfile) UserRoles() []string { return p.Roles }
+
+// Shell converts a profile into the shape an application shell renders.
+func (p ProfileDTO) Shell() ShellProfile {
+	return ShellProfile{
+		Name:   p.Name,
+		Avatar: p.Avatar,
+		Roles:  p.RoleNames,
 	}
 }

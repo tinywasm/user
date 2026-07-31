@@ -54,3 +54,50 @@ The application builds its own login page using `tinywasm/form` and the generate
 f := form.New("login", &user.LoginData{})
 // ... render form and post to user.PathLogin
 ```
+
+---
+
+## Wiring Sessions into layout.Platform (End-to-End Client snippet)
+
+Here is a snippet showing how to fetch the authenticated caller's profile via the `me` RPC/Op and wire it directly into the application chassis shell (`platformd.Platform`) using the `ShellProfile` adapter:
+
+```go
+package client
+
+import (
+	"github.com/tinywasm/layout/platformd"
+	"github.com/tinywasm/view"
+	"github.com/tinywasm/user"
+)
+
+type ShellController struct {
+	caller view.Caller
+	shell  *platformd.Platform
+}
+
+func NewShellController(caller view.Caller) *ShellController {
+	return &ShellController{caller: caller}
+}
+
+func (sc *ShellController) Initialize() {
+	// 1. Query the 'me' operation to fetch current ProfileDTO
+	sc.caller.Call(user.OpMe, nil, &user.ProfileDTO{}, func(err error) {
+		if err != nil {
+			// Handle unauthenticated state (e.g., redirect to login view)
+			return
+		}
+
+		// 2. Wrap ProfileDTO in ShellProfile to satisfy platformd.Identity
+		var profile user.ProfileDTO
+		// ... (assume profile was successfully unmarshaled into sc.profile)
+		shellIdentity := profile.Shell()
+
+		// 3. Inject the identity directly into the platform layout chassis
+		sc.shell = &platformd.Platform{
+			AppName:   "Enterprise Portal",
+			UserBlock: platformd.NewUserBlock(shellIdentity),
+			// ... other configurations
+		}
+	})
+}
+```

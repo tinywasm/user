@@ -125,3 +125,29 @@ type SessionRepo interface {
 	DeleteSession(id string) error
 }
 ```
+
+---
+
+## Roles & Identity Representation in Application Shell
+
+`github.com/tinywasm/user` integrates with application shells (such as `github.com/tinywasm/layout/platformd`) through the `ShellProfile` struct.
+
+### Roles vs RoleNames
+
+To satisfy authorization checks and human rendering simultaneously, user roles are divided into two parallel fields:
+- `Roles` (codes): Holds programmatic uppercase codes (e.g., `["ADMIN", "PRODUCT_MANAGER"]`) used exclusively for access control and permission evaluations.
+- `RoleNames` (names): Holds human-readable display names (e.g., `["Administrator", "Product Manager"]`) rendered inside the UI chrome.
+
+This parallel mapping ensures we never repurpose uppercase permission codes as user interface display values, preventing visual corruption and broken access checks.
+
+### Avatar Representation
+
+The `UserModel` carries an optional `avatar` string column representing the user's avatar URL (populated automatically from OAuth providers such as Google).
+- **Fallback as Normal Behavior:** If a user does not have an avatar set (the field is empty `""`), this is an expected outcome. The application shell is responsible for falling back to standard glyphs or placeholder symbols based on its internal visual theme; the user module remains strictly decoupled from styling decisions.
+
+### Contract Adapter: `ShellProfile`
+
+To map `ProfileDTO` into layout's required `platformd.Identity` interface without dragging UI/layout dependencies into the backend root package, `user.ShellProfile` serves as a dedicated read-only presentation adapter:
+- `UserName() string` mapped to `ProfileDTO.Name`
+- `UserAvatar() string` mapped to `ProfileDTO.Avatar`
+- `UserRoles() []string` mapped to parallel display `ProfileDTO.RoleNames`

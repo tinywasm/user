@@ -26,9 +26,10 @@ func (m *Module) opMe(ctx router.Context) {
 		ctx.WriteStatus(404)
 		return
 	}
-	profile := user.ProfileDTO{Id: u.Id, Name: u.Name, Email: u.Email}
+	profile := user.ProfileDTO{Id: u.Id, Name: u.Name, Email: u.Email, Avatar: u.Avatar}
 	for _, r := range u.Roles {
 		profile.Roles = append(profile.Roles, r.Code)
+		profile.RoleNames = append(profile.RoleNames, r.Name)
 	}
 	profile.Permissions = permissionsOf(u)
 	if err := ctx.Encode(&profile); err != nil {
