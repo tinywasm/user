@@ -16,14 +16,17 @@ contract it declares itself (`platformd/platformd.go`):
 
 ```go
 type Identity interface {
-	UserName() string   // who is logged in
-	UserArea() string   // the area they work in — a department, a tenant, a role
-	UserIcon() svg.Icon // the glyph that stands for them in the collapsed rail
+	UserName() string // who is logged in
+	UserArea() string // the area they work in — a department, a tenant, a role
 }
 ```
 
+It asks for facts and nothing else. The glyph beside the name in the collapsed
+rail belongs to `platformd`, which owns the sprite and the styling; an
+authentication package has no business choosing one.
+
 **This repository does not satisfy it today.** The demo in
-`layout/platformd/web/client.go` mocks it with a three-line stub, and that stub is
+`layout/platformd/web/client.go` mocks it with a two-method stub, and that stub is
 the only implementation that exists. Since `user` is the package a real
 application will authenticate against, the shell should be able to hand it a
 session and get the chrome filled in — not have every consumer write the adapter
@@ -37,22 +40,20 @@ again.
 |---|---|---|
 | `UserName() string` | `Name string` | field, not a method |
 | `UserArea() string` | — | **no such concept anywhere in the package** |
-| `UserIcon() svg.Icon` | `Avatar string` | a URL, not a sprite glyph; and `svg.Icon` is a different type |
 
-Three consequences follow from that table:
+Two consequences follow from that table:
 
 1. **Fields are not methods.** A struct with the right field names still does not
-   satisfy an interface. Either `ProfileDTO` grows the three methods, or a small
+   satisfy an interface. Either `ProfileDTO` grows the two methods, or a small
    adapter type does.
 2. **`area` does not exist.** Not in `UserModel` (`models.go:8-20`), not in
    `ProfileDTO`, not in `RoleModel`. It has to be introduced deliberately — see
    §2, which is the only part of this plan that needs a design decision rather
    than mechanical work.
-3. **`Avatar` and `UserIcon` are different kinds of thing.** `Avatar` is a URL to
-   an image; `UserIcon` is an id into the page's SVG sprite. The shell asks for
-   the second because the collapsed rail is a column of sprite glyphs and a
-   remote image there would be a different visual object at a different load
-   time.
+
+`Avatar` (`user.go:252`) is untouched by this plan. It is a URL to an image and
+the shell does not ask for one; wiring it into the chrome is a separate problem
+with its own loading and fallback behaviour.
 
 ### A naming collision to be careful about
 
@@ -126,29 +127,26 @@ migration; the rest of the plan does not depend on which option wins.
 type ShellProfile struct {
 	Name string
 	Area string
-	Icon svg.Icon
 }
 
-func (p ShellProfile) UserName() string   { return p.Name }
-func (p ShellProfile) UserArea() string   { return p.Area }
-func (p ShellProfile) UserIcon() svg.Icon { return p.Icon }
+func (p ShellProfile) UserName() string { return p.Name }
+func (p ShellProfile) UserArea() string { return p.Area }
 ```
 
 Plus one constructor from what the package already produces:
 
 ```go
 // Shell converts a profile into the shape an application shell renders.
-// fallback is used when the profile carries no icon of its own.
-func (p ProfileDTO) Shell(fallback svg.Icon) ShellProfile
+func (p ProfileDTO) Shell() ShellProfile
 ```
 
 **Do not** make `ProfileDTO` implement the interface directly. It is a wire DTO
 with `EncodeFields`/`DecodeFields`; hanging presentation methods on it couples
 the transport shape to one consumer's chrome, and the next shell will want a
-fourth method.
+third method.
 
-`Icon` has no source in this package yet. Until avatars are resolved (out of
-scope here), `Shell` returns the fallback the caller passes.
+`ShellProfile` carries no styling of any kind, which is the point: it is two
+strings the shell is free to render however it likes.
 
 ## 4. Acceptance criteria
 
@@ -165,8 +163,7 @@ Each is checkable.
    a backend auth package importing a UI package. If it is, drop the assertion
    and put the equivalent one in `layout` instead, or in `user/tests`, which
    already exists as a separate module. Decide this explicitly and record why.
-3. `ProfileDTO.Shell(fallback)` round-trips: name and area survive, and an empty
-   icon yields the fallback.
+3. `ProfileDTO.Shell()` round-trips: name and area survive.
 4. Whichever `area` option §2 lands on is documented in `docs/ARCHITECTURE.md`,
    including what fills it and what an empty value means.
 5. `docs/SKILL.md` gains a snippet showing a consumer wiring a session into a
@@ -176,8 +173,9 @@ Each is checkable.
 
 ## 5. Out of scope
 
-- Avatar images. `UserIcon` is a sprite glyph; resolving a remote avatar into one
-  is a separate problem with its own loading and fallback behaviour.
+- Avatar images. `ProfileDTO.Avatar` stays where it is; the shell asks for no
+  imagery, and rendering one would be a separate problem with its own loading
+  and fallback behaviour.
 - Any change to `platformd`. The contract is already published and the demo
   already mocks it; this plan makes the real package fit the contract, not the
   contract fit the package.
