@@ -1,6 +1,8 @@
 ---
 PLAN: "satisfy platformd.Identity — expose the logged-in user to the shell"
 TAG: v0.3.0
+STATUS: running
+SESSION: 4415263291472933684
 ---
 
 # Plan — `user`: expose the logged-in identity to the application shell
