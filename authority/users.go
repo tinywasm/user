@@ -175,6 +175,20 @@ func updateUser(db *orm.DB, cache *userCache, id, name, phone string) error {
 	return db.Update(u, orm.Eq(user.User_.Id, u.Id))
 }
 
+func updateUserAvatar(db *orm.DB, cache *userCache, id, avatar string) error {
+	if cache != nil {
+		cache.Delete(id)
+	}
+	qb := db.Query(&user.User{}).Where(user.User_.Id).Eq(id)
+	results, err := user.ReadAllUser(qb)
+	if err != nil || len(results) == 0 {
+		return user.ErrNotFound
+	}
+	u := results[0]
+	u.Avatar = avatar
+	return db.Update(u, orm.Eq(user.User_.Id, u.Id))
+}
+
 func suspendUser(db *orm.DB, cache *userCache, id string) error {
 	if cache != nil {
 		cache.Delete(id)

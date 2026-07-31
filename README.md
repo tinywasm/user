@@ -21,7 +21,7 @@ In `v0.2.0`, the system has been refactored to make `authority` a pure orchestra
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — What & Why: schema, contracts, design principles
 - [docs/SKILL.md](docs/SKILL.md) — API contract, configuration, and usage snippets
-- [docs/PLAN.md](docs/PLAN.md) — pending: satisfy `platformd.Identity` so an application shell can render the logged-in user
+- [docs/LAST_PLAN_EXECUTED.md](docs/LAST_PLAN_EXECUTED.md) — Historical executed implementation plans
 
 ---
 

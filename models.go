@@ -13,6 +13,7 @@ var UserModel = model.Definition{
 		{Name: "name", Type: input.Text()},
 		{Name: "phone", Type: input.Phone()},
 		{Name: "status", Type: model.Text()},
+		{Name: "avatar", Type: model.Text()},
 		{Name: "created_at", Type: model.Int()},
 		{Name: "roles", Type: model.StructSlice(&RoleModel), Exclude: true},
 		{Name: "permissions", Type: model.StructSlice(&PermissionModel), Exclude: true},

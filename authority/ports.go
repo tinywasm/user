@@ -32,6 +32,9 @@ func (m *Module) IdentityFor(userID, provider string) (user.Identity, error) {
 func (m *Module) UpsertIdentity(userID, provider, providerID, email string) error {
 	return upsertIdentity(m.db, m.ids, userID, provider, providerID, email)
 }
+func (m *Module) UpdateUserAvatar(userID, avatar string) error {
+	return updateUserAvatar(m.db, m.ucache, userID, avatar)
+}
 
 func (m *Module) CreateState(provider string) (string, error) {
 	state := m.ids.NewID()

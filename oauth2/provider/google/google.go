@@ -42,9 +42,10 @@ func (p *GoogleProvider) ExchangeCode(code string) (user.OAuthToken, error) {
 }
 
 type googleData struct {
-	ID    string
-	Email string
-	Name  string
+	ID      string
+	Email   string
+	Name    string
+	Picture string
 }
 
 func (d *googleData) EncodeFields(w model.FieldWriter) {}
@@ -53,6 +54,7 @@ func (d *googleData) DecodeFields(r model.FieldReader) {
 	d.ID, _ = r.String("id")
 	d.Email, _ = r.String("email")
 	d.Name, _ = r.String("name")
+	d.Picture, _ = r.String("picture")
 }
 
 func (p *GoogleProvider) GetUserInfo(token user.OAuthToken) (user.OAuthUserInfo, error) {
@@ -78,9 +80,10 @@ func (p *GoogleProvider) GetUserInfo(token user.OAuthToken) (user.OAuthUserInfo,
 				return
 			}
 			res = user.OAuthUserInfo{
-				ID:    data.ID,
-				Email: data.Email,
-				Name:  data.Name,
+				ID:     data.ID,
+				Email:  data.Email,
+				Name:   data.Name,
+				Avatar: data.Picture,
 			}
 		})
 
