@@ -1,10 +1,6 @@
 ---
 PLAN: "satisfy platformd.Identity — expose the logged-in user to the shell"
-TAG: v0.1.0
-EXECUTOR: pending
-REVIEWER: none
-STATUS: running
-SESSION: 14909466989555226837
+TAG: v0.3.0
 ---
 
 # Plan — `user`: expose the logged-in identity to the application shell
@@ -17,14 +13,19 @@ contract it declares itself (`platformd/platformd.go`):
 
 ```go
 type Identity interface {
-	UserName() string // who is logged in
-	UserArea() string // the area they work in — a department, a tenant, a role
+	UserName() string    // who is logged in
+	UserAvatar() string  // URL of their picture; empty is normal
+	UserRoles() []string // display names, not authorization codes
 }
 ```
 
-It asks for facts and nothing else. The glyph beside the name in the collapsed
-rail belongs to `platformd`, which owns the sprite and the styling; an
-authentication package has no business choosing one.
+It asks for facts and nothing else. The glyph drawn when there is no avatar
+belongs to `platformd`, which owns the sprite and the styling; an authentication
+package has no business choosing one.
+
+**Roles, plural, because they are plural here.** An earlier draft of this plan
+asked for a singular `area` and claimed the concept was missing. That was wrong
+on both counts — see §0.
 
 **This repository does not satisfy it today.** The demo in
 `layout/platformd/web/client.go` mocks it with a two-method stub, and that stub is
@@ -33,28 +34,33 @@ application will authenticate against, the shell should be able to hand it a
 session and get the chrome filled in — not have every consumer write the adapter
 again.
 
+## 0. What an earlier draft got wrong
+
+Recorded so nobody re-derives it:
+
+- It said **"`area` does not exist and has to be introduced"** and offered three
+  ways to derive it. `area` was the wrong concept. What exists is **roles**, and
+  the shell now asks for those. §2 of that draft is gone; there is no pending
+  design decision.
+- It listed **§1 "check whether the package builds for wasm"** as work.
+  Already checked: `GOOS=js GOARCH=wasm go build ./...` **passes clean** across
+  all nine packages. No split, no `shell` subpackage.
+- It put **`Avatar` out of scope**. It is back in scope — the contract asks for
+  it — and it is worse than a gap: it is a **dead field** (§3).
+
 ### What is missing, precisely
 
-`ProfileDTO` (`user.go:248-262`) is the closest thing and it is close:
+`ProfileDTO` (`user.go:247-256`) is the closest thing:
 
 | Contract wants | `ProfileDTO` has | Gap |
 |---|---|---|
 | `UserName() string` | `Name string` | field, not a method |
-| `UserArea() string` | — | **no such concept anywhere in the package** |
+| `UserRoles() []string` | `Roles []string` | holds **codes**, not display names |
+| `UserAvatar() string` | `Avatar string` | **never populated by anything** |
 
-Two consequences follow from that table:
-
-1. **Fields are not methods.** A struct with the right field names still does not
-   satisfy an interface. Either `ProfileDTO` grows the two methods, or a small
-   adapter type does.
-2. **`area` does not exist.** Not in `UserModel` (`models.go:8-20`), not in
-   `ProfileDTO`, not in `RoleModel`. It has to be introduced deliberately — see
-   §2, which is the only part of this plan that needs a design decision rather
-   than mechanical work.
-
-`Avatar` (`user.go:252`) is untouched by this plan. It is a URL to an image and
-the shell does not ask for one; wiring it into the chrome is a separate problem
-with its own loading and fallback behaviour.
+**Fields are not methods.** A struct with the right field names still does not
+satisfy an interface. Either `ProfileDTO` grows the three methods, or a small
+adapter type does — §4 argues for the adapter.
 
 ### A naming collision to be careful about
 
@@ -67,57 +73,79 @@ saying which is which.
 
 ---
 
-## 1. Where the implementation belongs
+## 1. Roles are already here, and they are N:M
 
-`platformd` runs in the browser. Whatever satisfies the contract must therefore
-compile under `GOOS=js GOARCH=wasm` and must not drag `router`, `orm` or the
-storage ports in with it.
+Nothing to introduce. What exists, verified:
 
-Check first, before writing anything:
+- `user_role` (`models.go:56-62`) is a join table with a **composite primary
+  key** on `user_id` + `role_id`. Uniqueness is on the pair, so one user holds
+  many rows.
+- `UserModel.roles` is a `model.StructSlice`, generating `Roles []Role`
+  (`models_orm.go:18`).
+- `AssignRole` swallows duplicate-key violations and `GetUserRoles` returns a
+  slice (`authority/rbac.go:108-163`).
 
+Two facts that shape the work:
+
+**`User.Roles` is `Exclude: true`** (`models.go:17`), so it never crosses the
+wire and the ORM never reads or writes it. Exactly one function fills it:
+`hydrateUser` (`authority/users.go:34-101`), server-side, with a four-step
+fan-out. A `User` decoded from a payload always has `Roles == nil`.
+
+**There is no primary, current or active role.** No ordering, no rank, no flag;
+`HasPermission` is a flat OR over the union of every role's permissions
+(`authority/rbac.go:230-258`). This is why the shell shows roles only inside its
+menu and never picks one to display at rest — there is nothing to pick.
+
+## 2. `Roles` holds codes, and the shell wants names
+
+`ProfileDTO.Roles` is filled in exactly one place, `authority/ops.go:29-33`:
+
+```go
+for _, r := range u.Roles {
+	profile.Roles = append(profile.Roles, r.Code)
+}
 ```
-GOOS=js GOARCH=wasm go build github.com/tinywasm/user
+
+`r.Code`, not `r.Name`. Consumers use those codes to **authorize**.
+
+**Do not repurpose the field.** Changing it to names would silently break every
+authorization check reading it. Add display names alongside:
+
+```go
+RoleNames []string // parallel to Roles; r.Name, for humans
 ```
 
-`ProfileDTO` itself only touches `model.FieldWriter`/`FieldReader`, so it is
-probably already clean — but `user.go` also declares `Config`, `Authenticator`
-and every port interface in the same file, and those reach `router`. **If the
-package does not build for wasm, do not force it**: put the shell-facing type in
-its own file with no backend imports, or in a `user/shell` subpackage. Report
-which of the two the build forced, with the error, rather than choosing silently.
+filled in the same loop. `ShellProfile` reads `RoleNames`; nothing else changes.
 
-## 2. `area` — the one design decision
+⚠️ The bootstrap seed makes code and name coincide for one role
+(`authority/bootstrap.go:48-49` passes the same `RoleCode` as both). **Do not
+take that as licence to use one for the other** — it is an accident of the seed,
+and `GetRoleByCode` (`rbac.go:185-195`) is the only place the two are meant to
+meet.
 
-The contract's `UserArea()` is "the area they work in — a department, a tenant, a
-role". This package has roles (`RoleModel`, `models.go:45-53`) and nothing else
-resembling it.
+## 3. `Avatar` is a dead field
 
-Three candidates, in the order I would try them:
+`ProfileDTO.Avatar` (`user.go:252`) is declared, encoded and decoded, and
+**nothing ever assigns it**. `opMe` builds `ProfileDTO{Id, Name, Email}` and
+leaves it `""`. There is no `avatar` column on `UserModel` and the OAuth identity
+mapping does not carry one, though the providers return a picture URL
+(`OAuthUserInfo`, `user.go:60`).
 
-**(a) Derive it from the primary role.** No schema change: `UserArea()` returns
-the display `Name` of the user's first role, or `""` when they have none.
-Cheapest, and truthful for an application whose "area" really is the role.
-Weakness: a user with several roles has no defined primary one, so the answer
-depends on row order.
+Satisfying `UserAvatar()` is therefore real work, not wiring:
 
-**(b) A new `area` field on `UserModel`.** One `model.Text()` field, one
-migration, and `ProfileDTO` carries it through. Unambiguous and independent of
-roles. Weakness: every existing deployment gains a column that starts empty, and
-something has to decide who fills it.
+1. An `avatar` field on `UserModel` (`model.Text()`), plus the migration.
+2. Populate it from `OAuthUserInfo` where the provider supplies one.
+3. Carry it in `opMe`.
 
-**(c) Leave it to the consumer.** The adapter takes the area as a constructor
-argument and this package never stores it.
+An empty avatar is a **normal, expected outcome** — the shell falls back to its
+own glyph — so none of this blocks the contract being satisfied. Ship the type
+first, fill the column second.
 
-**Recommendation: (b), with (a) as the fallback when the field is empty.** An
-area and a role are different things — a person can be an administrator *of*
-Operations — and conflating them now is the kind of shortcut that is expensive to
-unpick once data exists. The fallback keeps existing deployments rendering
-something sensible on day one.
+`Locale` (`user.go:255`) is in the same dead state. Out of scope; noted so the
+next reader does not assume it works.
 
-**Do not decide this alone.** Confirm with the maintainer before writing the
-migration; the rest of the plan does not depend on which option wins.
-
-## 3. The type
+## 4. The type
 
 ```go
 // ShellProfile is the read-only view of a session that an application shell
@@ -126,12 +154,14 @@ migration; the rest of the plan does not depend on which option wins.
 // NOT to be confused with Identity in this package, which is the ORM row tying
 // a user to an auth provider.
 type ShellProfile struct {
-	Name string
-	Area string
+	Name   string
+	Avatar string
+	Roles  []string // display names, never codes
 }
 
-func (p ShellProfile) UserName() string { return p.Name }
-func (p ShellProfile) UserArea() string { return p.Area }
+func (p ShellProfile) UserName() string    { return p.Name }
+func (p ShellProfile) UserAvatar() string  { return p.Avatar }
+func (p ShellProfile) UserRoles() []string { return p.Roles }
 ```
 
 Plus one constructor from what the package already produces:
@@ -144,18 +174,17 @@ func (p ProfileDTO) Shell() ShellProfile
 **Do not** make `ProfileDTO` implement the interface directly. It is a wire DTO
 with `EncodeFields`/`DecodeFields`; hanging presentation methods on it couples
 the transport shape to one consumer's chrome, and the next shell will want a
-third method.
+fourth method.
 
-`ShellProfile` carries no styling of any kind, which is the point: it is two
-strings the shell is free to render however it likes.
+`ShellProfile` carries no styling of any kind, which is the point: it is facts
+the shell is free to render however it likes.
 
 ## 4. Acceptance criteria
 
 Each is checkable.
 
-1. `GOOS=js GOARCH=wasm go build github.com/tinywasm/user/...` succeeds, and the
-   package holding `ShellProfile` does not import `router` or `orm` —
-   `go list -deps` proves it.
+1. `GOOS=js GOARCH=wasm go build ./...` still succeeds. It already does today —
+   this is a regression guard, not an investigation.
 2. A compile-time assertion exists and is exercised by a test:
    ```go
    var _ platformd.Identity = ShellProfile{}
@@ -164,9 +193,10 @@ Each is checkable.
    a backend auth package importing a UI package. If it is, drop the assertion
    and put the equivalent one in `layout` instead, or in `user/tests`, which
    already exists as a separate module. Decide this explicitly and record why.
-3. `ProfileDTO.Shell()` round-trips: name and area survive.
-4. Whichever `area` option §2 lands on is documented in `docs/ARCHITECTURE.md`,
-   including what fills it and what an empty value means.
+3. `ProfileDTO.Shell()` round-trips: name, avatar and role NAMES survive, and
+   `Roles` (the codes) is left untouched.
+4. `docs/ARCHITECTURE.md` records that `Roles` are codes and `RoleNames` are
+   labels, and that an empty avatar is expected rather than an error.
 5. `docs/SKILL.md` gains a snippet showing a consumer wiring a session into a
    platform shell end to end.
 6. `README.md` re-indexes every file under `docs/`.
@@ -174,11 +204,13 @@ Each is checkable.
 
 ## 5. Out of scope
 
-- Avatar images. `ProfileDTO.Avatar` stays where it is; the shell asks for no
-  imagery, and rendering one would be a separate problem with its own loading
-  and fallback behaviour.
+- Rendering the avatar. Producing the URL is §3; what a shell does with it —
+  loading, sizing, failure — is the shell's problem, and `platformd` already
+  falls back to its own glyph.
+- `ProfileDTO.Locale`, dead in the same way as `Avatar` was.
 - Any change to `platformd`. The contract is already published and the demo
   already mocks it; this plan makes the real package fit the contract, not the
   contract fit the package.
-- Multi-tenant area switching. Reading the current area is this plan; letting a
-  user change it is a feature with its own UI.
+- Multi-tenant scoping. RBAC here is global — there is no department, tenant or
+  organisation in any model — and introducing one is a schema project, not a
+  contract adapter.
