@@ -29,7 +29,7 @@ require (
 	github.com/tinywasm/base64 v0.0.3 // indirect
 	github.com/tinywasm/crypto v0.0.20 // indirect
 	github.com/tinywasm/ddl v0.0.4 // indirect
-	github.com/tinywasm/dom v0.11.4 // indirect
+	github.com/tinywasm/dom v0.13.5 // indirect
 	github.com/tinywasm/fmt v0.25.5 // indirect
 	github.com/tinywasm/sqlt v0.0.8 // indirect
 	github.com/tinywasm/storage v0.0.2 // indirect
