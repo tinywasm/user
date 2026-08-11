@@ -4,7 +4,7 @@ go 1.25.2
 
 require (
 	github.com/tinywasm/events v0.0.2
-	github.com/tinywasm/form v0.3.27
+	github.com/tinywasm/form v0.3.28
 	github.com/tinywasm/json v0.5.17
 	github.com/tinywasm/jwt v0.1.1
 	github.com/tinywasm/model v0.1.2
@@ -31,6 +31,7 @@ require (
 	github.com/tinywasm/ddl v0.0.4 // indirect
 	github.com/tinywasm/dom v0.13.5 // indirect
 	github.com/tinywasm/fmt v0.25.5 // indirect
+	github.com/tinywasm/input v0.0.2 // indirect
 	github.com/tinywasm/sqlt v0.0.8 // indirect
 	github.com/tinywasm/storage v0.0.2 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
