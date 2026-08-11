@@ -8,7 +8,7 @@ require (
 	github.com/tinywasm/json v0.5.17
 	github.com/tinywasm/jwt v0.1.1
 	github.com/tinywasm/model v0.1.4
-	github.com/tinywasm/orm v0.11.4
+	github.com/tinywasm/orm v0.11.6
 	github.com/tinywasm/router v0.1.15
 	github.com/tinywasm/server v0.2.35
 	github.com/tinywasm/sqlite v0.3.0
