@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	twctx "github.com/tinywasm/context"
+	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/mcp"
@@ -17,6 +18,15 @@ import (
 	"github.com/tinywasm/user/authority"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// testIDGen is the composition-root double for model.IDGenerator — form never
+// constructs its own generator, so even wiring tests inject one.
+type testIDGen struct{ n int }
+
+func (g *testIDGen) NewID() string {
+	g.n++
+	return "test-id-" + fmt.Convert(g.n).String()
+}
 
 func TestProductionWiring(t *testing.T) {
 	authority.PasswordHashCost = bcrypt.MinCost
@@ -32,7 +42,7 @@ func TestProductionWiring(t *testing.T) {
 // login page over user.LoginData and posting to user.PathLogin: the
 // rendered HTML must expose the field names the handler expects.
 func testConsumerViewSSR(t *testing.T) {
-	f, err := form.New("login", &user.LoginData{})
+	f, err := form.New("login", &user.LoginData{}, &testIDGen{})
 	if err != nil {
 		t.Fatalf("form.New failed: %v", err)
 	}
@@ -61,7 +71,7 @@ func testWidgets(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		_, err := form.New("test", tc.data)
+		_, err := form.New("test", tc.data, &testIDGen{})
 		if err != nil {
 			t.Fatalf("%s: form.New failed: %v", tc.name, err)
 		}
