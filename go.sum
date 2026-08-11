@@ -26,7 +26,7 @@ github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f h1:pUgAGvJFbNcB
 github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f/go.mod h1:mF48cBANp2vWkgj2EbpurNY5QY4fYqpCTwbNaaLM5Ic=
 github.com/tinywasm/time v0.5.0 h1:M17DNgKrMYfkCK42V6miL9AcwfN/FHghbKOSTXJrkMo=
 github.com/tinywasm/time v0.5.0/go.mod h1:vxGAkKA40im4ObiTS6hcsJYiIsVVLSz/A63JC/+TwvA=
-github.com/tinywasm/view v0.1.13 h1:8zGNVGIg7RvNWkeieHNm1bu2jsbCHM6HH9jpwVpVjOA=
-github.com/tinywasm/view v0.1.13/go.mod h1:kWRy9lSqjsgulsVEIjgYjjQA/WlFhEAr+jfDLx70X+A=
+github.com/tinywasm/view v0.1.15 h1:KYS4V0GNiywSeGN9s2quxUqdjLuA7MOAMpyJFhZpfrw=
+github.com/tinywasm/view v0.1.15/go.mod h1:RO8XMWT/urjaW0xF4YjQvgyPsn+Qoy14wONrrz4jUks=
 golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
 golang.org/x/crypto v0.54.0/go.mod h1:KWL8ny2AZdGR2cWmzeHrp2azQPGogOv+HeQaVEXC2dk=
