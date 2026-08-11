@@ -5,7 +5,7 @@ package user
 import (
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/form/input"
+	"github.com/tinywasm/input"
 )
 
 type User struct {
@@ -893,3 +893,4 @@ func (s *PasswordDataList) DecodeFields(_ model.FieldReader) {}
 func (m *PasswordData) Validate(action byte) error {
 	return model.ValidateFields(action, m)
 }
+
