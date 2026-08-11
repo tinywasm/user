@@ -31,7 +31,7 @@ func TestProductionWiring(t *testing.T) {
 // login page over user.LoginData and posting to user.PathLogin: the
 // rendered HTML must expose the field names the handler expects.
 func testConsumerViewSSR(t *testing.T) {
-	f, err := form.New("login", &user.LoginData{})
+	f, err := form.New("login", &user.LoginData{}, testIDs)
 	if err != nil {
 		t.Fatalf("form.New failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func testWidgets(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		_, err := form.New("test", tc.data)
+		_, err := form.New("test", tc.data, testIDs)
 		if err != nil {
 			t.Fatalf("%s: form.New failed: %v", tc.name, err)
 		}
