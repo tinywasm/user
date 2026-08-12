@@ -27,8 +27,6 @@ github.com/tinywasm/events v0.0.2 h1:v9aQnj06ZGXcYVrkdAzDFXTYO5Dv4J8t13IBJNZVDg4
 github.com/tinywasm/events v0.0.2/go.mod h1:ybWdxV/2Vjru9SmT0Oa7O07K/Y7KtxB3f7Z72wt50Ao=
 github.com/tinywasm/fmt v0.25.5 h1:2nBU5H1lszhkGIusm7m4S+rGM2rPiIJkhvQqwqN17qo=
 github.com/tinywasm/fmt v0.25.5/go.mod h1:2Y4hlsQxqVsZ5z9vQL5XQbEzLQtQOr1Bhp44nPGfydA=
-github.com/tinywasm/form v0.3.28 h1:Ko8ZAXugdSyHmLlwnoXLBs6ehN3bgLG4mOLVdLvm/zY=
-github.com/tinywasm/form v0.3.28/go.mod h1:+zoiuosaWpOMXDzKTG5xnjBgJmLpIelM3gTp51SSRu0=
 github.com/tinywasm/form v0.3.29 h1:3gbh6nQRERPUB0RdY0+fT9GnWGZPUEr26pv6zQQEBRQ=
 github.com/tinywasm/form v0.3.29/go.mod h1:aGkpLWX0YJOPfCtma+Oc9GR2QACPBoDfT9BoMiECLDw=
 github.com/tinywasm/input v0.0.2 h1:ZGgXxCAHk7eiRWIU0hqN42xMGPxPlEumZY+YjSzNrTA=
@@ -57,8 +55,8 @@ github.com/tinywasm/unixid v0.2.26 h1:eU5VLSegyf9Np6dtbQssI5MVkU914cZyfTI4KnmAyO
 github.com/tinywasm/unixid v0.2.26/go.mod h1:wh1FAR4GDFpPoVcMiUQH2VYsIdxByEN44Rge3vTCo7k=
 github.com/tinywasm/view v0.1.15 h1:KYS4V0GNiywSeGN9s2quxUqdjLuA7MOAMpyJFhZpfrw=
 github.com/tinywasm/view v0.1.15/go.mod h1:RO8XMWT/urjaW0xF4YjQvgyPsn+Qoy14wONrrz4jUks=
-github.com/tinywasm/widget v0.6.6 h1:wWioBf+wCv3LSm7nF5NueAC0kM5pRO5vh1zbTOGJLvE=
-github.com/tinywasm/widget v0.6.6/go.mod h1:GOzkKd027O244d0MeYItQ2IJ8ehinM5Cb/Oq75pbnSY=
+github.com/tinywasm/widget v0.6.8 h1:X5o5SYOrq2zwnYo1MFoqRoO5V+WeWK8DQjNBAWoZM+A=
+github.com/tinywasm/widget v0.6.8/go.mod h1:9a8z690oyLv02SAF41nK1IIw3Cg9KHvBL1Escq8ELDQ=
 golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
 golang.org/x/crypto v0.54.0/go.mod h1:KWL8ny2AZdGR2cWmzeHrp2azQPGogOv+HeQaVEXC2dk=
 golang.org/x/mod v0.37.0 h1:vF1DjpVEshcIqoEaauuHebaLk1O1forxjxBaVn884JQ=
