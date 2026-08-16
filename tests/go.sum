@@ -55,8 +55,8 @@ github.com/tinywasm/unixid v0.2.26 h1:eU5VLSegyf9Np6dtbQssI5MVkU914cZyfTI4KnmAyO
 github.com/tinywasm/unixid v0.2.26/go.mod h1:wh1FAR4GDFpPoVcMiUQH2VYsIdxByEN44Rge3vTCo7k=
 github.com/tinywasm/view v0.1.15 h1:KYS4V0GNiywSeGN9s2quxUqdjLuA7MOAMpyJFhZpfrw=
 github.com/tinywasm/view v0.1.15/go.mod h1:RO8XMWT/urjaW0xF4YjQvgyPsn+Qoy14wONrrz4jUks=
-github.com/tinywasm/widget v0.6.9 h1:4IbdpEEuacIL2/ywKyWlgFUo9UgWb+dm/Fow7IP9mqc=
-github.com/tinywasm/widget v0.6.9/go.mod h1:vo28dejXTMTZ5WjvowIa72Xxuf75QtqSG14NC1wgLHA=
+github.com/tinywasm/widget v0.6.10 h1:nR+AcqRhW5TCYMwpwMZuDP1J118qoMdgKrHoeh6zqkQ=
+github.com/tinywasm/widget v0.6.10/go.mod h1:vo28dejXTMTZ5WjvowIa72Xxuf75QtqSG14NC1wgLHA=
 golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
 golang.org/x/crypto v0.54.0/go.mod h1:KWL8ny2AZdGR2cWmzeHrp2azQPGogOv+HeQaVEXC2dk=
 golang.org/x/mod v0.37.0 h1:vF1DjpVEshcIqoEaauuHebaLk1O1forxjxBaVn884JQ=

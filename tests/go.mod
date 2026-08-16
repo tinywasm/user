@@ -35,7 +35,7 @@ require (
 	github.com/tinywasm/sqlt v0.0.8 // indirect
 	github.com/tinywasm/storage v0.0.2 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
-	github.com/tinywasm/widget v0.6.9 // indirect
+	github.com/tinywasm/widget v0.6.10 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
