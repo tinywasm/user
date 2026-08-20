@@ -30,7 +30,7 @@ require (
 	github.com/tinywasm/crypto v0.0.20 // indirect
 	github.com/tinywasm/ddl v0.0.4 // indirect
 	github.com/tinywasm/dom v0.13.5 // indirect
-	github.com/tinywasm/fmt v0.25.5 // indirect
+	github.com/tinywasm/fmt v0.25.6 // indirect
 	github.com/tinywasm/input v0.0.2 // indirect
 	github.com/tinywasm/sqlt v0.0.8 // indirect
 	github.com/tinywasm/storage v0.0.2 // indirect
