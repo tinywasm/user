@@ -26,7 +26,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/smallstep/truststore v0.13.0 // indirect
-	github.com/tinywasm/base64 v0.0.3 // indirect
+	github.com/tinywasm/base64 v0.0.5 // indirect
 	github.com/tinywasm/crypto v0.0.20 // indirect
 	github.com/tinywasm/ddl v0.0.4 // indirect
 	github.com/tinywasm/dom v0.13.5 // indirect
