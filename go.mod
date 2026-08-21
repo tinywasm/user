@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	github.com/tinywasm/base64 v0.0.3 // indirect
+	github.com/tinywasm/base64 v0.0.5 // indirect
 	github.com/tinywasm/crypto v0.0.20 // indirect
 	github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f // indirect
 )

@@ -1,5 +1,5 @@
-github.com/tinywasm/base64 v0.0.3 h1:tFjQv8L4eUpA6eKBk9UVtcVc6+xL/GvqDVFEdTudAdw=
-github.com/tinywasm/base64 v0.0.3/go.mod h1:p6s8iOD4F6s6smO80R3bYd8ZGZQxXCBt+5KxFQ4vCHU=
+github.com/tinywasm/base64 v0.0.5 h1:OuRGCuJrUzqo15jtotxs9PKL0mLuZmRHL6heUFaZZE4=
+github.com/tinywasm/base64 v0.0.5/go.mod h1:p6s8iOD4F6s6smO80R3bYd8ZGZQxXCBt+5KxFQ4vCHU=
 github.com/tinywasm/crypto v0.0.20 h1:+HRwnFIHIrUgzbPmXzLFVAEpS/Njo7JQNYjtD3ANkI0=
 github.com/tinywasm/crypto v0.0.20/go.mod h1:lI2lsqDtvnmdyLW/u83L4JvY18s/nvTTh8LMZBueXLg=
 github.com/tinywasm/ddl v0.0.4 h1:2xgDb87vpY35nyLIttoW4Pvgi+TXVjkXw7+pj0/RjWM=
