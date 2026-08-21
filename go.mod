@@ -6,9 +6,9 @@ require (
 	github.com/tinywasm/ddl v0.0.4
 	github.com/tinywasm/events v0.0.2
 	github.com/tinywasm/fetch v0.1.24
-	github.com/tinywasm/fmt v0.25.5
+	github.com/tinywasm/fmt v0.25.7
 	github.com/tinywasm/input v0.0.2
-	github.com/tinywasm/json v0.5.17
+	github.com/tinywasm/json v0.5.21
 	github.com/tinywasm/jwt v0.1.1
 	github.com/tinywasm/model v0.1.4
 	github.com/tinywasm/orm v0.11.6
