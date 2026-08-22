@@ -54,7 +54,7 @@ func (s *Strategy) Issue(ctx router.Context, userID string) error {
 		return err
 	}
 	if s.bearer {
-		return router.Encode(ctx, &tokenResponse{Token: token})
+		return ctx.Encode(&tokenResponse{Token: token})
 	}
 	ctx.SetCookie(router.Cookie{
 		Name: s.cookieName, Value: token, HttpOnly: true, Secure: true,
