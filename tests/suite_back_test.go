@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tinywasm/crypto/bcrypt"
 	tinyjwt "github.com/tinywasm/jwt"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/router"
@@ -17,7 +18,6 @@ import (
 	"github.com/tinywasm/user/oauth2"
 	jwt "github.com/tinywasm/user/session/jwt"
 	trustedip "github.com/tinywasm/user/trusted_ip"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func newTestDB(t *testing.T) *orm.DB {

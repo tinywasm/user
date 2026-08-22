@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tinywasm/crypto/bcrypt"
 	"github.com/tinywasm/form"
 	"github.com/tinywasm/json"
 	"github.com/tinywasm/model"
@@ -14,7 +15,6 @@ import (
 	"github.com/tinywasm/user"
 	"github.com/tinywasm/user/authority"
 	emailpassword "github.com/tinywasm/user/email_password"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func TestProductionWiring(t *testing.T) {

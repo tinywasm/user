@@ -4,7 +4,7 @@ import (
 	"github.com/tinywasm/router"
 	"github.com/tinywasm/user"
 
-	"golang.org/x/crypto/bcrypt"
+	"github.com/tinywasm/crypto/bcrypt"
 )
 
 type Authenticator struct {
