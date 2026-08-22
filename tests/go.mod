@@ -6,7 +6,7 @@ require (
 	github.com/tinywasm/events v0.0.2
 	github.com/tinywasm/form v0.3.29
 	github.com/tinywasm/json v0.5.21
-	github.com/tinywasm/jwt v0.1.1
+	github.com/tinywasm/jwt v0.1.15
 	github.com/tinywasm/model v0.1.4
 	github.com/tinywasm/orm v0.11.6
 	github.com/tinywasm/router v0.1.22
@@ -27,7 +27,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/smallstep/truststore v0.13.0 // indirect
 	github.com/tinywasm/base64 v0.0.5 // indirect
-	github.com/tinywasm/crypto v0.0.24 // indirect
+	github.com/tinywasm/crypto v0.0.25 // indirect
 	github.com/tinywasm/ddl v0.0.4 // indirect
 	github.com/tinywasm/dom v0.13.5 // indirect
 	github.com/tinywasm/fmt v0.25.7 // indirect
