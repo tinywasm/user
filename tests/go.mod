@@ -15,7 +15,7 @@ require (
 	github.com/tinywasm/unixid v0.2.26
 	github.com/tinywasm/user v0.3.5
 	github.com/tinywasm/view v0.1.15
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.55.0
 	modernc.org/sqlite v1.54.0
 )
 
@@ -27,7 +27,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/smallstep/truststore v0.13.0 // indirect
 	github.com/tinywasm/base64 v0.0.5 // indirect
-	github.com/tinywasm/crypto v0.0.20 // indirect
+	github.com/tinywasm/crypto v0.0.24 // indirect
 	github.com/tinywasm/ddl v0.0.4 // indirect
 	github.com/tinywasm/dom v0.13.5 // indirect
 	github.com/tinywasm/fmt v0.25.7 // indirect
@@ -36,9 +36,9 @@ require (
 	github.com/tinywasm/storage v0.0.2 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	github.com/tinywasm/widget v0.6.12 // indirect
-	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	howett.net/plist v1.0.0 // indirect
 	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
