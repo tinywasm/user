@@ -15,11 +15,11 @@ require (
 	github.com/tinywasm/router v0.1.15
 	github.com/tinywasm/time v0.5.0
 	github.com/tinywasm/view v0.1.15
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.55.0
 )
 
 require (
 	github.com/tinywasm/base64 v0.0.5 // indirect
-	github.com/tinywasm/crypto v0.0.20 // indirect
+	github.com/tinywasm/crypto v0.0.24 // indirect
 	github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f // indirect
 )
