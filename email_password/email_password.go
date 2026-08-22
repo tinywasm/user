@@ -45,7 +45,7 @@ func (a *Authenticator) Mount(r router.Router) {
 	r.Post(user.PathLogin, func(ctx router.Context) {
 		ip := user.ClientIP(ctx, a.trustProxy)
 		data := &user.LoginData{}
-		if err := ctx.Decode(data); err != nil {
+		if err := router.Decode(ctx, data); err != nil {
 			ctx.WriteStatus(400)
 			ctx.Write([]byte(err.Error()))
 			return

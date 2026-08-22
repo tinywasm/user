@@ -32,7 +32,7 @@ func (m *Module) opMe(ctx router.Context) {
 		profile.RoleNames = append(profile.RoleNames, r.Name)
 	}
 	profile.Permissions = permissionsOf(u)
-	if err := ctx.Encode(&profile); err != nil {
+	if err := router.Encode(ctx, &profile); err != nil {
 		ctx.WriteStatus(500)
 	}
 }
@@ -47,14 +47,14 @@ func (m *Module) opListUsers(ctx router.Context) {
 	for i := range us {
 		list = append(list, &us[i])
 	}
-	if err := ctx.Encode(&list); err != nil {
+	if err := router.Encode(ctx, &list); err != nil {
 		ctx.WriteStatus(500)
 	}
 }
 
 func (m *Module) opUpsertUser(ctx router.Context) {
 	var u user.User
-	if err := ctx.Decode(&u); err != nil {
+	if err := router.Decode(ctx, &u); err != nil {
 		ctx.WriteStatus(400)
 		return
 	}
@@ -71,7 +71,7 @@ func (m *Module) opUpsertUser(ctx router.Context) {
 
 func (m *Module) opDeleteUser(ctx router.Context) {
 	var u user.User
-	if err := ctx.Decode(&u); err != nil {
+	if err := router.Decode(ctx, &u); err != nil {
 		ctx.WriteStatus(400)
 		return
 	}

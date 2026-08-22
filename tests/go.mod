@@ -6,16 +6,16 @@ require (
 	github.com/tinywasm/crypto v0.0.25
 	github.com/tinywasm/events v0.0.2
 	github.com/tinywasm/form v0.3.29
-	github.com/tinywasm/json v0.5.21
+	github.com/tinywasm/json v0.5.22
 	github.com/tinywasm/jwt v0.1.15
 	github.com/tinywasm/model v0.1.6
-	github.com/tinywasm/orm v0.11.8
-	github.com/tinywasm/router v0.1.25
+	github.com/tinywasm/orm v0.11.9
+	github.com/tinywasm/router v0.1.26
 	github.com/tinywasm/server v0.2.39
 	github.com/tinywasm/sqlite v0.3.0
 	github.com/tinywasm/unixid v0.2.26
-	github.com/tinywasm/user v0.3.7
-	github.com/tinywasm/view v0.1.20
+	github.com/tinywasm/user v0.3.8
+	github.com/tinywasm/view v0.1.21
 	modernc.org/sqlite v1.54.0
 )
 

@@ -105,9 +105,9 @@ func ReadOneUser(qb *orm.QB, model *User) (*User, error) {
 
 func ReadAllUser(qb *orm.QB) (UserList, error) {
 	var results UserList
-	err := qb.ReadAll(
-		func() model.Model { return &User{} },
-		func(m model.Model) { results = append(results, m.(*User)) },
+	err := orm.ReadAll(qb,
+		func() *User { return &User{} },
+		func(m *User) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -188,9 +188,9 @@ func ReadOneSession(qb *orm.QB, model *Session) (*Session, error) {
 
 func ReadAllSession(qb *orm.QB) (SessionList, error) {
 	var results SessionList
-	err := qb.ReadAll(
-		func() model.Model { return &Session{} },
-		func(m model.Model) { results = append(results, m.(*Session)) },
+	err := orm.ReadAll(qb,
+		func() *Session { return &Session{} },
+		func(m *Session) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -277,9 +277,9 @@ func ReadOneIdentity(qb *orm.QB, model *Identity) (*Identity, error) {
 
 func ReadAllIdentity(qb *orm.QB) (IdentityList, error) {
 	var results IdentityList
-	err := qb.ReadAll(
-		func() model.Model { return &Identity{} },
-		func(m model.Model) { results = append(results, m.(*Identity)) },
+	err := orm.ReadAll(qb,
+		func() *Identity { return &Identity{} },
+		func(m *Identity) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -356,9 +356,9 @@ func ReadOneRole(qb *orm.QB, model *Role) (*Role, error) {
 
 func ReadAllRole(qb *orm.QB) (RoleList, error) {
 	var results RoleList
-	err := qb.ReadAll(
-		func() model.Model { return &Role{} },
-		func(m model.Model) { results = append(results, m.(*Role)) },
+	err := orm.ReadAll(qb,
+		func() *Role { return &Role{} },
+		func(m *Role) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -419,9 +419,9 @@ func ReadOneUserRole(qb *orm.QB, model *UserRole) (*UserRole, error) {
 
 func ReadAllUserRole(qb *orm.QB) (UserRoleList, error) {
 	var results UserRoleList
-	err := qb.ReadAll(
-		func() model.Model { return &UserRole{} },
-		func(m model.Model) { results = append(results, m.(*UserRole)) },
+	err := orm.ReadAll(qb,
+		func() *UserRole { return &UserRole{} },
+		func(m *UserRole) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -499,9 +499,9 @@ func ReadOnePermission(qb *orm.QB, model *Permission) (*Permission, error) {
 
 func ReadAllPermission(qb *orm.QB) (PermissionList, error) {
 	var results PermissionList
-	err := qb.ReadAll(
-		func() model.Model { return &Permission{} },
-		func(m model.Model) { results = append(results, m.(*Permission)) },
+	err := orm.ReadAll(qb,
+		func() *Permission { return &Permission{} },
+		func(m *Permission) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -562,9 +562,9 @@ func ReadOneRolePermission(qb *orm.QB, model *RolePermission) (*RolePermission, 
 
 func ReadAllRolePermission(qb *orm.QB) (RolePermissionList, error) {
 	var results RolePermissionList
-	err := qb.ReadAll(
-		func() model.Model { return &RolePermission{} },
-		func(m model.Model) { results = append(results, m.(*RolePermission)) },
+	err := orm.ReadAll(qb,
+		func() *RolePermission { return &RolePermission{} },
+		func(m *RolePermission) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -647,9 +647,9 @@ func ReadOneLANIP(qb *orm.QB, model *LANIP) (*LANIP, error) {
 
 func ReadAllLANIP(qb *orm.QB) (LANIPList, error) {
 	var results LANIPList
-	err := qb.ReadAll(
-		func() model.Model { return &LANIP{} },
-		func(m model.Model) { results = append(results, m.(*LANIP)) },
+	err := orm.ReadAll(qb,
+		func() *LANIP { return &LANIP{} },
+		func(m *LANIP) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -726,9 +726,9 @@ func ReadOneOAuthState(qb *orm.QB, model *OAuthState) (*OAuthState, error) {
 
 func ReadAllOAuthState(qb *orm.QB) (OAuthStateList, error) {
 	var results OAuthStateList
-	err := qb.ReadAll(
-		func() model.Model { return &OAuthState{} },
-		func(m model.Model) { results = append(results, m.(*OAuthState)) },
+	err := orm.ReadAll(qb,
+		func() *OAuthState { return &OAuthState{} },
+		func(m *OAuthState) { results = append(results, m) },
 	)
 	return results, err
 }
