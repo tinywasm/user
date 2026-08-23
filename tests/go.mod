@@ -14,7 +14,7 @@ require (
 	github.com/tinywasm/server v0.2.39
 	github.com/tinywasm/sqlite v0.3.0
 	github.com/tinywasm/unixid v0.2.26
-	github.com/tinywasm/user v0.3.9
+	github.com/tinywasm/user v0.3.10
 	github.com/tinywasm/view v0.1.22
 	modernc.org/sqlite v1.54.0
 )
