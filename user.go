@@ -233,7 +233,24 @@ const (
 	PathLogin      = "/login"
 	PathLogout     = "/logout"
 	PathAfterLogin = "/"
+
+	// PathOAuthPrefix es la raiz bajo la que oauth2.Authenticator monta sus
+	// rutas. Es la unica definicion de esa cadena en el repositorio.
+	PathOAuthPrefix = "/oauth/"
 )
+
+// PathOAuthStart devuelve la ruta que inicia el intercambio OAuth2 con el
+// proveedor indicado. Un consumidor enlaza aqui su boton de "iniciar sesion".
+func PathOAuthStart(provider string) string {
+	return PathOAuthPrefix + provider
+}
+
+// PathOAuthCallback devuelve la ruta a la que el proveedor redirige de vuelta.
+// Es el valor que se registra como URI de redireccion en la consola del
+// proveedor, precedido del dominio publico de la aplicacion.
+func PathOAuthCallback(provider string) string {
+	return PathOAuthPrefix + "callback/" + provider
+}
 
 // TopicSecurity is the events topic every SecurityEvent is published on.
 const TopicSecurity = "user.security"

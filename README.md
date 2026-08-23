@@ -162,7 +162,7 @@ m, err := authority.New(db, user.Config{IDs: ids})
 gProv := &google.GoogleProvider{
 	ClientID:     "your-google-client-id",
 	ClientSecret: "your-google-client-secret",
-	RedirectURL:  "https://miapp.cl/oauth/callback/google",
+	RedirectURL:  "https://miapp.cl" + user.PathOAuthCallback(google.ProviderName),
 }
 
 // Construct independent OAuth2 authenticator
@@ -234,7 +234,7 @@ UPDATE identity SET provider = 'trusted_ip'    WHERE provider = 'lan';
 
 `tinywasm/user` handles authentication flows, while views belong to the consumer.
 
-1. **Mount API**: Call `m.MountAPI(router)` to publish standard authentication routes (`POST /login`, `POST /logout`, `/oauth/:provider`).
+1. **Mount API**: Call `m.MountAPI(router)` to publish standard authentication routes (`POST /login`, `POST /logout`, `user.PathOAuthStart(provider)`, `user.PathOAuthCallback(provider)`).
 2. **Bootstrap**: Call `m.Bootstrap(Seed)` on startup to ensure a first user and their initial role/permissions exist.
 3. **Consumer Views**: The application builds its own login page using `form.New(&user.LoginData{})` and posts to `user.PathLogin` using JSON.
 4. **Protect Routes**: Inject `m.Authenticate()` (middleware) and `m.Can` (authorization) into your host router.

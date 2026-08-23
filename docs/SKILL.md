@@ -30,7 +30,8 @@ type Config struct {
 func New(db *orm.DB, cfg Config) (*Module, error)
 
 // MountAPI registers:
-// POST /login, POST /logout, GET /oauth/:provider, GET /oauth/callback/:provider
+// POST /login (user.PathLogin), POST /logout (user.PathLogout),
+// GET user.PathOAuthStart(provider), GET user.PathOAuthCallback(provider)
 func (m *Module) MountAPI(r router.Router)
 
 func (m *Module) Bootstrap(s Seed) error
@@ -46,6 +47,11 @@ func (m *Module) Can(userID string, resource model.Resource, action model.Action
 ```
 
 ## Consumer Integration
+
+| Quiero… | Uso |
+|---|---|
+| enlazar el botón de login social | `user.PathOAuthStart(google.ProviderName)` |
+| registrar la URI de redirección en el proveedor | dominio público + `user.PathOAuthCallback(google.ProviderName)` |
 
 The application builds its own login page using `tinywasm/form` and the generated `user.LoginData` struct:
 

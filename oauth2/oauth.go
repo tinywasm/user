@@ -46,7 +46,7 @@ func (a *Authenticator) Mount(r router.Router) {
 	for _, p := range a.providers {
 		providerName := p.Name()
 
-		r.Get("/oauth/"+providerName, func(ctx router.Context) {
+		r.Get(user.PathOAuthStart(providerName), func(ctx router.Context) {
 			state, err := a.states.CreateState(providerName)
 			if err != nil {
 				ctx.WriteStatus(500)
@@ -56,7 +56,7 @@ func (a *Authenticator) Mount(r router.Router) {
 			ctx.WriteStatus(302)
 		}).Public()
 
-		r.Get("/oauth/callback/"+providerName, func(ctx router.Context) {
+		r.Get(user.PathOAuthCallback(providerName), func(ctx router.Context) {
 			var state, code string
 			path := ctx.Path()
 			if fmt.Contains(path, "?") {
