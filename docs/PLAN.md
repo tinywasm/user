@@ -2,8 +2,9 @@
 PLAN: "feat: exportar las rutas de OAuth2 para que el consumidor no las duplique"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 612294461273881843
+PR: https://github.com/tinywasm/user/pull/23
 ---
 
 > Este plan se despacha con el flujo CodeJob. Ver skill: agents-workflow.
