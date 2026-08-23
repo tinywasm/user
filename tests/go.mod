@@ -29,6 +29,7 @@ require (
 	github.com/tinywasm/base64 v0.0.5 // indirect
 	github.com/tinywasm/ddl v0.0.11 // indirect
 	github.com/tinywasm/dom v0.13.5 // indirect
+	github.com/tinywasm/fetch v0.1.27 // indirect
 	github.com/tinywasm/fmt v0.25.7 // indirect
 	github.com/tinywasm/input v0.0.5 // indirect
 	github.com/tinywasm/sqlt v0.0.8 // indirect

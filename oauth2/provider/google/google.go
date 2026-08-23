@@ -12,6 +12,10 @@ const (
 	googleTokenURL = "https://oauth2.googleapis.com/token"
 )
 
+// ProviderName identifica a este proveedor en las rutas y en el almacen de
+// estado. Un consumidor lo usa con user.PathOAuthStart / PathOAuthCallback.
+const ProviderName = "google"
+
 type GoogleProvider struct {
 	ClientID     string
 	ClientSecret string
@@ -19,7 +23,7 @@ type GoogleProvider struct {
 }
 
 func (p *GoogleProvider) Name() string {
-	return "google"
+	return ProviderName
 }
 
 func (p *GoogleProvider) config() user.OAuthConfig {

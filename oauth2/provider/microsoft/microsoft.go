@@ -13,6 +13,10 @@ const (
 	msTokenURL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 )
 
+// ProviderName identifica a este proveedor en las rutas y en el almacen de
+// estado. Un consumidor lo usa con user.PathOAuthStart / PathOAuthCallback.
+const ProviderName = "microsoft"
+
 type MicrosoftProvider struct {
 	ClientID     string
 	ClientSecret string
@@ -20,7 +24,7 @@ type MicrosoftProvider struct {
 }
 
 func (p *MicrosoftProvider) Name() string {
-	return "microsoft"
+	return ProviderName
 }
 
 func (p *MicrosoftProvider) config() user.OAuthConfig {
