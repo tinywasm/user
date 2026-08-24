@@ -1,7 +1,0 @@
-package authority
-
-import "github.com/tinywasm/user"
-
-func (m *Module) GetUserByEmail(email string) (user.User, error) {
-	return getUserByEmail(m.db, m.ucache, email)
-}

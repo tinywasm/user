@@ -1,153 +1,65 @@
 # Architecture
 
-`tinywasm/user` manages user entities, login credentials, authentication, sessions, and RBAC.
+`tinywasm/user` is the stable, lightweight identity contract for the TinyWasm
+ecosystem. It contains only value types needed to pass an authenticated identity
+across transport boundaries. Authentication, sessions, OAuth providers, and
+authorization live in sibling libraries.
 
-In `v0.2.0`, the system has been refactored to make `authority` a pure orchestrator, decoupling authentication modes into completely independent, injectable components.
-
----
-
-## Package Structure
-
-```
-user/                        raíz (wasm-safe): modelos, contratos, puertos, vista, consts
-├── session/
-│   ├── cookie/               package cookie  — sesión con ID opaco en cookie HttpOnly (default)
-│   └── jwt/                  package jwt     — sesión stateless firmada (cookie o Bearer)
-├── email_password/           package emailpassword — modo credencial email+contraseña COMPLETO
-├── trusted_ip/                package trustedip     — modo RUT + IP preregistrada COMPLETO
-├── oauth2/                    package oauth2  — modo OAuth COMPLETO
-│   └── provider/{google,microsoft}/   sin cambios — ya están correctamente aislados
-└── authority/                 orquestador PURO: repos (users/identities/sessions/state),
-                               RBAC, CRUD admin, migrate, bootstrap, middleware neutral
-```
-
----
-
-## Core Principles
-
-- **Pure Orchestrator:** The `authority` package does not contain concrete authentication algorithms or handle routes for specific login methods. Instead, it defines clean, domain-specific ports and coordinates database persistence, RBAC, and neutral middlewares.
-- **Injectable Authentication Modes:** All login mechanics (email/password, Chilean RUT + IP trust, OAuth2) are fully self-contained packages. They register their own HTTP routes onto the router and ask the authority orchestrator for only the ports they need.
-- **Pluggable Session Strategies:** Sessions are managed by `SessionStrategy` implementations. By default, stateful cookie-based sessions are used, but they can be swapped for stateless JWT-based strategies.
-- **Multiple Identities Per User:** A user can have `0..N` identities registered (one per login mode). The application enables `1..N` login modes; enabling `oauth2` does not force all users to connect via Google, nor does it prevent using `email_password` for others on the same application.
-
----
-
-## Component Flow & Composition
+## Dependency Graph
 
 ```mermaid
-flowchart LR
-    App["App (composition root)"] -->|"authority.New(db, cfg)"| M[authority.Module]
-    App -->|"session/jwt.New(...) o cookie por defecto"| S[SessionStrategy]
-    App -->|"m.SetStrategy(S)"| M
-    App -->|"email_password.New(m, m, m)"| EP[email_password.Authenticator]
-    App -->|"trusted_ip.New(m, m, m, m, true)"| TI[trusted_ip.Authenticator]
-    App -->|"oauth2.New(m, m, m, providers)"| OA[oauth2.Authenticator]
-    App -->|"m.Enable(EP, TI, OA)"| M
-    M -->|"MountAPI(r): logout + cada Mount(r)"| R[router.Router]
+flowchart TD
+    U[github.com/tinywasm/user<br/>stable Subject values only] --> A[github.com/tinywasm/auth<br/>authentication + sessions]
+    U --> R[github.com/tinywasm/rbac<br/>roles + permissions]
+    A --> C[application composition root]
+    R --> C
 ```
 
----
+One-way rules:
 
-## Core Contracts & Ports
+- `user` depends only on the minimal shared TinyWasm value packages required to
+  transport `Subject`. It imports neither `auth`, `rbac`, `orm`, `fetch`, `jwt`,
+  nor any concrete provider.
+- `auth` imports `user` and may depend on its own persistence/runtime
+  dependencies. It never imports `rbac`.
+- `rbac` imports `user` and may depend on its own persistence/runtime
+  dependencies. It never imports `auth`.
+- Only the application composition root imports both `auth` and `rbac`. It wires
+  the narrow ports between them.
+- No compatibility packages remain at
+  `github.com/tinywasm/user/{authority,oauth2,email_password,trusted_ip,session}`.
 
-The root package `github.com/tinywasm/user` defines the core interfaces used for decoupling:
+## Retained Public Contract
+
+The root package exports exactly two domain values. It is not a service or
+adapter package:
 
 ```go
-// Authenticator is one login mode. It owns its HTTP routes completely — authority
-// never inspects, duplicates, or knows the shape of what it mounts.
-type Authenticator interface {
-	Name() string
-	Mount(r router.Router)
-}
+type SubjectID string
 
-// SessionStrategy is how identity survives across requests after a successful
-// login. authority holds exactly one (default: session/cookie); the consumer may
-// swap it via Module.SetStrategy before mounting. Implementations: session/cookie,
-// session/jwt.
-type SessionStrategy interface {
-	Issue(ctx router.Context, userID string) error       // starts a session, writes the credential onto ctx's response
-	Identify(ctx router.Context) (userID string, err error) // reads the incoming credential; "" only alongside a non-nil err
-	Revoke(ctx router.Context) error                      // ends the session named by ctx's incoming credential
-}
-
-// --- Ports a mode receives at construction. It asks for ONLY the ones it needs —
-// none of these is a "god interface"; authority implements all of them, a mode
-// never sees *authority.Module itself. ---
-
-// SessionIssuer lets a mode start a session after verifying credentials, without
-// knowing whether the app carries it in a cookie or a signed JWT.
-type SessionIssuer interface {
-	IssueSession(ctx router.Context, userID string) error
-}
-
-// IdentityStore is the persistence port a mode uses to resolve or register the
-// domain User/Identity behind a credential. A mode never queries *orm.DB itself.
-type IdentityStore interface {
-	UserByID(id string) (User, error)
-	UserByEmail(email string) (User, error)
-	CreateUser(email, name, phone string) (User, error)
-	// IdentityByProvider finds who owns a (provider, providerID) pair — an OAuth
-	// (provider name, external subject) or a trusted_ip (provider="trusted_ip",
-	// the normalized RUT).
-	IdentityByProvider(provider, providerID string) (Identity, error)
-	// IdentityFor returns userID's identity row for provider — e.g. email_password
-	// reads its bcrypt hash from Identity.ProviderId here.
-	IdentityFor(userID, provider string) (Identity, error)
-	UpsertIdentity(userID, provider, providerID, email string) error
-}
-
-// StateStore is the anti-CSRF port the oauth2 mode uses for its one-time state
-// token. authority owns the oauth_state table; a mode never touches it directly.
-type StateStore interface {
-	CreateState(provider string) (state string, err error)
-	ConsumeState(state, provider string) error // single-use: deletes on read, validates provider+expiry
-}
-
-// TrustedIPStore is the read-only port the trusted_ip mode uses to check whether
-// a request's IP is on userID's allowlist. Kept separate from IdentityStore
-// because an allowed IP is not a login credential — it's an authorization check
-// applied AFTER the RUT already identified the user.
-type TrustedIPStore interface {
-	IsTrustedIP(userID, ip string) bool
-}
-
-// SecurityNotifier lets a mode report a SecurityEvent without knowing whether
-// anything is subscribed.
-type SecurityNotifier interface {
-	Notify(e SecurityEvent)
-}
-
-// SessionRepo is the storage port a SessionStrategy uses to persist stateful
-// sessions. authority.Module implements it with its own table + cache.
-type SessionRepo interface {
-	CreateSession(userID, ip, userAgent string) (Session, error)
-	GetSession(id string) (Session, error)
-	DeleteSession(id string) error
+type Subject struct {
+    ID     SubjectID
+    Email  string
+    Name   string
+    Avatar string
 }
 ```
 
----
+`SubjectID` is the only cross-library reference to a signed-in person.
+`auth` owns resolving and creating `Subject`; `rbac` stores and evaluates
+assignments by `SubjectID`; applications display a `Subject` returned by `auth`.
 
-## Roles & Identity Representation in Application Shell
+The root may contain value-only encoding helpers required to pass `Subject`
+across the TinyWasm typed transport. It contains no router route,
+authentication interface, session interface, OAuth type, persistence port, error
+value, model definition, CRUD presenter, event topic, or policy.
 
-`github.com/tinywasm/user` integrates with application shells (such as `github.com/tinywasm/layout/platformd`) through the `ShellProfile` struct.
+## Design Principles
 
-### Roles vs RoleNames
-
-To satisfy authorization checks and human rendering simultaneously, user roles are divided into two parallel fields:
-- `Roles` (codes): Holds programmatic uppercase codes (e.g., `["ADMIN", "PRODUCT_MANAGER"]`) used exclusively for access control and permission evaluations.
-- `RoleNames` (names): Holds human-readable display names (e.g., `["Administrator", "Product Manager"]`) rendered inside the UI chrome.
-
-This parallel mapping ensures we never repurpose uppercase permission codes as user interface display values, preventing visual corruption and broken access checks.
-
-### Avatar Representation
-
-The `UserModel` carries an optional `avatar` string column representing the user's avatar URL (populated automatically from OAuth providers such as Google).
-- **Fallback as Normal Behavior:** If a user does not have an avatar set (the field is empty `""`), this is an expected outcome. The application shell is responsible for falling back to standard glyphs or placeholder symbols based on its internal visual theme; the user module remains strictly decoupled from styling decisions.
-
-### Contract Adapter: `ShellProfile`
-
-To map `ProfileDTO` into layout's required `platformd.Identity` interface without dragging UI/layout dependencies into the backend root package, `user.ShellProfile` serves as a dedicated read-only presentation adapter:
-- `UserName() string` mapped to `ProfileDTO.Name`
-- `UserAvatar() string` mapped to `ProfileDTO.Avatar`
-- `UserRoles() []string` mapped to parallel display `ProfileDTO.RoleNames`
+- **WASM-safe**: no Go standard-library dependency in code reachable from
+  WASM/TinyGo. Uses `github.com/tinywasm/fmt` where needed.
+- **Typed and explicit**: subject identity has one representation.
+- **Narrow ports**: sibling libraries receive interfaces they need, never a
+  concrete sibling module or database handle merely to reach another service.
+- **Every repeated string is a package constant** in the owning module. The root
+  defines none.
